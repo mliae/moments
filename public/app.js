@@ -67,6 +67,7 @@
     ai_bot_avatar: "🤖",
     ai_text_model: "",
     qq_nick_apis: "",
+    site_icon: "",
   };
 
   const state = {
@@ -1242,9 +1243,20 @@
     </div>`;
   }
 
+  /** 站点图标值 → favicon href（与后端 src/index.ts 的 iconToHref 保持一致） */
+  function iconToHref(v) {
+    const val = String(v || "").trim();
+    if (/^https?:\/\//i.test(val)) return val;
+    const emoji = val || "✍️";
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${emoji}</text></svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  }
+
   /** 把站点设置应用到顶栏品牌名 / 导航文字 / 文档标题 */
   function applySettings() {
     const s = state.settings;
+    const iconLink = document.querySelector('link[rel="icon"]');
+    if (iconLink) iconLink.href = iconToHref(s.site_icon);
     document.querySelector(".brand-name").textContent = s.site_title;
     document.querySelector('[data-route="feed"]').textContent = s.nav_feeds_name;
     document.title = s.site_title;
@@ -3649,6 +3661,15 @@
           <div class="field-hint" data-avatar-preview="brand_avatar" style="margin-top:.4rem">${/^https?:\/\//i.test(s.brand_avatar || "") ? `<img src="${esc(s.brand_avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
         </div>
         <div class="field">
+          <label>站点图标（favicon）<br /><small style="color:var(--anzhiyu-secondtext)">emoji（如 ✨）或图片 URL，也可点"上传"选本地图片；留空=默认 ✍️</small></label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input name="site_icon" maxlength="300" value="${esc(s.site_icon)}" placeholder="✨ 或 https://...，留空=默认 ✍️" style="flex:1" />
+            <button type="button" class="btn" data-avatar-upload="site_icon">上传</button>
+            <input type="file" accept="image/*" data-avatar-file="site_icon" hidden />
+          </div>
+          <div class="field-hint" data-avatar-preview="site_icon" style="margin-top:.4rem">${/^https?:\/\//i.test(s.site_icon || "") ? `<img src="${esc(s.site_icon)}" alt="" style="width:48px;height:48px;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
+        </div>
+        <div class="field">
           <label>说说作者昵称<br /><small style="color:var(--anzhiyu-secondtext)">卡片左上角昵称；未设置作者头像时，头像显示昵称首字符</small></label>
           <input name="author_name" maxlength="32" value="${esc(s.author_name)}" />
         </div>
@@ -3755,7 +3776,7 @@
     // 头像类字段上传 + URL 实时预览
     const avatarPreviewHtml = url =>
       `<img src="${esc(url)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />`;
-    ["brand_avatar", "author_avatar", "post_avatar"].forEach(field => {
+    ["brand_avatar", "author_avatar", "post_avatar", "site_icon"].forEach(field => {
       const btn = panel.querySelector(`[data-avatar-upload="${field}"]`);
       if (!btn) return;
       const fileInp = panel.querySelector(`[data-avatar-file="${field}"]`);
@@ -5948,7 +5969,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;

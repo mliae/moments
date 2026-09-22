@@ -234,17 +234,31 @@ async function getIndexHtml(c: Context<HonoEnv>): Promise<string> {
 
 const TITLE_TAG = "<title>Moments</title>";
 const DESC_TAG = '<meta name="description" content="朋友圈式轻博客：图文动态与文章" />';
+const ICON_TAG =
+  '<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Ctext y=\'.9em\' font-size=\'90\'%3E%E2%9C%8D%EF%B8%8F%3C/text%3E%3C/svg%3E" />';
 const HEAD_MARK = "<!--SSR_HEAD-->";
 const APP_MARK = '<main id="app" class="page-main"></main>';
 
-function serveSsr(
+/** 站点图标值 → favicon href：URL 直接用；emoji 转 SVG data URI；空=默认 ✍️ */
+function iconToHref(v: string): string {
+  const val = String(v || "").trim();
+  if (/^https?:\/\//i.test(val)) return val;
+  const emoji = val || "✍️";
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${emoji}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+async function serveSsr(
   c: Context<HonoEnv>,
   html: string,
   opts: { title: string; description: string; head: string; body?: string; status?: number }
 ) {
+  // 首屏无闪烁：SSR 时把 favicon 替换为后台配置的站点图标
+  const s = await getSettings(c.env.DB);
   const out = html
     .replace(TITLE_TAG, () => `<title>${opts.title}</title>`)
     .replace(DESC_TAG, () => `<meta name="description" content="${opts.description}" />`)
+    .replace(ICON_TAG, () => `<link rel="icon" href="${iconToHref(s.site_icon)}" />`)
     .replace(HEAD_MARK, () => opts.head)
     .replace(APP_MARK, () => `<main id="app" class="page-main">${opts.body ?? ""}</main>`);
   return c.html(out, (opts.status ?? 200) as 200, {

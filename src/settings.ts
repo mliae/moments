@@ -47,6 +47,7 @@ export interface SiteSettings {
   qq_nick_apis: string; // QQ 昵称 API 列表，每行一条：URL 模板（{qq} 占位）|解析方式。留空=内置默认列表
   // 安全
   admin_path: string; // 后台秘密入口路径（/admin 或 /sys-xxxx），不通过公开 API 下发
+  site_icon: string; // 站点图标（favicon）：图片 URL 或 emoji；空=默认 ✍️
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -82,6 +83,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   ai_text_model: "",
   qq_nick_apis: "",
   admin_path: "/admin",
+  site_icon: "",
 };
 
 /** 字符串字段约束：最大长度 */
@@ -113,6 +115,7 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   ai_text_model: 100,
   qq_nick_apis: 2000,
   admin_path: 40,
+  site_icon: 300,
 };
 
 /**
