@@ -1,0 +1,60 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "moments",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  // 一键部署：默认启用 workers.dev 子域名；自定义域名请在 Cloudflare
+  // Dashboard → Workers & Pages → moments → Settings → Domains & Routes 绑定
+  // （Dashboard 绑定的自定义域名不受部署影响，不会被此处覆盖）
+  "workers_dev": true,
+  // 静态前端（含 vendor）：命中静态文件直接由 assets 服务，其余请求落到 Worker
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // 这些路径先进 Worker：HTML 做 SSR，API/媒体走动态处理；
+    // 注意 run_worker_first 是白名单语义，未列出的动态路径必须显式包含
+    "run_worker_first": [
+      "/",
+      "/posts",
+      "/post/*",
+      "/photos",
+      "/admin",
+      "/sys-*",
+      "/robots.txt",
+      "/sitemap.xml",
+      "/rss.xml",
+      "/api/*",
+      "/media/*",
+      "/imgproxy"
+    ]
+  },
+  // 自动资源 provisioning（wrangler 4.45+，2025-10-24 起 open beta）：
+  // 省略 database_id，部署时按 database_name 自动创建/复用 D1，并在 Worker
+  // 启动后由 ensureSchema() 在首次请求时检测并建表（migrations/ 仍保留供
+  // wrangler d1 migrations apply 命令使用，二者幂等不冲突）
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "moments-db",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // R2 桶同样按 bucket_name 自动创建；如已存在则复用
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "moments-storage"
+    }
+  ],
+  // Cloudflare Workers AI：评论区 @AI 机器人回复（免费额度内的 @cf/* 托管模型）
+  "ai": {
+    "binding": "AI"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "SITE_NAME": "Moments"
+  }
+}

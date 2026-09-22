@@ -1,0 +1,28 @@
+{
+  "name": "moments",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "朋友圈式轻博客：图文/短视频动态流 + Markdown 文章（Cloudflare Workers + D1 + R2）",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 migrations apply moments-db --local",
+    "db:remote": "wrangler d1 migrations apply moments-db --remote",
+    "typecheck": "tsc --noEmit",
+    "vendor": "node scripts/fetch-vendor.mjs"
+  },
+  "dependencies": {
+    "@ffmpeg/core": "^0.12.6",
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1",
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.0.0",
+    "hls.js": "^1.0.0",
+    "marked": "^15.0.0",
+    "typescript": "^5.0.0",
+    "wrangler": "^4.0.0"
+  }
+}
