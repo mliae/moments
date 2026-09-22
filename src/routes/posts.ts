@@ -201,6 +201,26 @@ app.delete("/:id", requireAdmin, async c => {
   return ok(c, { id }, "文章已删除");
 });
 
+/** POST /batch-delete  批量删除文章（连带评论），body: { ids: number[] } */
+app.post("/batch-delete", requireAdmin, async c => {
+  let ids: number[];
+  try {
+    const body = (await c.req.json()) as { ids?: unknown };
+    ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 200);
+  } catch {
+    return fail(c, "请求格式错误", 400);
+  }
+  if (!ids.length) return fail(c, "未选择任何文章", 400);
+
+  await c.env.DB.batch(
+    ids.flatMap(id => [
+      c.env.DB.prepare(`DELETE FROM comments WHERE target_type = 'post' AND target_id = ?`).bind(id),
+      c.env.DB.prepare(`DELETE FROM posts WHERE id = ?`).bind(id),
+    ])
+  );
+  return ok(c, { deleted: ids.length }, `已删除 ${ids.length} 篇文章`);
+});
+
 /* ==================== 文章评论（与说说共用 comments 表） ==================== */
 
 /** 按 slug 解析文章：访客仅已发布；管理员不限 */

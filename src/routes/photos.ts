@@ -173,6 +173,30 @@ admin.delete("/:id", requireAdmin, async c => {
   return ok(c, { id }, "已删除");
 });
 
+/** POST /batch-delete  批量删除相册图片（本站 R2 对象一并删除），body: { ids: number[] } */
+admin.post("/batch-delete", requireAdmin, async c => {
+  let ids: number[];
+  try {
+    const body = (await c.req.json()) as { ids?: unknown };
+    ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 200);
+  } catch {
+    return fail(c, "请求格式错误", 400);
+  }
+  if (!ids.length) return fail(c, "未选择任何图片", 400);
+
+  const ph = ids.map(() => "?").join(",");
+  const rows = await c.env.DB
+    .prepare(`SELECT src FROM photos WHERE id IN (${ph})`)
+    .bind(...ids)
+    .all<{ src: string }>();
+  const keys = [...new Set(rows.results.map(r => srcToKey(r.src)).filter((k): k is string => !!k && k.startsWith("uploads/")))];
+
+  await c.env.DB.batch(ids.map(id => c.env.DB.prepare(`DELETE FROM photos WHERE id = ?`).bind(id)));
+  if (keys.length) await c.env.R2.delete(keys);
+
+  return ok(c, { deleted: ids.length }, `已删除 ${ids.length} 张图片`);
+});
+
 /**
  * 同步：扫描 moments.images（JSON 数组）与 posts.cover，
  * 将尚未出现在 photos 表中的图片插入（source_type=moment/post），

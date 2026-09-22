@@ -166,6 +166,46 @@ app.delete("/:id", requireAdmin, async c => {
   return ok(c, { id }, "删除成功");
 });
 
+/** POST /batch-delete  批量删除说说（连带评论/点赞/R2 媒体），body: { ids: number[] } */
+app.post("/batch-delete", requireAdmin, async c => {
+  let ids: number[];
+  try {
+    const body = (await c.req.json()) as { ids?: unknown };
+    ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 200);
+  } catch {
+    return fail(c, "请求格式错误", 400);
+  }
+  if (!ids.length) return fail(c, "未选择任何说说", 400);
+
+  const ph = ids.map(() => "?").join(",");
+  const rows = await c.env.DB
+    .prepare(`SELECT images, video FROM moments WHERE id IN (${ph})`)
+    .bind(...ids)
+    .all<{ images: string; video: string }>();
+
+  const r2Domain = (await getSettings(c.env.DB)).r2_domain;
+  const r2Keys = new Set<string>();
+  for (const r of rows.results) {
+    for (const k of parseImages(r.images)) if (k.startsWith("uploads/")) r2Keys.add(k);
+    const v = parseVideo(r.video);
+    if (v && v.kind === "mp4") {
+      const k = mediaKeyFrom(v.src, r2Domain);
+      if (k && k.startsWith("uploads/")) r2Keys.add(k);
+    }
+  }
+
+  await c.env.DB.batch(
+    ids.flatMap(id => [
+      c.env.DB.prepare(`DELETE FROM comments WHERE target_type = 'moment' AND target_id = ?`).bind(id),
+      c.env.DB.prepare(`DELETE FROM likes WHERE moment_id = ?`).bind(id),
+      c.env.DB.prepare(`DELETE FROM moments WHERE id = ?`).bind(id),
+    ])
+  );
+  if (r2Keys.size) await c.env.R2.delete([...r2Keys]);
+
+  return ok(c, { deleted: rows.results.length }, `已删除 ${rows.results.length} 条说说`);
+});
+
 /**
  * PUT /:id  编辑说说（content/images/video/location，可选字段；未传字段保留原值）
  * 注意：images/video 整体替换；旧 R2 对象不自动清理（编辑时不删旧素材，避免误删）

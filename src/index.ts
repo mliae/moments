@@ -44,6 +44,34 @@ app.use("*", async (c, next) => {
   await next();
 });
 
+/* ==================== 规范域名跳转 ====================
+ * 保证 http→https、www→非 www 全部 301 到后台 site_domain 指定的规范主机，
+ * 保留原路径与查询串（SEO 友好 + Cookie/资源同源一致）。
+ * 快速路径：已是 https 且非 www 前缀时直接放行，不查 D1，零额外开销。
+ * workers.dev 调试子域不参与规范化。
+ */
+app.use("*", async (c, next) => {
+  const url = new URL(c.req.url);
+  const host = url.host.toLowerCase();
+  if (url.protocol === "https:" && !host.startsWith("www.")) return next();
+  const s = await getSettings(c.env.DB);
+  let canonical: string | null = null;
+  if (s.site_domain) {
+    try {
+      canonical = new URL(s.site_domain).host.toLowerCase();
+    } catch {
+      canonical = null;
+    }
+  }
+  // 未配置规范域或访问的是 workers.dev 调试子域：只做 http→https，不动主机名
+  const targetHost = canonical && !host.endsWith(".workers.dev") ? canonical : host;
+  const needsRedirect = url.protocol !== "https:" || host !== targetHost;
+  if (!needsRedirect) return next();
+  const dest = `https://${targetHost}${url.pathname}${url.search}`;
+  const status = c.req.method === "GET" || c.req.method === "HEAD" ? 301 : 308;
+  return c.redirect(dest, status);
+});
+
 app.get("/api/health", c => ok(c, { site: c.env.SITE_NAME ?? "moments", time: new Date().toISOString() }));
 
 // 公开站点配置（横幅文案/站名等）；admin_path 等敏感字段不下发

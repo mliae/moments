@@ -2220,6 +2220,7 @@
       const adminBtn = state.admin ? `<div style="margin-bottom:1rem;text-align:right"><button class="btn primary" data-act="new-post">＋ 写文章</button></div>` : "";
       app.innerHTML = `
         <div class="essay">
+          ${bannerHtml()}
           <div class="posts-wrap">
             ${adminBtn}
             ${
@@ -3285,6 +3286,46 @@
   let adminPostsPage = 1;
   let adminPhotosPage = 1;
 
+  /** 后台列表多选 + 批量删除通用接线：rowSel 为行/卡片选择器，onDone 为删除成功后的重绘回调 */
+  function wireBatch(panel, { rowSel, endpoint, label, onDone }) {
+    const all = panel.querySelector("[data-batch-all]");
+    const countEl = panel.querySelector("[data-batch-count]");
+    const delBtn = panel.querySelector("[data-batch-del]");
+    if (!all || !delBtn) return;
+    const boxes = () => [...panel.querySelectorAll(`${rowSel} input.admin-check`)];
+    const sync = () => {
+      const bs = boxes();
+      const checked = bs.filter(b => b.checked);
+      if (countEl) countEl.textContent = checked.length;
+      delBtn.disabled = checked.length === 0;
+      all.checked = bs.length > 0 && checked.length === bs.length;
+      all.indeterminate = checked.length > 0 && checked.length < bs.length;
+    };
+    all.addEventListener("change", () => {
+      boxes().forEach(b => { b.checked = all.checked; });
+      sync();
+    });
+    boxes().forEach(b => b.addEventListener("change", sync));
+    delBtn.addEventListener("click", async () => {
+      const ids = boxes().filter(b => b.checked).map(b => Number(b.value));
+      if (!ids.length) return;
+      if (!confirm(`确定删除选中的 ${ids.length} ${label}？此操作不可恢复`)) return;
+      delBtn.disabled = true;
+      const oldText = delBtn.textContent;
+      delBtn.textContent = "删除中...";
+      try {
+        await api(endpoint, { method: "POST", body: { ids } });
+        toast(`已删除 ${ids.length} ${label}`);
+        onDone && onDone();
+      } catch (err) {
+        toast(err.message);
+        delBtn.disabled = false;
+        delBtn.textContent = oldText;
+      }
+    });
+    sync();
+  }
+
   async function renderAdminMoments(panel, page = adminMomPage) {
     adminMomPage = page;
     panel.innerHTML = `<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
@@ -3308,12 +3349,18 @@
         <h3>说说管理</h3>
         <button class="btn primary" data-admin-act="new-moment">＋ 发布说说</button>
       </div>
+      <div class="admin-batch-bar">
+        <label class="admin-batch-all"><input type="checkbox" data-batch-all /> 全选</label>
+        <span class="admin-batch-info">已选 <strong data-batch-count>0</strong> 项</span>
+        <button class="btn danger" data-batch-del disabled>批量删除</button>
+      </div>
       ${
         list.length
           ? list
               .map(
                 m => `
         <div class="admin-row">
+          <label class="admin-check-cell"><input type="checkbox" class="admin-check" value="${m.id}" /></label>
           <div class="row-main">
             <div class="row-title">${esc(plainText(m.content, 80) || (m.video ? "[视频说说]" : "[图片说说]"))}</div>
             <div class="row-sub">
@@ -3342,6 +3389,7 @@
     panel.querySelectorAll("[data-pager]").forEach(b =>
       b.addEventListener("click", () => renderAdminMoments(panel, b.dataset.pager === "prev" ? page - 1 : page + 1))
     );
+    wireBatch(panel, { rowSel: ".admin-row", endpoint: "/api/moments/batch-delete", label: "条说说", onDone: () => renderAdminMoments(panel) });
   }
 
   async function renderAdminPosts(panel, page = adminPostsPage) {
@@ -3364,12 +3412,18 @@
         <h3>文章管理（${total}）</h3>
         <button class="btn primary" data-admin-act="new-post">＋ 写文章</button>
       </div>
+      <div class="admin-batch-bar">
+        <label class="admin-batch-all"><input type="checkbox" data-batch-all /> 全选</label>
+        <span class="admin-batch-info">已选 <strong data-batch-count>0</strong> 项</span>
+        <button class="btn danger" data-batch-del disabled>批量删除</button>
+      </div>
       ${
         list.length
           ? list
               .map(
                 p => `
         <div class="admin-row">
+          <label class="admin-check-cell"><input type="checkbox" class="admin-check" value="${p.id}" /></label>
           <div class="row-main">
             <div class="row-title">${esc(p.title)}${p.status === "draft" ? '<span class="tag-mini draft" style="margin-left:6px">草稿</span>' : ""}</div>
             <div class="row-sub"><span>${timeAgo(p.created_at)}</span><span>/${esc(p.slug)}</span></div>
@@ -3388,6 +3442,7 @@
     panel.querySelectorAll("[data-pager]").forEach(b =>
       b.addEventListener("click", () => renderAdminPosts(panel, b.dataset.pager === "prev" ? page - 1 : page + 1))
     );
+    wireBatch(panel, { rowSel: ".admin-row", endpoint: "/api/posts/batch-delete", label: "篇文章", onDone: () => renderAdminPosts(panel) });
   }
 
   async function renderAdminPhotos(panel, page = adminPhotosPage) {
@@ -3414,7 +3469,12 @@
           <button class="btn primary" data-photo-act="upload">上传图片</button>
         </div>
       </div>
-      <div class="field-hint" style="margin-bottom:1rem">上传或同步的图片会出现在前台「相册」页；可设置标题、排序（升序）和是否显示。</div>
+      <div class="field-hint" style="margin-bottom:1rem">上传或同步的图片会出现在前台「相册」页；可设置标题、排序（升序）和是否显示。勾选图片可批量删除。</div>
+      <div class="admin-batch-bar">
+        <label class="admin-batch-all"><input type="checkbox" data-batch-all /> 全选</label>
+        <span class="admin-batch-info">已选 <strong data-batch-count>0</strong> 项</span>
+        <button class="btn danger" data-batch-del disabled>批量删除</button>
+      </div>
       <input type="file" accept="image/*" data-photo-file hidden multiple />
       ${
         list.length
@@ -3423,6 +3483,7 @@
                 p => `
             <div class="photo-admin-card" data-id="${p.id}">
               <div class="photo-admin-thumb">
+                <input type="checkbox" class="admin-check photo-admin-check" value="${p.id}" title="选中用于批量操作" />
                 <img src="${esc(p.src)}" alt="" referrerpolicy="no-referrer" loading="lazy" />
                 <span class="photo-admin-src-tag">${sourceLabel(p.source_type)}</span>
               </div>
@@ -3448,8 +3509,7 @@
     panel.querySelectorAll("[data-pager]").forEach(b =>
       b.addEventListener("click", () => renderAdminPhotos(panel, b.dataset.pager === "prev" ? page - 1 : page + 1))
     );
-
-    // 同步
+    wireBatch(panel, { rowSel: ".photo-admin-card", endpoint: "/api/admin/photos/batch-delete", label: "张图片", onDone: () => renderAdminPhotos(panel) });
     panel.querySelector('[data-photo-act="sync"]').addEventListener("click", async e => {
       const btn = e.currentTarget;
       btn.disabled = true;
@@ -5889,6 +5949,9 @@
       const fd = new FormData(settingsForm);
       const patch = {};
       ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain"].forEach(k => {
+        // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
+        // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
+        if (!fd.has(k)) return;
         patch[k] = String(fd.get(k) || "").trim();
       });
       const btn = settingsForm.querySelector('button[type="submit"]');
