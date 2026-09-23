@@ -686,6 +686,19 @@
   }
 
   /**
+   * 把表情面板重新定位到当前 textarea 上方（键盘弹起 / 视口变化后调用，
+   * 避免面板被键盘遮挡或位置过时）。
+   */
+  function repositionEmojiPanel() {
+    const panel = document.getElementById("emojiPanel");
+    const ta = emojiPanelTarget;
+    if (!panel || !ta || !ta.isConnected) return;
+    const rect = ta.getBoundingClientRect();
+    panel.style.left = rect.left + "px";
+    panel.style.bottom = window.innerHeight - rect.top + 4 + "px";
+  }
+
+  /**
    * 手机端键盘适配：键盘弹起时把弹窗内容（含底部输入框）顶到键盘之上，
    * 并把当前聚焦元素滚入可视区，避免评论框被输入法遮挡。
    * 返回清理函数，closeModal 时调用。
@@ -694,23 +707,46 @@
     const vv = window.visualViewport;
     if (!vv) return () => {};
     let raf = 0;
+    let lastKbd = -1; // 上次应用的键盘高度，用于阈值去抖
+    let wasOpen = false; // 键盘是否处于弹起状态（只在收起→弹起时滚一次）
+
+    const scrollFocused = () => {
+      const el = document.activeElement;
+      if (el && modal.contains(el) && typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ block: "nearest" });
+      }
+    };
+
     const onViewport = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         // 键盘高度 = 布局视口高 - 可视视口高 - 可视视口偏移
-        const kbd = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-        modal.style.paddingBottom = kbd > 0 ? kbd + 12 + "px" : "";
-        const el = document.activeElement;
-        if (el && modal.contains(el) && typeof el.scrollIntoView === "function") {
-          el.scrollIntoView({ block: "nearest" });
+        const kbd = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+        // 阈值去抖：忽略地址栏伸缩等小幅抖动（<20px 不响应），减少跳动
+        if (Math.abs(kbd - lastKbd) >= 20) {
+          lastKbd = kbd;
+          modal.style.paddingBottom = kbd > 0 ? kbd + 12 + "px" : "";
         }
+        // 仅在键盘「收起→弹起」的瞬间滚一次，避免与浏览器原生滚动反复打架
+        if (kbd > 0 && !wasOpen) {
+          wasOpen = true;
+          scrollFocused();
+        } else if (kbd === 0) {
+          wasOpen = false;
+        }
+        repositionEmojiPanel(); // 表情面板跟随键盘重定位
       });
     };
+    // 键盘已弹起时切换到另一个输入框，也滚一次
+    const onFocus = () => { if (wasOpen) scrollFocused(); };
+
     vv.addEventListener("resize", onViewport);
     vv.addEventListener("scroll", onViewport);
+    modal.addEventListener("focusin", onFocus);
     return () => {
       vv.removeEventListener("resize", onViewport);
       vv.removeEventListener("scroll", onViewport);
+      modal.removeEventListener("focusin", onFocus);
       cancelAnimationFrame(raf);
       modal.style.paddingBottom = "";
     };
