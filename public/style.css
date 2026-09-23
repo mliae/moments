@@ -816,7 +816,7 @@ input:focus, textarea:focus { border-color: var(--anzhiyu-main); box-shadow: var
 .modal {
   background: var(--anzhiyu-card-bg); width: 100%; max-width: 560px;
   border-radius: 12px 12px 0 0; padding: 1.5rem 1.4rem 1.75rem;
-  max-height: 92vh; max-height: 92dvh; overflow-y: auto;
+  max-height: 92vh; max-height: 92dvh; overflow-y: auto; box-sizing: border-box;
   overscroll-behavior: contain; animation: slide .22s; color: var(--anzhiyu-fontcolor);
 }
 @media (min-width: 680px) {

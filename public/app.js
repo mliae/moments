@@ -685,6 +685,37 @@
     if (modalOpenCount === 0) document.body.style.overflow = "";
   }
 
+  /**
+   * 手机端键盘适配：键盘弹起时把弹窗内容（含底部输入框）顶到键盘之上，
+   * 并把当前聚焦元素滚入可视区，避免评论框被输入法遮挡。
+   * 返回清理函数，closeModal 时调用。
+   */
+  function bindKeyboardAware(modal) {
+    const vv = window.visualViewport;
+    if (!vv) return () => {};
+    let raf = 0;
+    const onViewport = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        // 键盘高度 = 布局视口高 - 可视视口高 - 可视视口偏移
+        const kbd = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        modal.style.paddingBottom = kbd > 0 ? kbd + 12 + "px" : "";
+        const el = document.activeElement;
+        if (el && modal.contains(el) && typeof el.scrollIntoView === "function") {
+          el.scrollIntoView({ block: "nearest" });
+        }
+      });
+    };
+    vv.addEventListener("resize", onViewport);
+    vv.addEventListener("scroll", onViewport);
+    return () => {
+      vv.removeEventListener("resize", onViewport);
+      vv.removeEventListener("scroll", onViewport);
+      cancelAnimationFrame(raf);
+      modal.style.paddingBottom = "";
+    };
+  }
+
   function openModal(html, opts) {
     lockBodyScroll();
     modalRoot.innerHTML = `
@@ -692,6 +723,8 @@
         <div class="modal${opts?.size === "lg" ? " modal-lg" : ""}" role="dialog">${html}</div>
       </div>`;
     const mask = modalRoot.querySelector(".modal-mask");
+    const modal = modalRoot.querySelector(".modal");
+    modal._kbCleanup = bindKeyboardAware(modal);
     mask.addEventListener("click", e => {
       if (e.target !== mask) return;
       // 编辑器类弹窗（含文本输入框）点外部不关闭，防止误点丢内容；
@@ -699,13 +732,15 @@
       if (modalRoot.querySelector(".modal textarea, .modal input[type='text'], .modal input[type='url'], .modal input[type='email'], .modal input[type='password']")) return;
       closeModal();
     });
-    return modalRoot.querySelector(".modal");
+    return modal;
   }
   function closeModal() {
     document.querySelectorAll(".md-menu").forEach(m => m.remove()); // 编辑器下拉菜单挂在 body，需手动清理
     // 必须先停掉弹窗内所有视频：直接 innerHTML="" 会让正在播放的 MP4 继续发声、
     // HLS 实例不 destroy 继续后台拉分片
     disposeVideos(modalRoot);
+    const modal = modalRoot.querySelector(".modal");
+    if (modal && typeof modal._kbCleanup === "function") modal._kbCleanup();
     modalRoot.innerHTML = "";
     unlockBodyScroll();
   }
