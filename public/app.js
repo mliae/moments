@@ -2945,7 +2945,7 @@
         .map(
           (src, i) => `
       <div class="pick-item" draggable="true" data-drag-idx="${i}">
-        <img src="${esc(thumbSrc(src))}" alt="" />
+        <img src="${esc(thumbSrc(src))}" alt=""${thumbSrc(src) !== src ? ` data-orig="${esc(src)}"` : ""} />
         <button type="button" class="remove" data-rm-img="${i}">×</button>
       </div>`
         )
