@@ -34,7 +34,7 @@
   <br><em>相册 · 瀑布流图集</em>
 </p>
 
-线上示例：<https://e.jxe.me/>
+线上示例：<https://jxe.me/>
 
 ---
 
@@ -193,7 +193,7 @@ npx wrangler deploy
 
 #### 4. 绑定自定义域名（可选）
 
-Cloudflare Dashboard → Workers & Pages → moments → Settings → Domains & Routes → 添加自定义域名（如 `e.jxe.me`），DNS 与 SSL 自动配置。Dashboard 绑定的域名不受后续部署影响。
+Cloudflare Dashboard → Workers & Pages → moments → Settings → Domains & Routes → 添加自定义域名（如 `jxe.me`），DNS 与 SSL 自动配置。Dashboard 绑定的域名不受后续部署影响。
 
 #### 5. 后台初始化
 
