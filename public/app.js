@@ -3846,19 +3846,27 @@
           <input name="footer_run_since" maxlength="40" value="${esc(s.footer_run_since)}" placeholder="2024-01-01T00:00:00" />
         </div>
 
+        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>评论头像</h3></div>
         <div class="field">
-          <label>随机头像 API（评论头像回退源）<br /><small style="color:var(--anzhiyu-secondtext)">每行一条，按序自动故障转移；支持 {imgtype} 占位。留空=用默认 apihz</small></label>
+          <label>随机头像 API（回退源）<br /><small style="color:var(--anzhiyu-secondtext)">评论者无 QQ / Gravatar 时，从这里随机取头像。每行一条，按序自动故障转移；支持 {imgtype} 占位。留空=用默认 apihz</small></label>
           <textarea name="random_avatar_api" rows="3" style="width:100%;resize:vertical" placeholder="https://cn.apihz.cn/api/img/apihzimgtx.php?id=88888888&amp;key=88888888&amp;type=1&amp;imgtype={imgtype}">${esc(s.random_avatar_api)}</textarea>
         </div>
         <div class="field">
-          <label>随机头像类型 imgtype<br /><small style="color:var(--anzhiyu-secondtext)">评论者无 QQ/Gravatar 时，用此类型随机头像；默认 9=古风</small></label>
-          <select name="random_avatar_imgtype">
-            ${[["0","综合"],["1","男生"],["2","女生"],["3","情侣"],["4","闺蜜"],["5","动漫"],["6","萌宠"],["7","可爱"],["8","欧美"],["9","古风"],["10","沙雕"],["11","仙女"],["12","简单"],["13","QQ"],["14","微信"],["15","文字"],["16","个性"]].map(([v,t])=>`<option value="${v}"${String(s.random_avatar_imgtype)===v?" selected":""}>${v} ${t}</option>`).join("")}
+          <label>随机头像类型<br /><small style="color:var(--anzhiyu-secondtext)">无 QQ / Gravatar 时随机头像的风格；默认 9=古风</small></label>
+          <select name="random_avatar_imgtype" style="max-width:220px">
+            ${[["0","综合"],["1","男生"],["2","女生"],["3","情侣"],["4","闺蜜"],["5","动漫"],["6","萌宠"],["7","可爱"],["8","欧美"],["9","古风"],["10","沙雕"],["11","仙女"],["12","简单"],["13","QQ"],["14","微信"],["15","文字"],["16","个性"]].map(([v,t])=>`<option value="${v}"${String(s.random_avatar_imgtype)===v?" selected":""}>${v} · ${t}</option>`).join("")}
           </select>
-          <div style="margin-top:.5rem">
-            <label style="margin-right:.8rem;font-weight:normal"><input type="checkbox" data-refresh-avatars-force /> 强制覆盖已缓存头像（较慢，会重新抽随机头像）</label>
-            <button type="button" class="btn" data-refresh-avatars>刷新头像缓存</button>
-            <span data-refresh-avatars-msg style="margin-left:.5rem;color:var(--anzhiyu-secondtext)"></span>
+        </div>
+        <div class="field" style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc)">
+          <label style="font-weight:600">刷新头像缓存</label>
+          <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">扫描历史评论里的邮箱，把缺失的头像补拉到本地（已缓存的默认跳过）。</div>
+          <label style="display:flex;align-items:center;gap:.45rem;font-weight:normal;margin-bottom:.5rem;cursor:pointer">
+            <input type="checkbox" data-refresh-avatars-force />
+            <span>强制覆盖已缓存头像（较慢，随机头像会重新抽取）</span>
+          </label>
+          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <button type="button" class="btn" data-refresh-avatars>开始刷新</button>
+            <span data-refresh-avatars-msg style="color:var(--anzhiyu-secondtext);font-size:.85rem"></span>
           </div>
         </div>
 
