@@ -3856,6 +3856,7 @@
             ${[["0","综合"],["1","男生"],["2","女生"],["3","情侣"],["4","闺蜜"],["5","动漫"],["6","萌宠"],["7","可爱"],["8","欧美"],["9","古风"],["10","沙雕"],["11","仙女"],["12","简单"],["13","QQ"],["14","微信"],["15","文字"],["16","个性"]].map(([v,t])=>`<option value="${v}"${String(s.random_avatar_imgtype)===v?" selected":""}>${v} ${t}</option>`).join("")}
           </select>
           <div style="margin-top:.5rem">
+            <label style="margin-right:.8rem;font-weight:normal"><input type="checkbox" data-refresh-avatars-force /> 强制覆盖已缓存头像（较慢，会重新抽随机头像）</label>
             <button type="button" class="btn" data-refresh-avatars>刷新头像缓存</button>
             <span data-refresh-avatars-msg style="margin-left:.5rem;color:var(--anzhiyu-secondtext)"></span>
           </div>
@@ -3936,18 +3937,29 @@
       });
     });
 
-    // 刷新评论头像缓存
+    // 刷新评论头像缓存：分页批处理，每批 ≤100，循环跑到结束，避免单请求超时/超子请求上限
     const refreshBtn = panel.querySelector("[data-refresh-avatars]");
     if (refreshBtn) {
       const msg = panel.querySelector("[data-refresh-avatars-msg]");
+      const forceBox = panel.querySelector("[data-refresh-avatars-force]");
       refreshBtn.addEventListener("click", async () => {
         refreshBtn.disabled = true;
-        if (msg) msg.textContent = "刷新中…";
+        let offset = 0;
+        let total = 0, ok = 0, fail = 0;
+        const force = forceBox && forceBox.checked ? "1" : "0";
         try {
-          const r = await api("/api/admin/avatars/refresh", { method: "POST" });
-          if (msg) msg.textContent = `完成：刷新 ${r.refreshed} 个${r.failed ? `，失败 ${r.failed}` : ""}`;
+          for (;;) {
+            if (msg) msg.textContent = `刷新中…已处理 ${total}`;
+            const r = await api(`/api/admin/avatars/refresh?offset=${offset}&force=${force}`, { method: "POST" });
+            total += r.count || 0;
+            ok += r.refreshed || 0;
+            fail += r.failed || 0;
+            if (!r.hasMore) break;
+            offset += r.count || 100;
+          }
+          if (msg) msg.textContent = `完成：共 ${total} 个，成功 ${ok}${fail ? `，失败 ${fail}` : ""}`;
         } catch (e) {
-          if (msg) msg.textContent = e.message;
+          if (msg) msg.textContent = `中断于 ${total}：${e.message}`;
         } finally {
           refreshBtn.disabled = false;
         }

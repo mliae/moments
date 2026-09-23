@@ -285,21 +285,37 @@ app.put("/settings", requireAdmin, async c => {
  */
 app.post("/avatars/refresh", requireAdmin, async c => {
   const s = await getSettings(c.env.DB);
+  // 分页批处理：单批 ≤100 条，并发拉取，确保不超 Workers 子请求上限（付费 1000）与 30s 墙钟
+  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit")) || 100));
+  const offset = Math.max(0, Number(c.req.query("offset")) || 0);
+  const force = c.req.query("force") === "1";
   const rows = (
     await c.env.DB
-      .prepare(`SELECT DISTINCT email, qq FROM comments WHERE email != '' OR qq != '' LIMIT 500`)
+      .prepare(
+        `SELECT DISTINCT email, qq FROM comments WHERE email != '' OR qq != '' LIMIT ${limit} OFFSET ${offset}`
+      )
       .all<{ email: string; qq: string }>()
   ).results;
   let refreshed = 0;
   let failed = 0;
-  for (const r of rows) {
-    const email = (r.email || (r.qq ? `${r.qq}@qq.com` : "")).trim().toLowerCase();
-    if (!email) continue;
-    const res = await ensureAvatar(c.env.R2, s, email, r.qq || "", true);
-    if (res) refreshed++;
-    else failed++;
-  }
-  return ok(c, { total: rows.length, refreshed, failed }, "头像缓存刷新完成");
+  const concurrency = 8;
+  let i = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, rows.length) }, async () => {
+      while (i < rows.length) {
+        const r = rows[i++];
+        const email = (r.email || (r.qq ? `${r.qq}@qq.com` : "")).trim().toLowerCase();
+        if (!email) { failed++; continue; }
+        const res = await ensureAvatar(c.env.R2, s, email, r.qq || "", force);
+        if (res) refreshed++; else failed++;
+      }
+    })
+  );
+  return ok(
+    c,
+    { limit, offset, count: rows.length, hasMore: rows.length >= limit, refreshed, failed, force },
+    "ok"
+  );
 });
 
 /**
