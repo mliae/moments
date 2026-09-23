@@ -20,6 +20,7 @@ import {
   listComments,
 } from "../comment-service";
 import { maybeScheduleAiReply } from "../ai-reply";
+import { ensureAvatar } from "../avatar";
 
 const app = new Hono<HonoEnv>();
 
@@ -272,6 +273,16 @@ app.post("/:slug/comments", async c => {
   }
   const fieldError = validateCommentInput(input);
   if (fieldError) return fail(c, fieldError);
+
+  // 头像兜底：服务端确保头像已缓存并写入（不依赖客户端）
+  const ps = await getSettings(c.env.DB);
+  const ensured = await ensureAvatar(
+    c.env.R2,
+    ps,
+    input.email || (input.qq ? `${input.qq}@qq.com` : ""),
+    input.qq
+  );
+  if (ensured) input.avatarUrl = ensured.src;
 
   const result = await createComment(c.env.DB, "post", post.id, input, admin);
   if ("error" in result) return fail(c, result.error, result.status ?? 400);

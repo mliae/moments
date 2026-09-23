@@ -8,8 +8,8 @@
   <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/mliae/moments">
     <img src="https://img.shields.io/badge/Deploy_to-Cloudflare-F38020?logo=cloudflare&logoColor=white" alt="Deploy to Cloudflare">
   </a>
-  <a href="https://e.jxe.me/">
-    <img src="https://img.shields.io/badge/在线预览-e.jxe.me-0052ff" alt="在线预览">
+  <a href="https://jxe.me/">
+    <img src="https://img.shields.io/badge/在线预览-jxe.me-0052ff" alt="在线预览">
   </a>
   <img src="https://img.shields.io/badge/技术栈-Hono+D1+R2+AI-0052ff" alt="技术栈">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
@@ -34,7 +34,7 @@
   <br><em>相册 · 瀑布流图集</em>
 </p>
 
-线上示例：<https://e.jxe.me/>
+线上示例：<https://jxe.me/>
 
 ---
 
@@ -92,7 +92,7 @@
 浏览器请求
    │
    ▼
-Cloudflare Worker（moments，e.jxe.me）
+Cloudflare Worker（moments，jxe.me）
    ├─ /api/*                                ─► Hono 路由（src/routes/*）
    ├─ /media/*                              ─► R2 代理（r2_domain 未配置时）
    ├─ /imgproxy                             ─► 图片代理

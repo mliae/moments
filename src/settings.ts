@@ -48,6 +48,9 @@ export interface SiteSettings {
   // 安全
   admin_path: string; // 后台秘密入口路径（/admin 或 /sys-xxxx），不通过公开 API 下发
   site_icon: string; // 站点图标（favicon）：图片 URL 或 emoji；空=默认 ✍️
+  // 评论头像
+  random_avatar_api: string; // 随机头像 API 列表，每行一条，支持 {imgtype} 占位；留空=内置 apihz 默认
+  random_avatar_imgtype: string; // 随机头像类型 imgtype（apihz 0-16），默认 9=古风
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -84,6 +87,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   qq_nick_apis: "",
   admin_path: "/admin",
   site_icon: "",
+  random_avatar_api:
+    "https://cn.apihz.cn/api/img/apihzimgtx.php?id=88888888&key=88888888&type=1&imgtype={imgtype}",
+  random_avatar_imgtype: "9",
 };
 
 /** 字符串字段约束：最大长度 */
@@ -116,6 +122,8 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   qq_nick_apis: 2000,
   admin_path: 40,
   site_icon: 300,
+  random_avatar_api: 2000,
+  random_avatar_imgtype: 2,
 };
 
 /**

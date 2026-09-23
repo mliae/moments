@@ -14,6 +14,8 @@ import {
   deleteCommentThread,
 } from "../comment-service";
 import { maybeScheduleAiReply } from "../ai-reply";
+import { getSettings } from "../settings";
+import { ensureAvatar } from "../avatar";
 
 const app = new Hono<HonoEnv>();
 
@@ -76,6 +78,16 @@ app.post("/:id/comments", async c => {
   }
   const fieldError = validateCommentInput(input);
   if (fieldError) return fail(c, fieldError);
+
+  // 头像兜底：前端预拉取失败/未拉取时，服务端确保头像已缓存并写入（不依赖客户端）
+  const s = await getSettings(c.env.DB);
+  const ensured = await ensureAvatar(
+    c.env.R2,
+    s,
+    input.email || (input.qq ? `${input.qq}@qq.com` : ""),
+    input.qq
+  );
+  if (ensured) input.avatarUrl = ensured.src;
 
   const owner = await isAdmin(c);
   const result = await createComment(c.env.DB, "moment", id, input, owner);

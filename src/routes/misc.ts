@@ -8,6 +8,7 @@ import { ok, fail } from "../respond";
 import type { HonoEnv } from "../types";
 import { getSettings } from "../settings";
 import { keyToSrc } from "../db";
+import { ensureAvatar } from "../avatar";
 
 const app = new Hono<HonoEnv>();
 
@@ -166,6 +167,31 @@ app.post("/comment-upload", async c => {
 
   const s = await getSettings(c.env.DB);
   return ok(c, { key, src: keyToSrc(key, s.r2_domain), content_type: file.type, size: file.size });
+});
+
+/**
+ * POST /api/comment/avatar  按邮箱预拉取评论头像并缓存到 R2（无需登录）
+ * body: { email, qq } → { src, cached }；拉取失败返回 src=""
+ * 前端在评论框输入邮箱后调用，实现「输入即拉取」。
+ */
+const EMAIL_RE2 = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
+const QQ_RE2 = /^[1-9]\d{4,11}$/;
+app.post("/comment/avatar", async c => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail(c, "请求格式错误", 400);
+  }
+  const b = (body ?? {}) as Record<string, unknown>;
+  let email = String(b.email ?? "").trim().toLowerCase().slice(0, 100);
+  if (email && !EMAIL_RE2.test(email)) email = "";
+  let qq = String(b.qq ?? "").trim().replace(/[^\d]/g, "").slice(0, 12);
+  if (qq && !QQ_RE2.test(qq)) qq = "";
+
+  const s = await getSettings(c.env.DB);
+  const res = await ensureAvatar(c.env.R2, s, email, qq);
+  return ok(c, { src: res?.src || "", cached: res?.cached ?? false });
 });
 
 /** 逆地址解析：服务端代理 OpenStreetMap Nominatim */

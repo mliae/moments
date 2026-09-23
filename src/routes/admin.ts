@@ -19,6 +19,7 @@ import {
 import { keyToSrc } from "../db";
 import { getSettings, updateSettings, normalizeAdminPath } from "../settings";
 import { deleteCommentAnywhere, editCommentAnywhere } from "../comment-service";
+import { ensureAvatar } from "../avatar";
 
 const app = new Hono<HonoEnv>();
 
@@ -276,6 +277,29 @@ app.put("/settings", requireAdmin, async c => {
   }
   const settings = await updateSettings(c.env.DB, patch);
   return ok(c, settings, "已保存");
+});
+
+/**
+ * POST /api/admin/avatars/refresh  刷新评论头像缓存
+ * 扫描评论里出现过的邮箱，强制重新拉取并覆盖 R2 头像（随机头像会重新抽）。
+ */
+app.post("/avatars/refresh", requireAdmin, async c => {
+  const s = await getSettings(c.env.DB);
+  const rows = (
+    await c.env.DB
+      .prepare(`SELECT DISTINCT email, qq FROM comments WHERE email != '' OR qq != '' LIMIT 500`)
+      .all<{ email: string; qq: string }>()
+  ).results;
+  let refreshed = 0;
+  let failed = 0;
+  for (const r of rows) {
+    const email = (r.email || (r.qq ? `${r.qq}@qq.com` : "")).trim().toLowerCase();
+    if (!email) continue;
+    const res = await ensureAvatar(c.env.R2, s, email, r.qq || "", true);
+    if (res) refreshed++;
+    else failed++;
+  }
+  return ok(c, { total: rows.length, refreshed, failed }, "头像缓存刷新完成");
 });
 
 /**

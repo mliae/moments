@@ -3,7 +3,6 @@
 /* build 20260921f */
 /**
  * moments 前端（原生 JS，无构建）
- * 1:1 复刻 jxe.me/essay（anzhiyu bber 即刻样式）：
  * BannerCard + 瀑布流 bber 卡片（>=1200 三列 / >=768 两列 / 其余一列，列间距 16px）
  * History API 路由：/ 首页 ｜ /posts 文章列表 ｜ /post/:slug 文章详情 ｜ /photos 相册 ｜ /admin 后台
  * （旧 hash 链接 #/... 自动重定向到真实路径）
@@ -2079,6 +2078,32 @@
       const v = nickInput.value.trim();
       if (QQ_NUM_RE.test(v) && form.dataset.qq !== v) resolveQq(v);
     });
+
+    // 输入邮箱即拉取头像（QQ→Gravatar→随机），服务端缓存到 R2；防抖 600ms，失败静默
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    let emailTimer = null;
+    const prefetchAvatar = async () => {
+      if (!emailInput) return;
+      const email = emailInput.value.trim().toLowerCase();
+      if (!EMAIL_RE.test(email)) return;
+      try {
+        const res = await api("/api/comment/avatar", { method: "POST", body: { email, qq: form.dataset.qq || "" } });
+        if (res && res.src) {
+          form.dataset.avatar = res.src;
+          renderAvatar(res.src, nickInput.value || "?");
+          localStorage.setItem("moments_avatar", res.src);
+          localStorage.setItem("moments_email", email);
+        }
+      } catch { /* 拉取失败不影响评论，提交时服务端会兜底 */ }
+    };
+    if (emailInput) {
+      emailInput.addEventListener("input", () => {
+        clearTimeout(emailTimer);
+        const email = emailInput.value.trim().toLowerCase();
+        if (EMAIL_RE.test(email)) emailTimer = setTimeout(prefetchAvatar, 600);
+      });
+      emailInput.addEventListener("blur", prefetchAvatar);
+    }
   }
 
   /** 规范化评论目标对象 */
@@ -3821,6 +3846,21 @@
           <input name="footer_run_since" maxlength="40" value="${esc(s.footer_run_since)}" placeholder="2024-01-01T00:00:00" />
         </div>
 
+        <div class="field">
+          <label>随机头像 API（评论头像回退源）<br /><small style="color:var(--anzhiyu-secondtext)">每行一条，按序自动故障转移；支持 {imgtype} 占位。留空=用默认 apihz</small></label>
+          <textarea name="random_avatar_api" rows="3" style="width:100%;resize:vertical" placeholder="https://cn.apihz.cn/api/img/apihzimgtx.php?id=88888888&amp;key=88888888&amp;type=1&amp;imgtype={imgtype}">${esc(s.random_avatar_api)}</textarea>
+        </div>
+        <div class="field">
+          <label>随机头像类型 imgtype<br /><small style="color:var(--anzhiyu-secondtext)">评论者无 QQ/Gravatar 时，用此类型随机头像；默认 9=古风</small></label>
+          <select name="random_avatar_imgtype">
+            ${[["0","综合"],["1","男生"],["2","女生"],["3","情侣"],["4","闺蜜"],["5","动漫"],["6","萌宠"],["7","可爱"],["8","欧美"],["9","古风"],["10","沙雕"],["11","仙女"],["12","简单"],["13","QQ"],["14","微信"],["15","文字"],["16","个性"]].map(([v,t])=>`<option value="${v}"${String(s.random_avatar_imgtype)===v?" selected":""}>${v} ${t}</option>`).join("")}
+          </select>
+          <div style="margin-top:.5rem">
+            <button type="button" class="btn" data-refresh-avatars>刷新头像缓存</button>
+            <span data-refresh-avatars-msg style="margin-left:.5rem;color:var(--anzhiyu-secondtext)"></span>
+          </div>
+        </div>
+
         <button class="btn primary" type="submit">保存设置</button>
       </form>`;
 
@@ -3895,6 +3935,24 @@
         preview.innerHTML = /^https?:\/\//i.test(urlInp.value.trim()) ? avatarPreviewHtml(urlInp.value.trim()) : "";
       });
     });
+
+    // 刷新评论头像缓存
+    const refreshBtn = panel.querySelector("[data-refresh-avatars]");
+    if (refreshBtn) {
+      const msg = panel.querySelector("[data-refresh-avatars-msg]");
+      refreshBtn.addEventListener("click", async () => {
+        refreshBtn.disabled = true;
+        if (msg) msg.textContent = "刷新中…";
+        try {
+          const r = await api("/api/admin/avatars/refresh", { method: "POST" });
+          if (msg) msg.textContent = `完成：刷新 ${r.refreshed} 个${r.failed ? `，失败 ${r.failed}` : ""}`;
+        } catch (e) {
+          if (msg) msg.textContent = e.message;
+        } finally {
+          refreshBtn.disabled = false;
+        }
+      });
+    }
   }
 
   /* ---------- 后台 Tab：媒体 ---------- */
@@ -6053,7 +6111,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
