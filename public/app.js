@@ -673,8 +673,20 @@
   }
 
   /* ================= 模态 ================= */
+  // 弹窗打开时锁定背景滚动，避免手机端弹窗与背景争抢滚动导致抖动；
+  // 用计数兼容嵌套弹窗（如评论弹窗里再开图片灯箱）
+  let modalOpenCount = 0;
+  function lockBodyScroll() {
+    if (modalOpenCount === 0) document.body.style.overflow = "hidden";
+    modalOpenCount++;
+  }
+  function unlockBodyScroll() {
+    modalOpenCount = Math.max(0, modalOpenCount - 1);
+    if (modalOpenCount === 0) document.body.style.overflow = "";
+  }
 
   function openModal(html, opts) {
+    lockBodyScroll();
     modalRoot.innerHTML = `
       <div class="modal-mask">
         <div class="modal${opts?.size === "lg" ? " modal-lg" : ""}" role="dialog">${html}</div>
@@ -695,6 +707,7 @@
     // HLS 实例不 destroy 继续后台拉分片
     disposeVideos(modalRoot);
     modalRoot.innerHTML = "";
+    unlockBodyScroll();
   }
 
   /* ================= 图片灯箱（幻影灯） ================= */
