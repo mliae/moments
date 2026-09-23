@@ -79,6 +79,16 @@ function normalizeCover(raw: unknown): string | null {
   return key;
 }
 
+/** 从正文 markdown 中提取第一张图片地址（兼容 ![alt](url) 与 <img src="url">），用于无封面时自动兜底 */
+function extractFirstImage(md: string): string {
+  if (!md) return "";
+  const mdImg = md.match(/!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/);
+  if (mdImg) return mdImg[1].trim();
+  const htmlImg = md.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
+  if (htmlImg) return htmlImg[1].trim();
+  return "";
+}
+
 interface PostInput {
   title: string;
   excerpt: string;
@@ -94,8 +104,10 @@ function validatePost(raw: unknown): PostInput | string {
   const content_md = String(body.content_md ?? "").slice(0, MAX_MD);
   const excerptRaw = String(body.excerpt ?? "").trim().slice(0, MAX_EXCERPT);
   const excerpt = excerptRaw || plainExcerpt(content_md);
-  const cover = normalizeCover(body.cover);
-  if (cover === null) return "封面地址非法";
+  const explicitCover = normalizeCover(body.cover);
+  if (explicitCover === null) return "封面地址非法";
+  // 未设置封面时，自动用正文第一张图兜底（新建/编辑均生效）
+  const cover = explicitCover || normalizeCover(extractFirstImage(content_md)) || "";
   const status = body.status === "draft" ? "draft" : "published";
   if (!content_md.trim()) return "正文不能为空";
   return { title, excerpt, content_md, cover, status };
