@@ -78,8 +78,12 @@ app.get("/api/health", c => ok(c, { site: c.env.SITE_NAME ?? "moments", time: ne
 // 设置变更频率低：浏览器缓存 60s + Cloudflare 边缘缓存 5min（边缘命中不消耗 Worker 请求额度）
 app.get("/api/settings", async c => {
   const s = await getSettings(c.env.DB);
-  const { admin_path: _hidden, ...publicSettings } = s;
-  void _hidden;
+  // 私密字段绝不下发：后台入口、apihz 凭证、QQ 登录态
+  const {
+    admin_path: _h1, apihz_id: _h2, apihz_key: _h3, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
+    ...publicSettings
+  } = s;
+  void [_h1, _h2, _h3, _h4, _h5, _h6];
   const res = ok(c, publicSettings);
   res.headers.set("Cache-Control", "public, max-age=60, s-maxage=300");
   return res;

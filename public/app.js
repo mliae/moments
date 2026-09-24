@@ -3870,6 +3870,28 @@
           </div>
         </div>
 
+        <div class="field" style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc)">
+          <label style="font-weight:600">QQ 昵称资料（apihz）</label>
+          <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，用这组凭证查昵称。凭证仅存服务端，绝不下发前台。</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">apihz 开发者 ID</label><input name="apihz_id" value="${esc(s.apihz_id)}" placeholder="个人资料里的数字 ID" /></div>
+            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">apihz 开发者 KEY</label><input name="apihz_key" value="${esc(s.apihz_key)}" placeholder="通讯秘钥" /></div>
+            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">系统 QQ（ckqq）</label><input name="qq_ckqq" value="${esc(s.qq_ckqq)}" placeholder="你的 QQ 号" /></div>
+            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">skey</label><input name="qq_skey" value="${esc(s.qq_skey)}" placeholder="cookie 里的 skey" /></div>
+          </div>
+          <div style="margin-top:.4rem"><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">pskey（p_skey）</label><input name="qq_pskey" value="${esc(s.qq_pskey)}" placeholder="cookie 里的 p_skey" style="width:100%" /></div>
+          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.6rem">
+            <a data-qq-bookmarklet class="btn" href="#" style="text-decoration:none">拖拽到书签栏：一键抓取</a>
+            <button type="button" class="btn" data-qq-test>测试连接</button>
+            <span data-qq-test-msg style="color:var(--anzhiyu-secondtext);font-size:.85rem"></span>
+          </div>
+          <details style="margin-top:.6rem">
+            <summary style="cursor:pointer;font-size:.82rem;color:var(--anzhiyu-secondtext)">没有书签栏？手动粘贴 Cookie 自动解析</summary>
+            <textarea data-qq-paste rows="2" placeholder="登录 vip.qq.com 后，F12 把整段 Cookie 粘到这里" style="width:100%;margin-top:.4rem;resize:vertical"></textarea>
+            <button type="button" class="btn" data-qq-parse style="margin-top:.35rem">解析并填入</button>
+          </details>
+        </div>
+
         <button class="btn primary" type="submit">保存设置</button>
       </form>`;
 
@@ -3970,6 +3992,59 @@
           if (msg) msg.textContent = `中断于 ${total}：${e.message}`;
         } finally {
           refreshBtn.disabled = false;
+        }
+      });
+    }
+
+    // QQ 资料：书签一键抓取 / 粘贴 Cookie 解析 / 测试连接
+    const bmLink = panel.querySelector("[data-qq-bookmarklet]");
+    if (bmLink) {
+      const bm = "javascript:(function(){try{var c=document.cookie.split('; '),g=function(k){for(var i=0;i<c.length;i++){var p=c[i].indexOf('=');if(c[i].slice(0,p)===k)return decodeURIComponent(c[i].slice(p+1));}return ''};var u=g('p_uin').replace(/^o0*/,'');var t='QQCK#'+new URLSearchParams({ckqq:u,skey:g('skey'),pskey:g('p_skey')}).toString();navigator.clipboard.writeText(t).then(function(){alert('已复制 QQ 登录态（QQ:'+(u||'未取到')+'），回到后台粘贴即可')}).catch(function(){prompt('复制失败，请手动复制：',t)})}catch(e){alert('请先在 vip.qq.com 登录后，再点本书签')}})();";
+      bmLink.setAttribute("href", bm);
+      bmLink.addEventListener("click", e => e.preventDefault());
+    }
+    const qqFormVals = () => ({
+      apihz_id: panel.querySelector('[name="apihz_id"]')?.value || "",
+      apihz_key: panel.querySelector('[name="apihz_key"]')?.value || "",
+      qq_ckqq: panel.querySelector('[name="qq_ckqq"]')?.value || "",
+      qq_skey: panel.querySelector('[name="qq_skey"]')?.value || "",
+      qq_pskey: panel.querySelector('[name="qq_pskey"]')?.value || "",
+    });
+    const parseBtn = panel.querySelector("[data-qq-parse]");
+    if (parseBtn) {
+      parseBtn.addEventListener("click", () => {
+        const text = (panel.querySelector("[data-qq-paste]")?.value || "").trim();
+        if (!text) { toast("先粘贴 Cookie"); return; }
+        const out = { ckqq: "", skey: "", pskey: "" };
+        const m = text.match(/QQCK#([\s\S]*)/);
+        if (m) {
+          try { const p = new URLSearchParams(m[1]); out.ckqq = p.get("ckqq") || ""; out.skey = p.get("skey") || ""; out.pskey = p.get("pskey") || ""; } catch {}
+        } else {
+          const g = k => { const mm = text.match(new RegExp("(?:^|[;\\s])" + k + "=([^;\\s]+)")); return mm ? decodeURIComponent(mm[1]) : ""; };
+          out.ckqq = g("p_uin").replace(/^o0*/, "");
+          out.skey = g("skey");
+          out.pskey = g("p_skey");
+        }
+        if (!out.ckqq && !out.skey && !out.pskey) { toast("没解析到 p_uin/skey/p_skey，确认是 vip.qq.com 的 Cookie"); return; }
+        if (out.ckqq) panel.querySelector('[name="qq_ckqq"]').value = out.ckqq;
+        if (out.skey) panel.querySelector('[name="qq_skey"]').value = out.skey;
+        if (out.pskey) panel.querySelector('[name="qq_pskey"]').value = out.pskey;
+        toast(`已填入 ckqq=${out.ckqq || "?"}，记得点「保存设置」`);
+      });
+    }
+    const testBtn = panel.querySelector("[data-qq-test]");
+    if (testBtn) {
+      const tmsg = panel.querySelector("[data-qq-test-msg]");
+      testBtn.addEventListener("click", async () => {
+        testBtn.disabled = true;
+        if (tmsg) tmsg.style.color = "" , tmsg.textContent = "测试中…";
+        try {
+          const r = await api("/api/admin/qq/test", { method: "POST", body: qqFormVals() });
+          if (tmsg) { tmsg.style.color = r.ok ? "#23b26d" : "#f56c6c"; tmsg.textContent = r.ok ? `✓ ${r.msg}（昵称：${r.nickname}）` : `✗ ${r.msg}`; }
+        } catch (e) {
+          if (tmsg) { tmsg.style.color = "#f56c6c"; tmsg.textContent = "✗ " + e.message; }
+        } finally {
+          testBtn.disabled = false;
         }
       });
     }
@@ -6131,7 +6206,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;

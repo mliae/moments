@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import { ok, fail } from "../respond";
 import type { HonoEnv } from "../types";
 import { getSettings } from "../settings";
+import type { SiteSettings } from "../settings";
 import { keyToSrc } from "../db";
 import { ensureAvatar } from "../avatar";
 
@@ -116,6 +117,39 @@ async function fetchNickFromApi(api: ApiEntry, qq: string): Promise<string> {
   }
 }
 
+/**
+ * 通过 apihz「查询QQ基础资料」接口取昵称（需后台配置 id/ckqq/pskey）。
+ * 仅供服务端调用，凭证私密不下发前端。返回 null 表示未配置/失败。
+ */
+export async function fetchApihzNick(
+  s: SiteSettings,
+  qq: string
+): Promise<{ nickname: string } | null> {
+  if (!s.apihz_id || !s.qq_ckqq || !s.qq_pskey) return null;
+  const params = new URLSearchParams({
+    id: s.apihz_id,
+    key: s.apihz_key || "",
+    qq,
+    ckqq: s.qq_ckqq,
+    pskey: s.qq_pskey,
+  });
+  if (s.qq_skey) params.set("skey", s.qq_skey);
+  const url = `https://cn.apihz.cn/api/other/qq.php?${params.toString()}`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const resp = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": UA } });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const d = (await resp.json()) as Record<string, unknown>;
+    if (d.code === 200 && d.Name) {
+      return { nickname: String(d.Name).trim().slice(0, 50) };
+    }
+    throw new Error(String(d.msg || d.text || "apihz 未返回昵称"));
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 app.get("/qq-info", async c => {
   const qq = (c.req.query("qq") || "").trim();
   if (!QQ_RE.test(qq)) return fail(c, "QQ 号不合法", 400);
@@ -126,13 +160,22 @@ app.get("/qq-info", async c => {
 
   // 从后台读取 API 列表（留空=内置默认），逐个尝试直到拿到昵称
   const s = await getSettings(c.env.DB);
-  const apis = parseApiConfig(s.qq_nick_apis);
-  for (const api of apis) {
-    try {
-      nickname = await fetchNickFromApi(api, qq);
-      if (nickname) break;
-    } catch {
-      // 当前源失败，继续下一个
+
+  // 优先 apihz（需配置 id/ckqq/pskey），失败再回退多源列表，最后兜底 QQ 号
+  try {
+    const a = await fetchApihzNick(s, qq);
+    if (a?.nickname) nickname = a.nickname;
+  } catch { /* 继续回退 */ }
+
+  if (!nickname) {
+    const apis = parseApiConfig(s.qq_nick_apis);
+    for (const api of apis) {
+      try {
+        nickname = await fetchNickFromApi(api, qq);
+        if (nickname) break;
+      } catch {
+        // 当前源失败，继续下一个
+      }
     }
   }
 

@@ -51,6 +51,12 @@ export interface SiteSettings {
   // 评论头像
   random_avatar_api: string; // 随机头像 API 列表，每行一条，支持 {imgtype} 占位；留空=内置 apihz 默认
   random_avatar_imgtype: string; // 随机头像类型 imgtype（apihz 0-16），默认 9=古风
+  // QQ 资料（apihz 接口）——私密，不通过公开 API 下发
+  apihz_id: string; // apihz 开发者 ID
+  apihz_key: string; // apihz 开发者 KEY
+  qq_ckqq: string; // 系统 QQ 号
+  qq_skey: string; // 系统 QQ 的 skey
+  qq_pskey: string; // 系统 QQ 的 pskey（p_skey）
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -90,6 +96,11 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   random_avatar_api:
     "https://cn.apihz.cn/api/img/apihzimgtx.php?id=88888888&key=88888888&type=1&imgtype={imgtype}",
   random_avatar_imgtype: "9",
+  apihz_id: "",
+  apihz_key: "",
+  qq_ckqq: "",
+  qq_skey: "",
+  qq_pskey: "",
 };
 
 /** 字符串字段约束：最大长度 */
@@ -124,6 +135,11 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   site_icon: 300,
   random_avatar_api: 2000,
   random_avatar_imgtype: 2,
+  apihz_id: 20,
+  apihz_key: 64,
+  qq_ckqq: 20,
+  qq_skey: 200,
+  qq_pskey: 256,
 };
 
 /**
