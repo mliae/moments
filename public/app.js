@@ -68,11 +68,8 @@
       "2023|第一次做独立站|从模板到自己动手，慢慢搭起这个小站\n" +
       "2025|上线轻博客 Moments|更专注于碎片化的日常记录",
     about_bigstats: "6|年记录\n120+|篇文字\n300+|张照片\n1000+|个瞬间",
-    about_quote: "搭喜欢的事，做成每天的习惯。",
-    about_quote_author: "—— 写给自己",
     about_contacts:
       "GitHub|孤鸿剑尊|https://github.com/mliae\n邮箱|hi@jxe.me|mailto:hi@jxe.me\nRSS|订阅本站|/feed",
-    about_qr: "",
   about_qr_text: "这里没有广告，全是一杯杯陈酿。扫码或留言，跟我打个招呼。",
   about_qr_amounts: "10元|请我喝杯咖啡\n30元|支持我继续写下去\n60元|加个鸡腿，再接再厉",
     nav_links: "",
@@ -2624,15 +2621,6 @@
           </section>`
         : "";
 
-      // 引言卡
-      const quoteHtml = s.about_quote
-        ? `<section class="about-card about-quote">
-            <div class="about-quote-mark">${svgIcon("quote", 22)}</div>
-            <div class="about-quote-text">${esc(s.about_quote)}</div>
-            ${s.about_quote_author ? `<div class="about-quote-author">${esc(s.about_quote_author)}</div>` : ""}
-          </section>`
-        : "";
-
       // 大数字统计
       const bigRows = parseRows(s.about_bigstats);
       const bigHtml = bigRows.length
@@ -2673,7 +2661,7 @@
       // 赞助 / 收款码：咖啡主题卡 + 金额按钮切换二维码
       // about_qr_amounts 每行：金额|二维码URL（URL 可空，空则不切图）
       const amounts = parseRows(s.about_qr_amounts).map(r => ({ label: String(r[0] || "").trim(), src: String(r[1] || "").trim() })).filter(x => x.label);
-      const firstSrc = amounts.find(x => /^https?:\/\//i.test(x.src))?.src || s.about_qr || "";
+      const firstSrc = amounts.find(x => /^https?:\/\//i.test(x.src))?.src || "";
       const btnHtml = amounts.length
         ? amounts.map((a, i) => `<button type="button" class="about-amt-btn${i === 0 ? " is-active" : ""}" data-qr-src="${esc(a.src)}">${esc(a.label)}</button>`).join("")
         : "";
@@ -2699,7 +2687,6 @@
         ${bioHtml}
         ${timelineHtml}
         ${recentHtml}
-        ${quoteHtml}
         ${bigHtml}
         ${contactHtml}
         ${qrHtml}
@@ -4361,28 +4348,11 @@
           <textarea name="about_bigstats" maxlength="500" rows="3" placeholder="6|年记录&#10;120+|篇文字">${esc(s.about_bigstats)}</textarea>
         </div>
         <div class="field">
-          <label>引言大字</label>
-          <input name="about_quote" maxlength="200" value="${esc(s.about_quote)}" />
-        </div>
-        <div class="field">
-          <label>引言署名 / 出处</label>
-          <input name="about_quote_author" maxlength="100" value="${esc(s.about_quote_author)}" />
-        </div>
-        <div class="field">
           <label>联系方式（每行一条：类型|值|链接）<br /><small style="color:var(--anzhiyu-secondtext">链接可空；类型自动匹配图标（GitHub/邮箱/RSS/QQ 等）</small></label>
           <textarea name="about_contacts" maxlength="1000" rows="4" placeholder="GitHub|孤鸿剑尊|https://github.com/xxx&#10;邮箱|a@b.com|mailto:a@b.com">${esc(s.about_contacts)}</textarea>
         </div>
         <div class="field">
-          <label>二维码 / 收款码图片（可选）<br /><small style="color:var(--anzhiyu-secondtext)">图片 URL 或上传；留空不显示</small></label>
-          <div style="display:flex;gap:.5rem;align-items:center">
-            <input name="about_qr" maxlength="500" value="${esc(s.about_qr)}" placeholder="https://...（留空不显示）" style="flex:1" />
-            <button type="button" class="btn" data-avatar-upload="about_qr">上传</button>
-            <input type="file" accept="image/*" data-avatar-file="about_qr" hidden />
-          </div>
-          <div class="field-hint" data-avatar-preview="about_qr" style="margin-top:.4rem">${/^https?:\/\//i.test(s.about_qr || "") ? `<img src="${esc(s.about_qr)}" alt="" style="max-width:120px;max-height:120px;border-radius:8px;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
-        </div>
-        <div class="field">
-          <label>二维码下方说明文字</label>
+          <label>赞助卡说明文字</label>
           <input name="about_qr_text" maxlength="300" value="${esc(s.about_qr_text)}" />
         </div>
         <div class="field">
@@ -4429,7 +4399,7 @@
     // 头像类字段上传 + URL 实时预览
     const avatarPreviewHtml = url =>
       `<img src="${esc(url)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />`;
-    ["brand_avatar", "author_avatar", "post_avatar", "site_icon", "about_avatar", "about_qr"].forEach(field => {
+    ["brand_avatar", "author_avatar", "post_avatar", "site_icon", "about_avatar"].forEach(field => {
       const btn = panel.querySelector(`[data-avatar-upload="${field}"]`);
       if (!btn) return;
       const fileInp = panel.querySelector(`[data-avatar-file="${field}"]`);
@@ -6704,7 +6674,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_quote", "about_quote_author", "about_contacts", "about_qr", "about_qr_text", "about_qr_amounts"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
