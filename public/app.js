@@ -77,6 +77,7 @@
   about_qr_amounts: "10元|请我喝杯咖啡\n30元|支持我继续写下去\n60元|加个鸡腿，再接再厉",
     nav_links: "",
     banner_button_url: "",
+    banner_button_target: "_blank",
     banner_bg_image: "",
     footer_text: "",
     footer_run_since: "",
@@ -4683,8 +4684,15 @@
           <input name="essay_button_text" maxlength="20" value="${esc(s.essay_button_text)}" />
         </div>
         <div class="field">
-          <label>按钮链接（可选）<br /><small style="color:var(--anzhiyu-secondtext)">填写 http(s) 链接后，横幅按钮改为点击跳转该链接（新标签打开）；留空则保持默认发布/解锁行为</small></label>
+          <label>按钮链接（可选）<br /><small style="color:var(--anzhiyu-secondtext)">填写 http(s) 链接后，横幅按钮改为点击跳转该链接；留空则保持默认发布/解锁行为</small></label>
           <input name="banner_button_url" maxlength="500" value="${esc(s.banner_button_url)}" placeholder="https://example.com" />
+        </div>
+        <div class="field">
+          <label>外链打开方式<br /><small style="color:var(--anzhiyu-secondtext)">仅对 http(s) 外链生效；站内路径始终在当前标签内切换</small></label>
+          <select name="banner_button_target" style="max-width:220px">
+            <option value="_blank"${s.banner_button_target !== "_self" ? " selected" : ""}>新标签打开</option>
+            <option value="_self"${s.banner_button_target === "_self" ? " selected" : ""}>当前标签打开</option>
+          </select>
         </div>
         <div class="field">
           <label>背景图（可选）<br /><small style="color:var(--anzhiyu-secondtext)">直接填图片 URL，或点击"上传"选择本地图片（存入 R2）</small></label>
@@ -6976,8 +6984,10 @@
     const bannerLink = e.target.closest('[data-act="banner-link"]');
     if (bannerLink) {
       const url = bannerLink.dataset.url || "";
-      if (/^https?:\/\//i.test(url)) window.open(url, "_blank", "noopener");
-      else if (url.startsWith("/")) navigate(url);
+      if (/^https?:\/\//i.test(url)) {
+        if ((state.settings.banner_button_target || "_blank") === "_self") location.href = url;
+        else window.open(url, "_blank", "noopener");
+      } else if (url.startsWith("/")) navigate(url);
       return;
     }
     const unlockBtn = e.target.closest('[data-act="unlock"]');
@@ -7088,7 +7098,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;

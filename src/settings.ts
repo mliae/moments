@@ -43,6 +43,7 @@ export interface SiteSettings {
   nav_links: string; // 自定义导航项，每行一条：名称|链接
   // 横幅
   banner_button_url: string; // 横幅按钮链接（空=默认 发布/登录 行为）
+  banner_button_target: string; // 横幅外链打开方式：_blank=新标签（默认），_self=当前标签
   banner_bg_image: string; // 横幅背景图 URL（后台上传或外链）
   // 页脚
   footer_text: string; // 页脚文案（支持 HTML）
@@ -123,6 +124,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   about_qr_amounts: "10元|请我喝杯咖啡\n30元|支持我继续写下去\n60元|加个鸡腿，再接再厉",
   nav_links: "",
   banner_button_url: "",
+  banner_button_target: "_blank",
   banner_bg_image: "",
   footer_text: "",
   footer_run_since: "",
@@ -176,6 +178,7 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   links_categories: 500,
   nav_links: 1000,
   banner_button_url: 500,
+  banner_button_target: 10,
   banner_bg_image: 500,
   footer_text: 2000,
   footer_run_since: 40,
