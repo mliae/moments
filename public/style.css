@@ -1069,6 +1069,7 @@ input:focus, textarea:focus { border-color: var(--anzhiyu-main); box-shadow: var
     color: var(--anzhiyu-fontcolor); font-size: .95rem;
     transition: background .2s, color .2s;
   }
+  .m-nav a[hidden] { display: none !important; }
   .m-nav a svg { width: 20px; height: 20px; color: var(--anzhiyu-secondtext); flex: none; transition: color .2s; }
   .m-nav a:active { background: var(--anzhiyu-secondbg); }
   .m-nav a.active { background: var(--anzhiyu-main-op); color: var(--anzhiyu-main); font-weight: 600; }

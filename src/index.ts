@@ -413,9 +413,14 @@ app.get("/post/:slug", async c => {
 app.notFound(async c => {
   const path = new URL(c.req.url).pathname;
   if (path.startsWith("/api/") || path.startsWith("/media/")) return fail(c, "接口不存在", 404);
-  // 秘密后台入口（/sys-xxxx 已由 wrangler run_worker_first 转发到 Worker，
-  // 但没有注册对应路由，因此落到这里）
-  if (c.req.method === "GET" && path.startsWith("/sys-")) {
+  // 秘密后台入口（任意路径由 wrangler run_worker_first 的 /* 兜底到 Worker，
+  // 但没有注册对应路由，因此落到这里）。
+  // 前置过滤：仅对「单段、无扩展名」的路径查库，避免每个静态资源请求都打 D1。
+  if (
+    c.req.method === "GET" &&
+    !path.includes(".") &&
+    /^\/[a-z0-9-]{3,40}$/i.test(path)
+  ) {
     const s = await getSettings(c.env.DB);
     if (s.admin_path === path) return serveAdminEntry(c, path);
   }

@@ -4350,10 +4350,10 @@
       <form class="settings-form" data-adminpath-form style="max-width:560px">
         <div class="field">
           <label>后台入口路径<br />
-            <small style="color:var(--anzhiyu-secondtext)">修改后旧地址 /admin 立即失效（访客访问显示 404），请牢记新地址，建议收藏。格式：/sys- 开头 + 4~24 位字母数字</small>
+            <small style="color:var(--anzhiyu-secondtext)">修改后旧地址 /admin 立即失效（访客访问显示 404），请牢记新地址，建议收藏。格式：/ 开头 + 3~39 位字母数字或短横线，如 /my-secret</small>
           </label>
           <div style="display:flex;gap:8px">
-            <input name="admin_path" maxlength="40" value="${esc(s.admin_path || "/admin")}" pattern="/admin|/sys-[A-Za-z0-9]{4,24}" required style="flex:1;font-family:monospace" />
+            <input name="admin_path" maxlength="40" value="${esc(s.admin_path || "/admin")}" pattern="/admin|/[A-Za-z0-9][A-Za-z0-9-]{2,38}" required style="flex:1;font-family:monospace" />
             <button type="button" class="btn" data-gen-path style="white-space:nowrap">随机生成</button>
           </div>
           <div class="field-hint" style="margin-top:.5rem;color:#e6a23c">
@@ -6085,7 +6085,7 @@
       ).join("");
       const input = genPathBtn.closest("[data-adminpath-form]")?.querySelector('input[name="admin_path"]');
       if (input) {
-        input.value = "/sys-" + rnd;
+        input.value = "/" + rnd;
         const msg = input.closest("[data-adminpath-form]")?.querySelector("[data-adminpath-msg]");
         if (msg) {
           msg.textContent = "已生成随机路径，确认无误后点击「更新入口路径」";
@@ -6340,8 +6340,8 @@
       const msg = pathForm.querySelector("[data-adminpath-msg]");
       msg.textContent = "";
       const newPath = pathForm.admin_path.value.trim().toLowerCase();
-      if (!/^(\/admin|\/sys-[a-z0-9]{4,24})$/.test(newPath)) {
-        msg.textContent = "格式非法：需为 /admin 或 /sys- 开头加 4~24 位字母数字";
+      if (!/^(\/admin|\/[a-z0-9][a-z0-9-]{2,38})$/i.test(newPath)) {
+        msg.textContent = "格式非法：需为 /admin 或 / 开头加 3~39 位字母数字/短横线";
         msg.style.color = "#f56c6c";
         return;
       }
@@ -6716,8 +6716,9 @@
       const slug = decodeURIComponent(path.slice("/post/".length));
       const preview = state.admin && new URLSearchParams(search).get("preview") === "1";
       renderPostDetail(slug, preview);
-    } else if (path === state.adminPath || (ssrEntry === "1" && path.startsWith("/sys-"))) {
-      // 秘密后台入口（SPA 跳转靠本地记录的路径，硬加载靠 SSR meta 标记）
+    } else if (path === state.adminPath || ssrEntry === "1") {
+      // 秘密后台入口（SPA 跳转靠本地记录的路径，硬加载靠 SSR meta 标记；
+      // ssrEntry=1 仅由后端在 path===admin_path 时注入，故任意路径均适用）
       // 首次部署且未设密码：渲染设置初始密码表单，而非解锁页
       if (ssrSetup === "1" && !state.admin) {
         renderAdminSetup();

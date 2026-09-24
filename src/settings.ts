@@ -143,13 +143,15 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
 };
 
 /**
- * 校验后台入口路径：仅允许默认 /admin 或 /sys- 前缀的秘密路径
- * （/sys-* 已在 wrangler.jsonc run_worker_first 中放行到 Worker）
+ * 校验后台入口路径：默认 /admin，或任意单段秘密路径（如 /my-secret）。
+ * 任意路径的硬加载由 wrangler.jsonc run_worker_first 的 /* 兜底到 Worker，
+ * 在 index.ts notFound 中比对 admin_path 后注入 SSR 信号。
  */
 export function normalizeAdminPath(raw: unknown): string | null {
   const v = String(raw ?? "").trim().slice(0, 40);
   if (v === "/admin") return v;
-  if (/^\/sys-[a-z0-9]{4,24}$/i.test(v)) return v.toLowerCase();
+  // 允许任意单段路径：/ 开头 + 3-39 位字母数字短横线（如 /my-secret、/control-panel）
+  if (/^\/[a-z0-9][a-z0-9-]{2,38}$/i.test(v)) return v.toLowerCase();
   return null;
 }
 

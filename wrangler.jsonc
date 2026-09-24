@@ -12,22 +12,10 @@
     "directory": "./public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    // 这些路径先进 Worker：HTML 做 SSR，API/媒体走动态处理；
-    // 注意 run_worker_first 是白名单语义，未列出的动态路径必须显式包含
-    "run_worker_first": [
-      "/",
-      "/posts",
-      "/post/*",
-      "/photos",
-      "/admin",
-      "/sys-*",
-      "/robots.txt",
-      "/sitemap.xml",
-      "/rss.xml",
-      "/api/*",
-      "/media/*",
-      "/imgproxy"
-    ]
+    // 全部路径先进 Worker：HTML 做 SSR，API/媒体走动态处理；
+    // 这也让后台秘密入口可设为任意路径（见 settings.normalizeAdminPath），
+    // 硬加载时由 index.ts notFound 比对 admin_path 并注入 SSR 信号；其余未知路径回退静态资源。
+    "run_worker_first": ["/*"]
   },
   // 自动资源 provisioning（wrangler 4.45+，2025-10-24 起 open beta）：
   // 省略 database_id，部署时按 database_name 自动创建/复用 D1，并在 Worker
