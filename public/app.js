@@ -13,6 +13,7 @@
   const app = document.getElementById("app");
   const adminArea = document.getElementById("adminArea");
   const modalRoot = document.getElementById("modalRoot");
+  const lightboxRoot = document.getElementById("lightboxRoot");
   const themeToggle = document.getElementById("themeToggle");
   const fabPublish = document.getElementById("fabPublish");
 
@@ -381,7 +382,7 @@
       setMsg("正在收集图片列表…");
       for (;;) {
         const d = await api("/api/feed?limit=50" + (cursor ? "&cursor=" + encodeURIComponent(cursor) : ""));
-        (d.data?.list || []).forEach(it => {
+        (d.list || []).forEach(it => {
           (it.images || []).forEach(s => {
             const k = keyFrom(s);
             if (k) keys.add(k);
@@ -391,13 +392,13 @@
             if (k) keys.add(k);
           }
         });
-        cursor = d.data?.nextCursor || "";
+        cursor = d.nextCursor || "";
         if (!cursor) break;
       }
       let page = 1;
       for (;;) {
         const d = await api(`/api/photos?page=${page}&per_page=50`);
-        const list = d.data?.list || [];
+        const list = d.list || [];
         list.forEach(p => {
           const k = keyFrom(p.src);
           if (k) keys.add(k);
@@ -406,30 +407,38 @@
         page++;
       }
       const targets = [...keys].filter(k => !/_w1200\.jpg$/i.test(k) && !/\.gif$/i.test(k));
-      let done = 0, made = 0, missing = 0;
+      // 带超时的 fetch：单张请求超过 30s 自动中止，避免某张图卡住导致整个任务“假死”
+      const fetchWithTimeout = (url, opts = {}, ms = 30000) => {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), ms);
+        return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t));
+      };
+      let done = 0, made = 0, missing = 0, failed = 0;
       for (const key of targets) {
         done++;
         setMsg(`重建缩略图 ${done}/${targets.length}（已补 ${made}）…`);
         const thumbKey = key.replace(/\.([^.]+)$/i, "_w1200.jpg");
         try {
-          const head = await fetch("/media/" + encodeURI(thumbKey), { method: "HEAD" });
+          const head = await fetchWithTimeout("/media/" + encodeURI(thumbKey), { method: "HEAD" });
           if (head.ok) continue;
-          const resp = await fetch("/media/" + encodeURI(key));
+          const resp = await fetchWithTimeout("/media/" + encodeURI(key));
           if (!resp.ok) { missing++; continue; }
           const blob = await resp.blob();
           const file = new File([blob], key.split("/").pop() || "img", { type: blob.type || "image/jpeg" });
           const thumb = await generateThumb(file);
-          if (!thumb) continue;
+          if (!thumb) { failed++; continue; }
           const fd = new FormData();
           fd.append("file", thumb, "thumb.jpg");
           fd.append("kind", "image");
           fd.append("key", thumbKey);
-          const res = await fetch("/api/admin/upload", { method: "POST", body: fd, credentials: "same-origin" });
-          if (res.ok) made++;
-        } catch {}
+          const res = await fetchWithTimeout("/api/admin/upload", { method: "POST", body: fd, credentials: "same-origin" });
+          if (res.ok) made++; else failed++;
+        } catch {
+          failed++; // 超时/网络异常：记入失败，继续下一张，不中断整体任务
+        }
       }
-      setMsg(`完成：共 ${targets.length} 张，补生成 ${made} 张${missing ? `，${missing} 张原图读取失败` : ""}`);
-      toast(`缩略图重建完成（${made}/${targets.length}）`);
+      setMsg(`完成：共 ${targets.length} 张，补生成 ${made} 张${missing ? `，${missing} 张原图缺失` : ""}${failed ? `，${failed} 张失败` : ""}`);
+      toast(`缩略图重建完成（${made}/${targets.length}）${failed ? `，${failed} 张失败` : ""}`);
     } catch (err) {
       setMsg("失败：" + err.message);
       toast(err.message);
@@ -475,8 +484,10 @@
       }
       const W = bitmap.width;
       const H = bitmap.height;
-      if (Math.max(W, H) <= MAX_EDGE) return null; // 已小于 1200px，不缩
-      const scale = MAX_EDGE / Math.max(W, H);
+      // 始终生成 _w1200.jpg 缩略图：展示端 thumbSrc 无条件把站内图改写成 _w1200.jpg，
+      // 若小图不生成缩略图，前端请求会 404（控制台 ORB 报错 + 回退加载原图拖慢首页）。
+      // 小于 1200px 的按原尺寸重编码为 jpeg，保证每张站内图都有对应缩略图。
+      const scale = Math.min(1, MAX_EDGE / Math.max(W, H));
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.round(W * scale));
       canvas.height = Math.max(1, Math.round(H * scale));
@@ -823,7 +834,7 @@
     const { group, index } = lightboxState;
     const src = group[index];
     const multi = group.length > 1;
-    modalRoot.innerHTML = `
+    lightboxRoot.innerHTML = `
       <div class="lightbox-mask" data-lb-close>
         <button type="button" class="lightbox-close" data-lb-close aria-label="关闭">×</button>
         ${
@@ -840,12 +851,14 @@
 
   function openLightbox(src, group) {
     lightboxState = { group: group.filter(Boolean), index: Math.max(0, group.indexOf(src)) };
+    lockBodyScroll();
     renderLightbox();
   }
 
   function closeLightbox() {
     lightboxState = null;
-    modalRoot.innerHTML = "";
+    lightboxRoot.innerHTML = "";
+    unlockBodyScroll();
   }
 
   function moveLightbox(delta) {
@@ -874,6 +887,8 @@
 
   document.addEventListener("keydown", e => {
     if (!lightboxState) return;
+    // 灯箱打开时独占键盘：阻止模态的 ESC 处理器连带关闭评论弹窗
+    e.stopImmediatePropagation();
     if (e.key === "Escape") closeLightbox();
     else if (e.key === "ArrowLeft") moveLightbox(-1);
     else if (e.key === "ArrowRight") moveLightbox(1);
@@ -1797,7 +1812,7 @@
           <span class="comment-time">${timeAgo(cm.created_at)}</span>
         </div>
         <div class="comment-text">${formatCommentContent(cm.content)}</div>
-        ${imgs.length ? `<div class="comment-images">${imgs.map(u => `<img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="comment-img" data-comment-img="${esc(u)}" />`).join("")}</div>` : ""}
+        ${imgs.length ? `<div class="comment-images">${imgs.map(u => `<img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="comment-img" data-lightbox="${esc(u)}" data-comment-img="${esc(u)}" />`).join("")}</div>` : ""}
         <div class="comment-actions">
           <button type="button" class="comment-reply-btn" data-reply-root="${root}" data-reply-name="${esc(cm.nickname)}">回复</button>
         </div>
