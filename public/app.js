@@ -73,7 +73,8 @@
     about_contacts:
       "GitHub|孤鸿剑尊|https://github.com/mliae\n邮箱|hi@jxe.me|mailto:hi@jxe.me\nRSS|订阅本站|/feed",
     about_qr: "",
-    about_qr_text: "这里没有广告，全是一杯杯陈酿。扫码或留言，跟我打个招呼。",
+  about_qr_text: "这里没有广告，全是一杯杯陈酿。扫码或留言，跟我打个招呼。",
+  about_qr_amounts: "10元|请我喝杯咖啡\n30元|支持我继续写下去\n60元|加个鸡腿，再接再厉",
     nav_links: "",
     banner_button_url: "",
     banner_bg_image: "",
@@ -2669,11 +2670,28 @@
           </section>`
         : "";
 
-      // 二维码 / 底部卡
+      // 赞助 / 收款码：咖啡主题卡 + 金额按钮切换二维码
+      // about_qr_amounts 每行：金额|二维码URL（URL 可空，空则不切图）
+      const amounts = parseRows(s.about_qr_amounts).map(r => ({ label: String(r[0] || "").trim(), src: String(r[1] || "").trim() })).filter(x => x.label);
+      const firstSrc = amounts.find(x => /^https?:\/\//i.test(x.src))?.src || s.about_qr || "";
+      const btnHtml = amounts.length
+        ? amounts.map((a, i) => `<button type="button" class="about-amt-btn${i === 0 ? " is-active" : ""}" data-qr-src="${esc(a.src)}">${esc(a.label)}</button>`).join("")
+        : "";
+      const qrImgHtml = firstSrc ? `<img class="about-qr-pic" src="${esc(firstSrc)}" alt="赞助收款码" loading="lazy" />` : `<div class="about-qr-empty">${svgIcon("coffee", 40)}</div>`;
       const qrHtml = `
-        <section class="about-card about-qr">
-          <div class="about-qr-text">${esc(s.about_qr_text || "")}</div>
-          ${s.about_qr ? `<div class="about-qr-img"><img src="${esc(s.about_qr)}" alt="qr" loading="lazy" /></div>` : ""}
+        <section class="about-card about-sponsor">
+          <div class="about-sponsor-main">
+            <div class="about-sponsor-head">
+              <span class="about-sponsor-ico">${svgIcon("coffee", 22)}</span>
+              <span class="about-sponsor-title">请我喝杯咖啡</span>
+            </div>
+            <div class="about-qr-text">${esc(s.about_qr_text || "")}</div>
+            ${btnHtml ? `<div class="about-amt-group" role="group" aria-label="选择赞助金额">${btnHtml}</div>` : ""}
+          </div>
+          <div class="about-sponsor-qr">
+            ${qrImgHtml}
+            <div class="about-qr-tip">扫码支持，感谢你 ❤</div>
+          </div>
         </section>`;
 
       app.innerHTML = `<div class="essay"><div class="about-wrap">
@@ -2686,6 +2704,20 @@
         ${contactHtml}
         ${qrHtml}
       </div></div>`;
+      // 赞助金额按钮：点击切换对应收款码图片
+      app.querySelectorAll(".about-amt-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const src = btn.getAttribute("data-qr-src") || "";
+          app.querySelectorAll(".about-amt-btn").forEach(b => b.classList.toggle("is-active", b === btn));
+          const pic = app.querySelector(".about-sponsor-qr .about-qr-pic");
+          if (!/^https?:\/\//i.test(src)) return; // 该金额未配置二维码，仅高亮不切图
+          if (pic) { pic.src = src; }
+          else {
+            const box = app.querySelector(".about-sponsor-qr");
+            if (box) box.innerHTML = `<img class="about-qr-pic" src="${esc(src)}" alt="赞助收款码" loading="lazy" /><div class="about-qr-tip">扫码支持，感谢你 ❤</div>`;
+          }
+        });
+      });
     } catch (e) {
       app.innerHTML = `<div class="essay"><div class="about-wrap"><div class="essay-empty">${esc(e.message)}</div></div></div>`;
     }
@@ -4352,6 +4384,10 @@
         <div class="field">
           <label>二维码下方说明文字</label>
           <input name="about_qr_text" maxlength="300" value="${esc(s.about_qr_text)}" />
+        </div>
+        <div class="field">
+          <label>赞助金额按钮组（点击切换二维码）<br /><small style="color:var(--anzhiyu-secondtext)">每行一条：金额|该金额的二维码图片URL。URL 可留空（留空则该按钮只高亮不切图）</small></label>
+          <textarea name="about_qr_amounts" maxlength="1000" rows="4" placeholder="10元|https://.../10.png&#10;30元|https://.../30.png&#10;60元|https://.../60.png">${esc(s.about_qr_amounts)}</textarea>
         </div>
 
         <button class="btn primary" type="submit">保存设置</button>
@@ -6668,7 +6704,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_quote", "about_quote_author", "about_contacts", "about_qr", "about_qr_text"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_quote", "about_quote_author", "about_contacts", "about_qr", "about_qr_text", "about_qr_amounts"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;

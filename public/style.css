@@ -1912,6 +1912,21 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 .about-qr-img { display: inline-block; }
 .about-qr-img img { width: 150px; height: 150px; object-fit: contain; border-radius: 10px; }
 
+/* 赞助 / 收款码卡：左文案+金额按钮，右二维码 */
+.about-sponsor { display: flex; align-items: center; gap: 1.4rem; }
+.about-sponsor-main { flex: 1; min-width: 0; }
+.about-sponsor-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
+.about-sponsor-ico { display: inline-flex; color: #8a9a7b; }
+.about-sponsor-title { font-size: 1.05rem; font-weight: 700; color: var(--anzhiyu-main); }
+.about-sponsor-qr { flex-shrink: 0; text-align: center; }
+.about-sponsor-qr .about-qr-pic { width: 132px; height: 132px; object-fit: contain; border-radius: 10px; background: #fff; padding: 4px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.about-qr-empty { width: 132px; height: 132px; border-radius: 10px; background: var(--anzhiyu-maskbg); display: flex; align-items: center; justify-content: center; color: var(--anzhiyu-secondtext); opacity: .5; }
+.about-qr-tip { font-size: .78rem; color: var(--anzhiyu-secondtext); margin-top: .5rem; }
+.about-amt-group { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .8rem; }
+.about-amt-btn { padding: .4rem .95rem; border: 1px solid var(--anzhiyu-gray-op, #e3e8e3); border-radius: 999px; background: var(--anzhiyu-maskbg); color: var(--anzhiyu-secondtext); font-size: .85rem; cursor: pointer; transition: all .2s; }
+.about-amt-btn:hover { border-color: #8a9a7b; color: #8a9a7b; }
+.about-amt-btn.is-active { background: var(--anzhiyu-main, #8a9a7b); border-color: var(--anzhiyu-main, #8a9a7b); color: #fff; }
+
 @media (max-width: 720px) {
   .about-bio { flex-direction: column; }
   .about-stats-aside { min-width: 0; width: 100%; }
@@ -1919,5 +1934,7 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   .about-big-grid { grid-template-columns: repeat(2, 1fr); }
   .about-greet h1 { font-size: 1.35rem; }
   .about-card { padding: 1.1rem 1.2rem; }
+  .about-sponsor { flex-direction: column; align-items: stretch; gap: 1rem; }
+  .about-sponsor-qr { align-self: center; }
 }
 

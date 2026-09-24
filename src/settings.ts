@@ -38,6 +38,7 @@ export interface SiteSettings {
   about_contacts: string; // 联系方式，每行：类型|值|链接
   about_qr: string; // 底部二维码/收款码图片 URL
   about_qr_text: string; // 二维码下方说明文字
+  about_qr_amounts: string; // 赞助金额按钮组，每行：金额|二维码URL（如 10元|https://.../10.png）；点击切换二维码
   // 导航
   nav_links: string; // 自定义导航项，每行一条：名称|链接
   // 横幅
@@ -119,6 +120,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
     "RSS|订阅本站|/feed",
   about_qr: "",
   about_qr_text: "这里没有广告，全是一杯杯陈酿。扫码或留言，跟我打个招呼。",
+  about_qr_amounts: "10元|请我喝杯咖啡\n30元|支持我继续写下去\n60元|加个鸡腿，再接再厉",
   nav_links: "",
   banner_button_url: "",
   banner_bg_image: "",
@@ -173,6 +175,7 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   about_contacts: 1000,
   about_qr: 500,
   about_qr_text: 300,
+  about_qr_amounts: 1000,
   nav_links: 1000,
   banner_button_url: 500,
   banner_bg_image: 500,
