@@ -333,8 +333,8 @@ app.get("/links", async c => {
   const origin = new URL(c.req.url).origin;
   const countRow = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM friends WHERE status = 'approved'`).first<{ n: number }>();
   const count = Number(countRow?.n ?? 0);
-  const title = `友情链接 · ${s.site_title}`;
-  const description = `${s.site_title} 的友情链接，共收录 ${count} 个优秀站点`;
+  const title = `友链 · ${s.site_title}`;
+  const description = `${s.site_title} 的友链，共收录 ${count} 个优秀站点`;
   const head = buildSeoHead(origin, {
     title,
     description,

@@ -259,6 +259,7 @@
     "scroll-text": { stroke: '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>' },
     info: { stroke: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>' },
     check: { stroke: '<path d="M20 6 9 17l-5-5"/>' },
+    "circle-user": { stroke: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/>' },
   };
 
   function svgIcon(name, size) {
@@ -2788,8 +2789,8 @@
 
       app.innerHTML = `<div class="essay"><div class="links-wrap">
         <div class="links-page-head">
-          <div class="links-eyebrow">友情链接 · FRIENDS</div>
-          <h1 class="links-title">友情链接</h1>
+          <div class="links-eyebrow">友链 · FRIENDS</div>
+          <h1 class="links-title">友链</h1>
           <p class="links-subtitle">这里收集了我常去翻阅的独立博客与友站。每一家都有自己的节奏，值得慢下来读一读。</p>
           <div class="links-stats">
             <div class="links-stat"><b>${stats.total ?? 0}</b><span>友站总数</span></div>
@@ -3765,6 +3766,7 @@
     { key: "posts", label: "文章", icon: "file-text" },
     { key: "photos", label: "相册", icon: "image" },
     { key: "friends", label: "友链", icon: "link" },
+    { key: "about", label: "关于我", icon: "circle-user" },
     { key: "comments", label: "评论", icon: "message-square" },
     { key: "appearance", label: "外观", icon: "palette" },
     { key: "media", label: "媒体", icon: "folder" },
@@ -3942,6 +3944,7 @@
     if (tab === "posts") return renderAdminPosts(panel);
     if (tab === "photos") return renderAdminPhotos(panel);
     if (tab === "friends") return renderAdminFriends(panel);
+    if (tab === "about") return renderAdminAbout(panel);
     if (tab === "comments") return renderAdminComments(panel);
     if (tab === "appearance") return renderAdminAppearance(panel);
     if (tab === "media") return renderAdminMedia(panel);
@@ -4294,6 +4297,106 @@
     });
   }
 
+  /* ================= 后台：关于我页面 ================= */
+  function renderAdminAbout(panel) {
+    const s = state.settings;
+    panel.innerHTML = `
+      <h3>关于我页面</h3>
+      <form class="settings-form" data-settings-form>
+        <div class="field">
+          <label for="about_enabled">启用「关于我」页面<br /><small style="color:var(--anzhiyu-secondtext)">开启后顶栏显示「关于」入口，访问 /about 可查看</small></label>
+          <label class="admin-check-cell" style="justify-content:flex-start;gap:.5rem;margin-top:.35rem">
+            <input type="checkbox" name="about_enabled" id="about_enabled" ${s.about_enabled ? "checked" : ""} />
+            <span>启用关于我页面（/about）</span>
+          </label>
+        </div>
+        <div class="field">
+          <label>顶部问候大标题</label>
+          <input name="about_greeting" maxlength="60" value="${esc(s.about_greeting)}" />
+        </div>
+        <div class="field">
+          <label>问候标题下方小字</label>
+          <input name="about_greeting_sub" maxlength="200" value="${esc(s.about_greeting_sub)}" />
+        </div>
+        <div class="field">
+          <label>关于页大头像（可选）<br /><small style="color:var(--anzhiyu-secondtext)">图片 URL 或上传；留空则用说说作者头像</small></label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input name="about_avatar" maxlength="300" value="${esc(s.about_avatar)}" placeholder="https://...（留空=作者头像）" style="flex:1" />
+            <button type="button" class="btn" data-avatar-upload="about_avatar">上传</button>
+            <input type="file" accept="image/*" data-avatar-file="about_avatar" hidden />
+          </div>
+          <div class="field-hint" data-avatar-preview="about_avatar" style="margin-top:.4rem">${/^https?:\/\//i.test(s.about_avatar || "") ? `<img src="${esc(s.about_avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
+        </div>
+        <div class="field">
+          <label>一句话签名</label>
+          <input name="about_signature" maxlength="200" value="${esc(s.about_signature)}" />
+        </div>
+        <div class="field">
+          <label>自我介绍正文（Markdown）</label>
+          <textarea name="about_bio" maxlength="5000" rows="6" placeholder="支持 Markdown 语法…">${esc(s.about_bio)}</textarea>
+        </div>
+        <div class="field">
+          <label>「一些数字」小卡片（每行一条：名称|数值|说明）</label>
+          <textarea name="about_stats" maxlength="1000" rows="4" placeholder="坚持记录|多年|从开始写到现在&#10;记录天数|持续|几乎每天都在更新">${esc(s.about_stats)}</textarea>
+        </div>
+        <div class="field">
+          <label>时间线（每行一条：日期|标题|描述）</label>
+          <textarea name="about_timeline" maxlength="2000" rows="4" placeholder="2021|开始写博客|用文字记录生活的第一个节点">${esc(s.about_timeline)}</textarea>
+        </div>
+        <div class="field">
+          <label>底部大数字统计（每行一条：数字|标签）</label>
+          <textarea name="about_bigstats" maxlength="500" rows="3" placeholder="6|年记录&#10;120+|篇文字">${esc(s.about_bigstats)}</textarea>
+        </div>
+        <div class="field">
+          <label>联系方式（每行一条：类型|值|链接）<br /><small style="color:var(--anzhiyu-secondtext)">链接可空；类型自动匹配图标（GitHub/邮箱/RSS/QQ 等）</small></label>
+          <textarea name="about_contacts" maxlength="1000" rows="4" placeholder="GitHub|孤鸿剑尊|https://github.com/xxx&#10;邮箱|a@b.com|mailto:a@b.com">${esc(s.about_contacts)}</textarea>
+        </div>
+        <div class="field">
+          <label>赞助卡说明文字</label>
+          <input name="about_qr_text" maxlength="300" value="${esc(s.about_qr_text)}" />
+        </div>
+        <div class="field">
+          <label>赞助金额按钮组（点击切换二维码）<br /><small style="color:var(--anzhiyu-secondtext)">每行一条：金额|该金额的二维码图片URL。URL 可留空（留空则该按钮只高亮不切图）</small></label>
+          <textarea name="about_qr_amounts" maxlength="1000" rows="4" placeholder="10元|https://.../10.png&#10;30元|https://.../30.png&#10;60元|https://.../60.png">${esc(s.about_qr_amounts)}</textarea>
+        </div>
+
+        <button class="btn primary" type="submit">保存设置</button>
+      </form>`;
+
+    // 关于页头像上传 + 预览
+    const avBtn = panel.querySelector('[data-avatar-upload="about_avatar"]');
+    if (avBtn) {
+      const fileInp = panel.querySelector('[data-avatar-file="about_avatar"]');
+      const urlInp = panel.querySelector('[name="about_avatar"]');
+      const preview = panel.querySelector('[data-avatar-preview="about_avatar"]');
+      avBtn.addEventListener("click", () => fileInp.click());
+      fileInp.addEventListener("change", async () => {
+        const file = fileInp.files[0];
+        if (!file) return;
+        avBtn.disabled = true;
+        avBtn.textContent = "上传中...";
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("kind", "image");
+          const res = await fetch("/api/admin/upload", { method: "POST", body: fd, credentials: "same-origin" });
+          const json = await res.json();
+          if (!res.ok || !json.data?.src) throw new Error(json.message || "上传失败");
+          const full = /^https?:\/\//i.test(json.data.src) ? json.data.src : location.origin + json.data.src;
+          urlInp.value = full;
+          preview.innerHTML = `<img src="${esc(full)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />`;
+          toast("上传成功，记得点击保存设置");
+        } catch (err) {
+          toast(err.message);
+        } finally {
+          avBtn.disabled = false;
+          avBtn.textContent = "上传";
+          fileInp.value = "";
+        }
+      });
+    }
+  }
+
   /* ================= 后台：友链管理 ================= */
   async function renderAdminFriends(panel) {
     panel.innerHTML = `<h3>友链管理</h3><div class="field-hint">加载中…</div>`;
@@ -4332,7 +4435,15 @@
 
     panel.innerHTML = `
       <h3>友链管理（${list.length}）${data.pending_count ? ` <span class="friend-pending-badge">${data.pending_count} 条待审核</span>` : ""}</h3>
-      <div class="field-hint" style="margin-bottom:1rem">访客在 /links/apply 提交的申请会进入「待审核」，通过后自动上架到 /links。也可在此直接新增友站。分类在「外观 → 友链分类」维护。</div>
+      <div class="field-hint" style="margin-bottom:1rem">访客在 /links/apply 提交的申请会进入「待审核」，通过后自动上架到 /links。也可在此直接新增友站。</div>
+
+      <form class="settings-form" data-settings-form style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc);margin-bottom:1rem">
+        <div class="field">
+          <label>友链分类（每行一个）<br /><small style="color:var(--anzhiyu-secondtext)">列表页会自动加「全部」；此处可增删改，新增/编辑友站时分类下拉同步更新</small></label>
+          <textarea name="links_categories" maxlength="500" rows="4" placeholder="技术&#10;设计&#10;生活随笔&#10;摄影">${esc(state.settings.links_categories)}</textarea>
+        </div>
+        <button class="btn primary" type="submit">保存分类</button>
+      </form>
 
       <details class="friend-add-box" ${list.length === 0 ? "open" : ""}>
         <summary><b>＋ 新增友站</b></summary>
@@ -4649,82 +4760,20 @@
           </div>
         </details>
 
-        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>顶栏入口开关</h3></div>
+        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>导航入口开关</h3></div>
         <div class="field">
           <label class="admin-check-cell" style="justify-content:flex-start;gap:.5rem;margin-top:.35rem">
             <input type="checkbox" name="links_enabled" ${s.links_enabled ? "checked" : ""} />
-            <span>显示「友情链接」入口（/links）</span>
+            <span>显示「友链」入口（/links）</span>
           </label>
           <label class="admin-check-cell" style="justify-content:flex-start;gap:.5rem;margin-top:.35rem">
             <input type="checkbox" name="photos_enabled" ${s.photos_enabled ? "checked" : ""} />
             <span>显示「相册」入口（/photos）</span>
           </label>
-          <small style="color:var(--anzhiyu-secondtext)">「关于」入口开关在下方「关于我页面」分区；三个入口可独立开关，关闭后顶栏与移动端菜单均不显示。</small>
+          <small style="color:var(--anzhiyu-secondtext)">「关于我」入口开关在「关于我」Tab。三个入口可独立开关，关闭后顶栏与移动端菜单均不显示。</small>
         </div>
 
-        <div class="field">
-          <label>友链分类（每行一个）<br /><small style="color:var(--anzhiyu-secondtext)">列表页会自动加「全部」；此处可增删改，新增友站时分类下拉同步更新</small></label>
-          <textarea name="links_categories" maxlength="500" rows="4" placeholder="技术&#10;设计&#10;生活随笔&#10;摄影">${esc(s.links_categories)}</textarea>
-        </div>
-
-        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>关于我页面</h3></div>
-        <div class="field">
-          <label for="about_enabled">启用「关于我」页面<br /><small style="color:var(--anzhiyu-secondtext">开启后顶栏显示「关于」入口，访问 /about 可查看</small></label>
-          <label class="admin-check-cell" style="justify-content:flex-start;gap:.5rem;margin-top:.35rem">
-            <input type="checkbox" name="about_enabled" id="about_enabled" ${s.about_enabled ? "checked" : ""} />
-            <span>启用关于我页面（/about）</span>
-          </label>
-        </div>
-        <div class="field">
-          <label>顶部问候大标题</label>
-          <input name="about_greeting" maxlength="60" value="${esc(s.about_greeting)}" />
-        </div>
-        <div class="field">
-          <label>问候标题下方小字</label>
-          <input name="about_greeting_sub" maxlength="200" value="${esc(s.about_greeting_sub)}" />
-        </div>
-        <div class="field">
-          <label>关于页大头像（可选）<br /><small style="color:var(--anzhiyu-secondtext)">图片 URL 或上传；留空则用说说作者头像</small></label>
-          <div style="display:flex;gap:.5rem;align-items:center">
-            <input name="about_avatar" maxlength="300" value="${esc(s.about_avatar)}" placeholder="https://...（留空=作者头像）" style="flex:1" />
-            <button type="button" class="btn" data-avatar-upload="about_avatar">上传</button>
-            <input type="file" accept="image/*" data-avatar-file="about_avatar" hidden />
-          </div>
-          <div class="field-hint" data-avatar-preview="about_avatar" style="margin-top:.4rem">${/^https?:\/\//i.test(s.about_avatar || "") ? `<img src="${esc(s.about_avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
-        </div>
-        <div class="field">
-          <label>一句话签名</label>
-          <input name="about_signature" maxlength="200" value="${esc(s.about_signature)}" />
-        </div>
-        <div class="field">
-          <label>自我介绍正文（Markdown）</label>
-          <textarea name="about_bio" maxlength="5000" rows="6" placeholder="支持 Markdown 语法…">${esc(s.about_bio)}</textarea>
-        </div>
-        <div class="field">
-          <label>「一些数字」小卡片（每行一条：名称|数值|说明）</label>
-          <textarea name="about_stats" maxlength="1000" rows="4" placeholder="坚持记录|多年|从开始写到现在&#10;记录天数|持续|几乎每天都在更新">${esc(s.about_stats)}</textarea>
-        </div>
-        <div class="field">
-          <label>时间线（每行一条：日期|标题|描述）</label>
-          <textarea name="about_timeline" maxlength="2000" rows="4" placeholder="2021|开始写博客|用文字记录生活的第一个节点">${esc(s.about_timeline)}</textarea>
-        </div>
-        <div class="field">
-          <label>底部大数字统计（每行一条：数字|标签）</label>
-          <textarea name="about_bigstats" maxlength="500" rows="3" placeholder="6|年记录&#10;120+|篇文字">${esc(s.about_bigstats)}</textarea>
-        </div>
-        <div class="field">
-          <label>联系方式（每行一条：类型|值|链接）<br /><small style="color:var(--anzhiyu-secondtext">链接可空；类型自动匹配图标（GitHub/邮箱/RSS/QQ 等）</small></label>
-          <textarea name="about_contacts" maxlength="1000" rows="4" placeholder="GitHub|孤鸿剑尊|https://github.com/xxx&#10;邮箱|a@b.com|mailto:a@b.com">${esc(s.about_contacts)}</textarea>
-        </div>
-        <div class="field">
-          <label>赞助卡说明文字</label>
-          <input name="about_qr_text" maxlength="300" value="${esc(s.about_qr_text)}" />
-        </div>
-        <div class="field">
-          <label>赞助金额按钮组（点击切换二维码）<br /><small style="color:var(--anzhiyu-secondtext)">每行一条：金额|该金额的二维码图片URL。URL 可留空（留空则该按钮只高亮不切图）</small></label>
-          <textarea name="about_qr_amounts" maxlength="1000" rows="4" placeholder="10元|https://.../10.png&#10;30元|https://.../30.png&#10;60元|https://.../60.png">${esc(s.about_qr_amounts)}</textarea>
-        </div>
-
+        
         <button class="btn primary" type="submit">保存设置</button>
       </form>`;
 
