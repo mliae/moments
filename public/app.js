@@ -53,6 +53,27 @@
     author_name: "Moments",
     author_avatar: "",
     post_avatar: "",
+    about_enabled: true,
+    about_greeting: "先认识一下，再慢慢读。",
+    about_greeting_sub: "记录生活中的每一个瞬间，图文、视频与心情。",
+    about_avatar: "",
+    about_signature: "一个热爱记录生活的普通人，写字、拍照、偶尔写点代码。",
+    about_bio:
+      "写了几年字，还在慢慢找自己的声音。\n\n" +
+      "这里是我的小小角落，记录生活里那些值得停下的瞬间——可能是一段文字、一张照片、一首歌，或是某个忽然想说点什么的下午。\n\n" +
+      "如果你也喜欢这样的节奏，欢迎常来坐坐。",
+    about_stats: "坚持记录|多年|从开始写到现在\n记录天数|持续|几乎每天都在更新\n兴趣爱好|广泛|写字 拍照 音乐 代码",
+    about_timeline:
+      "2021|开始写博客|用文字记录生活的第一个节点\n" +
+      "2023|第一次做独立站|从模板到自己动手，慢慢搭起这个小站\n" +
+      "2025|上线轻博客 Moments|更专注于碎片化的日常记录",
+    about_bigstats: "6|年记录\n120+|篇文字\n300+|张照片\n1000+|个瞬间",
+    about_quote: "搭喜欢的事，做成每天的习惯。",
+    about_quote_author: "—— 写给自己",
+    about_contacts:
+      "GitHub|孤鸿剑尊|https://github.com/mliae\n邮箱|hi@jxe.me|mailto:hi@jxe.me\nRSS|订阅本站|/feed",
+    about_qr: "",
+    about_qr_text: "这里没有广告，全是一杯杯陈酿。扫码或留言，跟我打个招呼。",
     nav_links: "",
     banner_button_url: "",
     banner_bg_image: "",
@@ -222,6 +243,15 @@
     menu: { stroke: '<line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/>' },
     "triangle-alert": { stroke: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>' },
     gift: { stroke: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/>' },
+    /* —— 关于我页面用到的图标 —— */
+    quote: { stroke: '<path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/>' },
+    "chevron-right": { stroke: '<path d="m9 18 6-6-6-6"/>' },
+    github: { stroke: '<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/>' },
+    mail: { stroke: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>' },
+    rss: { stroke: '<path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/>' },
+    "at-sign": { stroke: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>' },
+    send: { stroke: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>' },
+    link: { stroke: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>' },
   };
 
   function svgIcon(name, size) {
@@ -1399,6 +1429,8 @@
     document.querySelector(".brand-name").textContent = s.site_title;
     document.querySelector('[data-route="feed"]').textContent = s.nav_feeds_name;
     document.title = s.site_title;
+    // 「关于」入口：about_enabled 开启时显示（桌面端 + 移动端）
+    document.querySelectorAll(".about-nav-link").forEach(a => { a.hidden = !s.about_enabled; });
     // 品牌头像：http(s) 链接渲染图片，否则用 lucide pen-nib 占位（不再用 emoji/文本）
     const avatarEl = document.querySelector(".brand-avatar");
     if (avatarEl) {
@@ -2468,6 +2500,208 @@
     } catch (e) {
       app.innerHTML = `<div class="essay"><div class="photos-wrap"><div class="essay-empty">${esc(e.message)}</div></div></div>`;
     }
+  }
+
+  /* ================= 关于我页面（/about） ================= */
+
+  /** 把「每行 a|b|c」文本解析成对象数组，空行忽略 */
+  function parseRows(text) {
+    return String(text || "")
+      .split(/\r?\n/)
+      .map(l => l.trim())
+      .filter(Boolean)
+      .map(l => l.split("|").map(s => s.trim()));
+  }
+
+  async function renderAbout() {
+    state.activeView = "about";
+    const s = state.settings;
+    setSeo({
+      title: `关于 · ${s.site_title}`,
+      description: s.about_signature || s.about_greeting_sub || "",
+      path: "/about",
+      image: s.about_avatar || s.author_avatar || s.brand_avatar || "",
+    });
+    app.innerHTML = `<div class="essay"><div class="about-wrap"><div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div></div></div>`;
+    try {
+      // 最近文章（设计图「最近写的一些东西」），失败则不显示该区块
+      let recentPosts = [];
+      try {
+        const pd = await api("/api/posts?page=1&per_page=6");
+        recentPosts = (pd && pd.list) || [];
+      } catch (_) {
+        recentPosts = [];
+      }
+      if (state.activeView !== "about") return;
+
+      const avatar = s.about_avatar || s.author_avatar || s.brand_avatar || "";
+      const name = s.author_name || s.site_title;
+
+      // 顶部问候 + 作者卡
+      const avatarHtml = avatar
+        ? `<img class="about-avatar-img" src="${esc(avatar)}" alt="${esc(name)}" />`
+        : `<span class="about-avatar-fallback">${svgIcon("pen-nib", 40)}</span>`;
+      const head = `
+        <section class="about-card about-head">
+          <div class="about-greet">
+            <h1>${esc(s.about_greeting || "关于我")}</h1>
+            ${s.about_greeting_sub ? `<p class="about-greet-sub">${esc(s.about_greeting_sub)}</p>` : ""}
+          </div>
+          <div class="about-author">
+            <div class="about-avatar">${avatarHtml}</div>
+            <div class="about-author-info">
+              <div class="about-author-name">${esc(name)}</div>
+              ${s.about_signature ? `<div class="about-author-sign">${esc(s.about_signature)}</div>` : ""}
+            </div>
+          </div>
+        </section>`;
+
+      // 自我介绍正文 + 右侧「一些数字」
+      const statsRows = parseRows(s.about_stats);
+      const statsHtml = statsRows.length
+        ? `<aside class="about-card about-stats-aside">
+            <div class="about-card-title">一些数字</div>
+            ${statsRows
+              .map(
+                r => `<div class="about-stat-mini">
+                  <span class="about-stat-mini-num">${esc(r[1] || "")}</span>
+                  <span class="about-stat-mini-label">${esc(r[0] || "")}</span>
+                  ${r[2] ? `<span class="about-stat-mini-desc">${esc(r[2])}</span>` : ""}
+                </div>`
+              )
+              .join("")}
+          </aside>`
+        : "";
+      const bioHtml = `
+        <section class="about-card about-bio${statsHtml ? " has-aside" : ""}">
+          <div class="about-bio-main">
+            <h2 class="about-card-title">${s.about_bio ? "" : ""}自我介绍</h2>
+            <div class="article-body">${sanitizeHtml(marked.parse(s.about_bio || ""))}</div>
+          </div>
+          ${statsHtml}
+        </section>`;
+
+      // 时间线
+      const tlRows = parseRows(s.about_timeline);
+      const timelineHtml = tlRows.length
+        ? `<section class="about-card about-tl">
+            <h2 class="about-card-title">一路走来的几个坐标</h2>
+            <div class="about-timeline">
+              ${tlRows
+                .map(
+                  r => `<div class="about-tl-item">
+                    <div class="about-tl-dot"></div>
+                    <div class="about-tl-body">
+                      <div class="about-tl-date">${esc(r[0] || "")}</div>
+                      <div class="about-tl-title">${esc(r[1] || "")}</div>
+                      ${r[2] ? `<div class="about-tl-desc">${esc(r[2])}</div>` : ""}
+                    </div>
+                  </div>`
+                )
+                .join("")}
+            </div>
+          </section>`
+        : "";
+
+      // 最近写的一些东西（文章网格）
+      const recentHtml = recentPosts.length
+        ? `<section class="about-card about-recent">
+            <div class="about-recent-head">
+              <h2 class="about-card-title">最近写的一些东西</h2>
+              <a class="about-more-link" href="/posts">查看全部 ${svgIcon("chevron-right", 14)}</a>
+            </div>
+            <div class="about-post-grid">
+              ${recentPosts
+                .map(
+                  p => `<a class="about-post-item" href="/post/${encodeURIComponent(p.slug)}">
+                    ${p.cover ? `<div class="about-post-cover"><img src="${esc(thumbSrc(p.cover))}" alt="" loading="lazy" data-orig="${esc(p.cover)}" /></div>` : `<div class="about-post-cover about-post-cover-empty">${svgIcon("file-text", 28)}</div>`}
+                    <div class="about-post-title">${esc(p.title)}</div>
+                  </a>`
+                )
+                .join("")}
+            </div>
+          </section>`
+        : "";
+
+      // 引言卡
+      const quoteHtml = s.about_quote
+        ? `<section class="about-card about-quote">
+            <div class="about-quote-mark">${svgIcon("quote", 22)}</div>
+            <div class="about-quote-text">${esc(s.about_quote)}</div>
+            ${s.about_quote_author ? `<div class="about-quote-author">${esc(s.about_quote_author)}</div>` : ""}
+          </section>`
+        : "";
+
+      // 大数字统计
+      const bigRows = parseRows(s.about_bigstats);
+      const bigHtml = bigRows.length
+        ? `<section class="about-card about-big">
+            <div class="about-card-title">这段时间，有多少人来过。</div>
+            <div class="about-big-grid">
+              ${bigRows
+                .map(
+                  r => `<div class="about-big-item">
+                    <div class="about-big-num">${esc(r[0] || "")}</div>
+                    <div class="about-big-label">${esc(r[1] || "")}</div>
+                  </div>`
+                )
+                .join("")}
+            </div>
+          </section>`
+        : "";
+
+      // 联系方式
+      const ctRows = parseRows(s.about_contacts);
+      const contactHtml = ctRows.length
+        ? `<section class="about-card about-contact">
+            <h2 class="about-card-title">想聊点什么，就挂挂我。</h2>
+            <div class="about-contact-list">
+              ${ctRows
+                .map(r => {
+                  const [type, val, link] = r;
+                  const inner = `<span class="about-contact-ico">${svgIcon(contactIcon(type), 18)}</span><span class="about-contact-type">${esc(type || "")}</span><span class="about-contact-val">${esc(val || "")}</span>`;
+                  return link
+                    ? `<a class="about-contact-item" href="${esc(link)}" target="_blank" rel="noopener noreferrer nofollow">${inner}</a>`
+                    : `<div class="about-contact-item">${inner}</div>`;
+                })
+                .join("")}
+            </div>
+          </section>`
+        : "";
+
+      // 二维码 / 底部卡
+      const qrHtml = `
+        <section class="about-card about-qr">
+          <div class="about-qr-text">${esc(s.about_qr_text || "")}</div>
+          ${s.about_qr ? `<div class="about-qr-img"><img src="${esc(s.about_qr)}" alt="qr" loading="lazy" /></div>` : ""}
+        </section>`;
+
+      app.innerHTML = `<div class="essay"><div class="about-wrap">
+        ${head}
+        ${bioHtml}
+        ${timelineHtml}
+        ${recentHtml}
+        ${quoteHtml}
+        ${bigHtml}
+        ${contactHtml}
+        ${qrHtml}
+      </div></div>`;
+    } catch (e) {
+      app.innerHTML = `<div class="essay"><div class="about-wrap"><div class="essay-empty">${esc(e.message)}</div></div></div>`;
+    }
+  }
+
+  /** 联系方式 → lucide 图标名映射，未知类型回退 link */
+  function contactIcon(type) {
+    const t = String(type || "").toLowerCase();
+    if (t.includes("github")) return "github";
+    if (t.includes("mail") || t.includes("邮箱") || t.includes("email")) return "mail";
+    if (t.includes("rss")) return "rss";
+    if (t.includes("qq")) return "message-circle";
+    if (t.includes("微博") || t.includes("weibo")) return "at-sign";
+    if (t.includes("tg") || t.includes("telegram")) return "send";
+    if (t.includes("b站") || t.includes("bilibili")) return "play";
+    return "link";
   }
 
   /** 水合服务端直出的文章页：保留 SSR DOM（无重绘闪烁），仅绑定交互/增强排版 */
@@ -4049,6 +4283,77 @@
           </div>
         </details>
 
+        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>关于我页面</h3></div>
+        <div class="field">
+          <label for="about_enabled">启用「关于我」页面<br /><small style="color:var(--anzhiyu-secondtext">开启后顶栏显示「关于」入口，访问 /about 可查看</small></label>
+          <label class="admin-check-cell" style="justify-content:flex-start;gap:.5rem;margin-top:.35rem">
+            <input type="checkbox" name="about_enabled" id="about_enabled" ${s.about_enabled ? "checked" : ""} />
+            <span>启用关于我页面（/about）</span>
+          </label>
+        </div>
+        <div class="field">
+          <label>顶部问候大标题</label>
+          <input name="about_greeting" maxlength="60" value="${esc(s.about_greeting)}" />
+        </div>
+        <div class="field">
+          <label>问候标题下方小字</label>
+          <input name="about_greeting_sub" maxlength="200" value="${esc(s.about_greeting_sub)}" />
+        </div>
+        <div class="field">
+          <label>关于页大头像（可选）<br /><small style="color:var(--anzhiyu-secondtext)">图片 URL 或上传；留空则用说说作者头像</small></label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input name="about_avatar" maxlength="300" value="${esc(s.about_avatar)}" placeholder="https://...（留空=作者头像）" style="flex:1" />
+            <button type="button" class="btn" data-avatar-upload="about_avatar">上传</button>
+            <input type="file" accept="image/*" data-avatar-file="about_avatar" hidden />
+          </div>
+          <div class="field-hint" data-avatar-preview="about_avatar" style="margin-top:.4rem">${/^https?:\/\//i.test(s.about_avatar || "") ? `<img src="${esc(s.about_avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
+        </div>
+        <div class="field">
+          <label>一句话签名</label>
+          <input name="about_signature" maxlength="200" value="${esc(s.about_signature)}" />
+        </div>
+        <div class="field">
+          <label>自我介绍正文（Markdown）</label>
+          <textarea name="about_bio" maxlength="5000" rows="6" placeholder="支持 Markdown 语法…">${esc(s.about_bio)}</textarea>
+        </div>
+        <div class="field">
+          <label>「一些数字」小卡片（每行一条：名称|数值|说明）</label>
+          <textarea name="about_stats" maxlength="1000" rows="4" placeholder="坚持记录|多年|从开始写到现在&#10;记录天数|持续|几乎每天都在更新">${esc(s.about_stats)}</textarea>
+        </div>
+        <div class="field">
+          <label>时间线（每行一条：日期|标题|描述）</label>
+          <textarea name="about_timeline" maxlength="2000" rows="4" placeholder="2021|开始写博客|用文字记录生活的第一个节点">${esc(s.about_timeline)}</textarea>
+        </div>
+        <div class="field">
+          <label>底部大数字统计（每行一条：数字|标签）</label>
+          <textarea name="about_bigstats" maxlength="500" rows="3" placeholder="6|年记录&#10;120+|篇文字">${esc(s.about_bigstats)}</textarea>
+        </div>
+        <div class="field">
+          <label>引言大字</label>
+          <input name="about_quote" maxlength="200" value="${esc(s.about_quote)}" />
+        </div>
+        <div class="field">
+          <label>引言署名 / 出处</label>
+          <input name="about_quote_author" maxlength="100" value="${esc(s.about_quote_author)}" />
+        </div>
+        <div class="field">
+          <label>联系方式（每行一条：类型|值|链接）<br /><small style="color:var(--anzhiyu-secondtext">链接可空；类型自动匹配图标（GitHub/邮箱/RSS/QQ 等）</small></label>
+          <textarea name="about_contacts" maxlength="1000" rows="4" placeholder="GitHub|孤鸿剑尊|https://github.com/xxx&#10;邮箱|a@b.com|mailto:a@b.com">${esc(s.about_contacts)}</textarea>
+        </div>
+        <div class="field">
+          <label>二维码 / 收款码图片（可选）<br /><small style="color:var(--anzhiyu-secondtext)">图片 URL 或上传；留空不显示</small></label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input name="about_qr" maxlength="500" value="${esc(s.about_qr)}" placeholder="https://...（留空不显示）" style="flex:1" />
+            <button type="button" class="btn" data-avatar-upload="about_qr">上传</button>
+            <input type="file" accept="image/*" data-avatar-file="about_qr" hidden />
+          </div>
+          <div class="field-hint" data-avatar-preview="about_qr" style="margin-top:.4rem">${/^https?:\/\//i.test(s.about_qr || "") ? `<img src="${esc(s.about_qr)}" alt="" style="max-width:120px;max-height:120px;border-radius:8px;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
+        </div>
+        <div class="field">
+          <label>二维码下方说明文字</label>
+          <input name="about_qr_text" maxlength="300" value="${esc(s.about_qr_text)}" />
+        </div>
+
         <button class="btn primary" type="submit">保存设置</button>
       </form>`;
 
@@ -4088,7 +4393,7 @@
     // 头像类字段上传 + URL 实时预览
     const avatarPreviewHtml = url =>
       `<img src="${esc(url)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />`;
-    ["brand_avatar", "author_avatar", "post_avatar", "site_icon"].forEach(field => {
+    ["brand_avatar", "author_avatar", "post_avatar", "site_icon", "about_avatar", "about_qr"].forEach(field => {
       const btn = panel.querySelector(`[data-avatar-upload="${field}"]`);
       if (!btn) return;
       const fileInp = panel.querySelector(`[data-avatar-file="${field}"]`);
@@ -6363,12 +6668,15 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_quote", "about_quote_author", "about_contacts", "about_qr", "about_qr_text"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
         patch[k] = String(fd.get(k) || "").trim();
       });
+      // about_enabled 复选框：勾选=启用（表单含该字段时才提交，避免跨 Tab 覆盖）
+      const aboutEnabledEl = settingsForm.querySelector('[name="about_enabled"]');
+      if (aboutEnabledEl) patch.about_enabled = aboutEnabledEl.checked;
       const btn = settingsForm.querySelector('button[type="submit"]');
       btn.disabled = true;
       try {
@@ -6753,6 +7061,7 @@
         (key === "feed" && path === "/") ||
         (key === "posts" && (path === "/posts" || path.startsWith("/post/"))) ||
         (key === "photos" && path === "/photos") ||
+        (key === "about" && path === "/about") ||
         (key === "admin" && (path === state.adminPath || path === "/admin"));
       a.classList.toggle("active", isActive);
     });
@@ -6761,6 +7070,8 @@
     disposeVideos(app);
     if (path === "/") {
       renderFeed();
+    } else if (path === "/about") {
+      renderAbout();
     } else if (path === "/posts") {
       renderPostList();
     } else if (path === "/photos") {

@@ -23,6 +23,21 @@ export interface SiteSettings {
   author_name: string; // 说说作者昵称（卡片头像 fallback 取首字符）
   author_avatar: string; // 说说作者头像（图片 URL；空=昵称首字符）
   post_avatar: string; // 文章卡片头像（仅图片 URL；空=lucide 占位图标）
+  // 关于我页面（/about）
+  about_enabled: boolean; // 是否启用关于我页面（顶栏入口与路由）
+  about_greeting: string; // 顶部问候大标题（如「先认识一下，再慢慢读。」）
+  about_greeting_sub: string; // 问候标题下方小字
+  about_avatar: string; // 关于页大头像（图片 URL；空=用 author_avatar）
+  about_signature: string; // 头像旁一句话签名
+  about_bio: string; // 自我介绍正文（Markdown）
+  about_stats: string; // 「一些数字」小卡片，每行：名称|数值|说明
+  about_timeline: string; // 时间线，每行：日期|标题|描述
+  about_bigstats: string; // 底部大数字统计，每行：数字|标签
+  about_quote: string; // 引言大字（如「搭喜欢的事，做成每天的习惯。」）
+  about_quote_author: string; // 引言署名/出处
+  about_contacts: string; // 联系方式，每行：类型|值|链接
+  about_qr: string; // 底部二维码/收款码图片 URL
+  about_qr_text: string; // 二维码下方说明文字
   // 导航
   nav_links: string; // 自定义导航项，每行一条：名称|链接
   // 横幅
@@ -77,6 +92,33 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   author_name: "Jxe",
   author_avatar: "",
   post_avatar: "",
+  // 关于我（默认开启，带演示内容，可在后台「设置 - 关于我」修改）
+  about_enabled: true,
+  about_greeting: "先认识一下，再慢慢读。",
+  about_greeting_sub: "记录生活中的每一个瞬间，图文、视频与心情。",
+  about_avatar: "",
+  about_signature: "一个热爱记录生活的普通人，写字、拍照、偶尔写点代码。",
+  about_bio:
+    "写了几年字，还在慢慢找自己的声音。\n\n" +
+    "这里是我的小小角落，记录生活里那些值得停下的瞬间——可能是一段文字、一张照片、一首歌，或是某个忽然想说点什么的下午。\n\n" +
+    "如果你也喜欢这样的节奏，欢迎常来坐坐。",
+  about_stats:
+    "坚持记录|多年|从开始写到现在\n" +
+    "记录天数|持续|几乎每天都在更新\n" +
+    "兴趣爱好|广泛|写字 拍照 音乐 代码",
+  about_timeline:
+    "2021|开始写博客|用文字记录生活的第一个节点\n" +
+    "2023|第一次做独立站|从模板到自己动手，慢慢搭起这个小站\n" +
+    "2025|上线轻博客 Moments|更专注于碎片化的日常记录",
+  about_bigstats: "6|年记录\n120+|篇文字\n300+|张照片\n1000+|个瞬间",
+  about_quote: "搭喜欢的事，做成每天的习惯。",
+  about_quote_author: "—— 写给自己",
+  about_contacts:
+    "GitHub|孤鸿剑尊|https://github.com/mliae\n" +
+    "邮箱|hi@jxe.me|mailto:hi@jxe.me\n" +
+    "RSS|订阅本站|/feed",
+  about_qr: "",
+  about_qr_text: "这里没有广告，全是一杯杯陈酿。扫码或留言，跟我打个招呼。",
   nav_links: "",
   banner_button_url: "",
   banner_bg_image: "",
@@ -118,6 +160,19 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   author_name: 32,
   author_avatar: 200,
   post_avatar: 200,
+  about_greeting: 60,
+  about_greeting_sub: 200,
+  about_avatar: 300,
+  about_signature: 200,
+  about_bio: 5000,
+  about_stats: 1000,
+  about_timeline: 2000,
+  about_bigstats: 500,
+  about_quote: 200,
+  about_quote_author: 100,
+  about_contacts: 1000,
+  about_qr: 500,
+  about_qr_text: 300,
   nav_links: 1000,
   banner_button_url: 500,
   banner_bg_image: 500,
@@ -162,6 +217,7 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "music_preload",
   "music_collapsed",
   "ai_reply_enabled",
+  "about_enabled",
 ];
 
 export function clampSetting(value: unknown, max: number): string {
