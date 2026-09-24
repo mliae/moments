@@ -429,6 +429,18 @@ app.delete("/comments/:cid", requireAdmin, async c => {
   return ok(c, { id: commentId }, "已删除");
 });
 
+/** POST /api/admin/comments/batch-delete  批量删除评论（带整楼回复） */
+app.post("/comments/batch-delete", requireAdmin, async c => {
+  let body: { ids?: unknown };
+  try { body = await c.req.json(); } catch { return fail(c, "请求格式错误", 400); }
+  const raw = Array.isArray(body?.ids) ? body.ids : [];
+  const ids = [...new Set(raw.map(Number).filter(Number.isFinite))].slice(0, 300);
+  if (ids.length === 0) return fail(c, "未选择评论", 400);
+  let deleted = 0;
+  for (const id of ids) if (await deleteCommentAnywhere(c.env.DB, id)) deleted++;
+  return ok(c, { deleted }, `已删除 ${deleted} 条评论`);
+});
+
 /** PUT /api/admin/comments/:cid 编辑评论内容（后台管理用） */
 app.put("/comments/:cid", requireAdmin, async c => {
   const commentId = Number(c.req.param("cid"));

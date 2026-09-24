@@ -3407,6 +3407,7 @@
               <span class="admin-head-date">${dateStr} · ${curTab.label}</span>
             </div>
             <div class="admin-head-actions">
+              <button class="btn ghost sm admin-side-toggle" data-admin-side-toggle type="button">☰ 菜单</button>
               <a class="btn ghost sm" href="/" data-link>查看网站</a>
             </div>
           </header>
@@ -3416,6 +3417,13 @@
         </main>
       </div>`;
     loadAdminTab(state.adminTab);
+    // 手机端：汉堡按钮折叠/展开侧栏导航
+    const sideToggle = app.querySelector("[data-admin-side-toggle]");
+    if (sideToggle) {
+      sideToggle.addEventListener("click", () => {
+        app.querySelector(".admin-side")?.classList.toggle("is-open");
+      });
+    }
   }
 
   function loadAdminTab(tab) {
@@ -3790,10 +3798,16 @@
       <div class="admin-panel-head"><h3>评论管理（${list.length}）</h3></div>
       ${
         list.length
-          ? list
+          ? `<div class="admin-batch-bar">
+        <label class="admin-batch-all"><input type="checkbox" data-batch-all /> 全选</label>
+        <span class="admin-batch-info">已选 <strong data-batch-count>0</strong> 项</span>
+        <button class="btn danger" data-batch-del disabled>批量删除</button>
+      </div>` +
+            list
               .map(
                 c => `
         <div class="admin-row">
+          <div class="admin-check-cell"><input type="checkbox" class="admin-check" value="${c.id}" /></div>
           <div class="row-main">
             <div class="row-title">
               ${c.is_ai ? '<span class="tag-mini tag-ai">AI</span>' : c.is_owner ? '<span class="tag-mini">博主</span>' : ""}<strong>${esc(c.nickname)}</strong>：${esc(c.content)}
@@ -3813,6 +3827,9 @@
               .join("")
           : `<div class="essay-empty">还没有评论</div>`
       }`;
+    if (list.length) {
+      wireBatch(panel, { rowSel: ".admin-row", endpoint: "/api/admin/comments/batch-delete", label: "条评论", onDone: () => renderAdminComments(panel) });
+    }
   }
 
   /** 后台：音乐播放器设置面板 */
@@ -3927,7 +3944,9 @@
           <input name="footer_run_since" maxlength="40" value="${esc(s.footer_run_since)}" placeholder="2024-01-01T00:00:00" />
         </div>
 
-        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>评论头像</h3></div>
+        <details class="admin-fold" style="margin-top:1.25rem">
+          <summary class="admin-fold-summary">评论头像设置</summary>
+          <div class="admin-fold-body">
         <div class="field">
           <label>随机头像 API（回退源）<br /><small style="color:var(--anzhiyu-secondtext)">评论者无 QQ / Gravatar 时，从这里随机取头像。每行一条，按序自动故障转移；支持 {imgtype} 占位。留空=用默认 apihz</small></label>
           <textarea name="random_avatar_api" rows="3" style="width:100%;resize:vertical" placeholder="https://cn.apihz.cn/api/img/apihzimgtx.php?id=88888888&amp;key=88888888&amp;type=1&amp;imgtype={imgtype}">${esc(s.random_avatar_api)}</textarea>
@@ -3950,9 +3969,13 @@
             <span data-refresh-avatars-msg style="color:var(--anzhiyu-secondtext);font-size:.85rem"></span>
           </div>
         </div>
+          </div>
+        </details>
 
+        <details class="admin-fold">
+          <summary class="admin-fold-summary">QQ 昵称资料（apihz）</summary>
+          <div class="admin-fold-body">
         <div class="field" style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc)">
-          <label style="font-weight:600">QQ 昵称资料（apihz）</label>
           <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，用这组凭证查昵称。凭证仅存服务端，绝不下发前台。</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
             <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">apihz 开发者 ID</label><input name="apihz_id" value="${esc(s.apihz_id)}" placeholder="个人资料里的数字 ID" /></div>
@@ -3972,6 +3995,8 @@
             <button type="button" class="btn" data-qq-parse style="margin-top:.35rem">解析并填入</button>
           </details>
         </div>
+          </div>
+        </details>
 
         <button class="btn primary" type="submit">保存设置</button>
       </form>`;

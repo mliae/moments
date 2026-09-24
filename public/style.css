@@ -1155,6 +1155,16 @@ input:focus, textarea:focus { border-color: var(--anzhiyu-main); box-shadow: var
 }
 .admin-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; gap: .75rem; }
 
+/* ---- 后台折叠区（外观设置里的分组） ---- */
+.admin-fold { border: var(--style-border-always); border-radius: 14px; background: var(--anzhiyu-secondbg); margin-bottom: .75rem; overflow: hidden; }
+.admin-fold > summary { list-style: none; cursor: pointer; padding: .75rem 1rem; font-weight: 600; display: flex; align-items: center; gap: .5rem; user-select: none; }
+.admin-fold > summary::-webkit-details-marker { display: none; }
+.admin-fold > summary::before { content: "▸"; color: var(--anzhiyu-secondtext); transition: transform .2s; font-size: .8rem; }
+.admin-fold[open] > summary::before { transform: rotate(90deg); }
+.admin-fold-body { padding: .25rem 1rem 1rem; background: var(--anzhiyu-card-bg); border-top: var(--style-border-always); }
+
+.admin-side-toggle { display: none; }
+
 /* ---- 概览仪表盘 ---- */
 .ov-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
 .ov-card {
@@ -1176,8 +1186,10 @@ input:focus, textarea:focus { border-color: var(--anzhiyu-main); box-shadow: var
 @media (max-width: 900px) {
   .admin-app { flex-direction: column; }
   .admin-side { width: auto; position: static; }
-  .admin-nav { flex-direction: row; flex-wrap: wrap; }
-  .admin-nav-item { width: auto; }
+  .admin-side-toggle { display: inline-flex; }
+  .admin-side .admin-nav, .admin-side .admin-side-foot { display: none; }
+  .admin-side.is-open .admin-nav { display: flex; flex-direction: column; }
+  .admin-side.is-open .admin-side-foot { display: flex; }
   .ov-cards { grid-template-columns: repeat(2, 1fr); }
 }
 
