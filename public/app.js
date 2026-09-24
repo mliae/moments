@@ -81,7 +81,7 @@
     feedLoading: false,
     commentTarget: null,
     settings: { ...DEFAULT_SETTINGS },
-    adminTab: "moments",
+    adminTab: "overview",
     adminData: { moments: [], posts: [], comments: [] },
     music: {
       playlist: [],
@@ -3265,14 +3265,15 @@
   /* ================= 后台管理页 ================= */
 
   const ADMIN_TABS = [
-    { key: "moments", label: "说说" },
-    { key: "posts", label: "文章" },
-    { key: "photos", label: "相册" },
-    { key: "comments", label: "评论" },
-    { key: "appearance", label: "外观" },
-    { key: "media", label: "媒体" },
-    { key: "ai", label: "AI 助手" },
-    { key: "security", label: "安全" },
+    { key: "overview", label: "概览", icon: "📊" },
+    { key: "moments", label: "说说", icon: "💬" },
+    { key: "posts", label: "文章", icon: "📝" },
+    { key: "photos", label: "相册", icon: "🖼️" },
+    { key: "comments", label: "评论", icon: "💭" },
+    { key: "appearance", label: "外观", icon: "🎨" },
+    { key: "media", label: "媒体", icon: "📁" },
+    { key: "ai", label: "AI 助手", icon: "🤖" },
+    { key: "security", label: "安全", icon: "🔒" },
   ];
 
   /**
@@ -3374,23 +3375,53 @@
       });
       return;
     }
+    const hour = new Date().getHours();
+    const greet = hour < 6 ? "夜深了" : hour < 11 ? "早上好" : hour < 14 ? "中午好" : hour < 18 ? "下午好" : "晚上好";
+    const dateStr = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
+    if (!ADMIN_TABS.some(t => t.key === state.adminTab)) state.adminTab = "overview";
+    const curTab = ADMIN_TABS.find(t => t.key === state.adminTab) || ADMIN_TABS[0];
     app.innerHTML = `
-      <div class="essay"><div class="admin-wrap">
-        <div class="admin-tabs">
-          ${ADMIN_TABS.map(
-            t => `<button class="admin-tab ${state.adminTab === t.key ? "is-active" : ""}" data-admin-tab="${t.key}">${t.label}</button>`
-          ).join("")}
-        </div>
-        <div class="admin-panel" id="adminPanel">
-          <div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>
-        </div>
-      </div></div>`;
+      <div class="admin-app">
+        <aside class="admin-side">
+          <div class="admin-brand">
+            <span class="admin-logo">✍️</span>
+            <div class="admin-brand-name"><b>${esc(state.settings.site_title || "moments")}</b><small>管理后台</small></div>
+          </div>
+          <nav class="admin-nav">
+            ${ADMIN_TABS.map(t => `
+              <button class="admin-nav-item ${state.adminTab === t.key ? "is-active" : ""}" data-admin-tab="${t.key}">
+                <span class="admin-nav-dot"></span>
+                <span class="admin-nav-ico">${t.icon || ""}</span>
+                <span class="admin-nav-label">${t.label}</span>
+              </button>`).join("")}
+          </nav>
+          <div class="admin-side-foot">
+            <button class="btn ghost sm" data-nav="logout" title="退出登录">退出</button>
+            <a class="admin-back-home" href="/" data-link>← 返回首页</a>
+          </div>
+        </aside>
+        <main class="admin-main">
+          <header class="admin-head">
+            <div>
+              <h2>${greet}，站长</h2>
+              <span class="admin-head-date">${dateStr} · ${curTab.label}</span>
+            </div>
+            <div class="admin-head-actions">
+              <a class="btn ghost sm" href="/" data-link>查看网站</a>
+            </div>
+          </header>
+          <div class="admin-panel" id="adminPanel">
+            <div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>
+          </div>
+        </main>
+      </div>`;
     loadAdminTab(state.adminTab);
   }
 
   function loadAdminTab(tab) {
     const panel = document.getElementById("adminPanel");
     if (!panel) return;
+    if (tab === "overview") return renderAdminOverview(panel);
     if (tab === "moments") return renderAdminMoments(panel);
     if (tab === "posts") return renderAdminPosts(panel);
     if (tab === "photos") return renderAdminPhotos(panel);
@@ -3399,6 +3430,56 @@
     if (tab === "media") return renderAdminMedia(panel);
     if (tab === "ai") return renderAdminAI(panel);
     if (tab === "security") return renderAdminSecurity(panel);
+  }
+
+  /* ---------- 后台 Tab：概览仪表盘 ---------- */
+  async function renderAdminOverview(panel) {
+    let d;
+    try { d = await api("/api/admin/overview"); } catch (e) { panel.innerHTML = `<p>概览加载失败：${esc(e.message)}</p>`; return; }
+    const cards = [
+      { label: "说说", icon: "💬", val: d.moments, tab: "moments" },
+      { label: "文章", icon: "📝", val: d.posts, tab: "posts" },
+      { label: "评论", icon: "💭", val: d.comments, tab: "comments" },
+      { label: "相册", icon: "🖼️", val: d.photos, tab: "photos" },
+    ];
+    // 近 7 天评论趋势 SVG 面积图
+    const trend = d.trend || [];
+    const max = Math.max(1, ...trend.map(t => t.count));
+    const W = 640, H = 180, pad = 28;
+    const n = trend.length;
+    const x = i => pad + (i * (W - pad * 2)) / Math.max(1, n - 1);
+    const y = v => H - pad - (v / max) * (H - pad * 2);
+    const pts = trend.map((t, i) => `${x(i).toFixed(1)},${y(t.count).toFixed(1)}`);
+    const linePts = pts.join(" ");
+    const areaPts = `${pad},${H - pad} ${linePts} ${x(n - 1).toFixed(1)},${H - pad}`;
+    const total = trend.reduce((s, t) => s + t.count, 0);
+    panel.innerHTML = `
+      <div class="ov-cards">
+        ${cards.map(c => `
+          <div class="ov-card" data-admin-tab="${c.tab}">
+            <div class="ov-card-ico">${c.icon}</div>
+            <div class="ov-card-num">${c.val}</div>
+            <div class="ov-card-label">${c.label}</div>
+          </div>`).join("")}
+      </div>
+      <div class="ov-chart-card">
+        <div class="ov-chart-head">
+          <h3>近 7 天评论</h3>
+          <span class="ov-chart-sub">共 ${total} 条 · 峰值 ${max}</span>
+        </div>
+        <svg class="ov-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">
+          <defs><linearGradient id="ovFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--anzhiyu-main)" stop-opacity="0.28"/>
+            <stop offset="100%" stop-color="var(--anzhiyu-main)" stop-opacity="0"/>
+          </linearGradient></defs>
+          ${[0.25, 0.5, 0.75].map(f => `<line x1="${pad}" y1="${(pad + (H - pad * 2) * f).toFixed(1)}" x2="${W - pad}" y2="${(pad + (H - pad * 2) * f).toFixed(1)}" stroke="var(--anzhiyu-card-border)" stroke-dasharray="4 5"/>`).join("")}
+          <polygon points="${areaPts}" fill="url(#ovFill)"/>
+          <polyline points="${linePts}" fill="none" stroke="var(--anzhiyu-main)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+          ${trend.map((t, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(t.count).toFixed(1)}" r="3.5" fill="var(--anzhiyu-card-bg)" stroke="var(--anzhiyu-main)" stroke-width="2"/>`).join("")}
+        </svg>
+        <div class="ov-chart-axis">${trend.map(t => `<span>${t.date.slice(5)}</span>`).join("")}</div>
+      </div>
+      <p class="ov-tip">提示：点击上方数字卡片可快速跳转到对应管理页。</p>`;
   }
 
   // 后台列表分页状态（跨重渲染保留）

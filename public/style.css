@@ -2,22 +2,22 @@
    moments — 1:1 复刻 jxe.me/essay（anzhiyu 主题 bber 即刻样式）
    ============================================================ */
 
-/* ==================== 主题变量（anzhiyu） ==================== */
+/* ==================== 主题变量（bloom 风：鼠尾草绿 + 米白） ==================== */
 :root {
-  --anzhiyu-main: #163bf2;
-  --anzhiyu-main-op: #163bf224;
-  --anzhiyu-main-deep: rgba(22, 59, 242, 0.08);
+  --anzhiyu-main: #6b8e6f;          /* 鼠尾草绿主色 */
+  --anzhiyu-main-op: #6b8e6f22;
+  --anzhiyu-main-deep: rgba(107, 142, 111, 0.1);
   --anzhiyu-white: #fff;
-  --anzhiyu-gray: #999;
-  --anzhiyu-gray-op: #9999992b;
-  --anzhiyu-fontcolor: #363636;
-  --anzhiyu-secondtext: rgb(60 60 67 / 80%);
-  --anzhiyu-background: #f7f9fe;
-  --anzhiyu-secondbg: #f1f3f8;
+  --anzhiyu-gray: #9a9f94;
+  --anzhiyu-gray-op: #9a9f942b;
+  --anzhiyu-fontcolor: #3f4a40;     /* 偏暖墨绿灰正文 */
+  --anzhiyu-secondtext: rgb(72 82 74 / 72%);
+  --anzhiyu-background: #f3f1ea;    /* 米白背景 */
+  --anzhiyu-secondbg: #ece9df;
   --anzhiyu-card-bg: #fff;
-  --anzhiyu-card-border: #e3e8f7;
+  --anzhiyu-card-border: #e6e2d6;   /* 暖米色描边 */
   --anzhiyu-shadow-main: 0 8px 12px -3px var(--anzhiyu-main-op);
-  --anzhiyu-shadow-border: 0 8px 16px -4px #2c2d300c;
+  --anzhiyu-shadow-border: 0 8px 16px -4px rgba(95, 110, 90, 0.1);
   --style-border: 1px solid var(--anzhiyu-card-border);
   --style-border-always: 1px solid var(--anzhiyu-card-border);
   --style-border-hover: 1px solid var(--anzhiyu-main);
@@ -26,19 +26,20 @@
   --code-color: #d6e2ff;
 }
 html[data-theme="dark"] {
-  --anzhiyu-main: #dfa621;
-  --anzhiyu-main-op: #dfa62124;
-  --anzhiyu-main-deep: rgba(223, 166, 33, 0.1);
-  --anzhiyu-white: #f7f7fa;
-  --anzhiyu-gray-op: rgba(160, 160, 180, 0.14);
-  --anzhiyu-fontcolor: #f7f7fa;
-  --anzhiyu-secondtext: #a1a2b8;
-  --anzhiyu-background: #18171d;
-  --anzhiyu-secondbg: #21232a;
-  --anzhiyu-card-bg: #1d1e22;
-  --anzhiyu-card-border: #3d3d3f;
+  --anzhiyu-main: #8fb89a;          /* 鼠尾草深夜：亮一度的绿 */
+  --anzhiyu-main-op: #8fb89a22;
+  --anzhiyu-main-deep: rgba(143, 184, 154, 0.12);
+  --anzhiyu-white: #eef0ea;
+  --anzhiyu-gray: #97a39a;
+  --anzhiyu-gray-op: rgba(151, 163, 154, 0.14);
+  --anzhiyu-fontcolor: #e8ece6;
+  --anzhiyu-secondtext: #9aa79c;
+  --anzhiyu-background: #191c1a;    /* 带绿调的深夜底 */
+  --anzhiyu-secondbg: #222622;
+  --anzhiyu-card-bg: #20231f;
+  --anzhiyu-card-border: #343b35;
   --anzhiyu-shadow-main: 0 8px 12px -3px var(--anzhiyu-main-op);
-  --anzhiyu-shadow-border: 0 8px 16px -4px #00000050;
+  --anzhiyu-shadow-border: 0 8px 16px -4px rgba(0, 0, 0, 0.45);
   --mask-bg: rgb(0 0 0 / 55%);
   --code-bg: #0d0d12;
   --code-color: #d6e2ff;
@@ -1114,23 +1115,71 @@ input:focus, textarea:focus { border-color: var(--anzhiyu-main); box-shadow: var
   .fab-publish { right: 1.1rem; bottom: 1.1rem; width: 46px; height: 46px; }
 }
 
-/* ==================== 后台管理页 ==================== */
-.admin-wrap { max-width: 900px; margin: 0 auto; }
-.admin-tabs { display: flex; gap: .5rem; margin: 1.25rem 0; flex-wrap: wrap; }
-.admin-tab {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 18px; border-radius: 999px; font-size: .875rem; cursor: pointer;
-  color: var(--anzhiyu-fontcolor); background: var(--anzhiyu-card-bg);
-  border: var(--style-border-always); transition: .25s;
+/* ==================== 后台管理页（bloom 侧栏布局） ==================== */
+.admin-wrap { max-width: 900px; margin: 0 auto; }   /* 登录页用 */
+.admin-app {
+  display: flex; gap: 1.25rem; min-height: calc(100vh - 64px);
+  max-width: 1240px; margin: 0 auto; padding: 1.25rem 1rem;
 }
-.admin-tab:hover { color: var(--anzhiyu-main); border-color: var(--anzhiyu-main); }
-.admin-tab.is-active { color: #fff; background: var(--anzhiyu-main); border-color: var(--anzhiyu-main); }
+.admin-side {
+  width: 212px; flex-shrink: 0; position: sticky; top: 76px; align-self: flex-start;
+  display: flex; flex-direction: column; gap: .5rem;
+  background: var(--anzhiyu-card-bg); border: var(--style-border-always); border-radius: 16px;
+  padding: 1.1rem .8rem; box-shadow: var(--anzhiyu-shadow-border);
+}
+.admin-brand { display: flex; align-items: center; gap: .65rem; padding: .1rem .4rem .9rem; border-bottom: 1px solid var(--anzhiyu-card-border); }
+.admin-logo { width: 40px; height: 40px; border-radius: 50%; background: var(--anzhiyu-main); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0; }
+.admin-brand-name b { display: block; font-size: .95rem; line-height: 1.25; }
+.admin-brand-name small { color: var(--anzhiyu-secondtext); font-size: .72rem; }
+.admin-nav { display: flex; flex-direction: column; gap: .2rem; }
+.admin-nav-item {
+  display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left;
+  border: none; background: transparent; cursor: pointer; color: var(--anzhiyu-fontcolor);
+  padding: .55rem .7rem; border-radius: 10px; font-size: .9rem; font-family: inherit; transition: .2s;
+}
+.admin-nav-item:hover { background: var(--anzhiyu-secondbg); }
+.admin-nav-item.is-active { background: var(--anzhiyu-main); color: #fff; font-weight: 600; box-shadow: var(--anzhiyu-shadow-main); }
+.admin-nav-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--anzhiyu-card-border); flex-shrink: 0; }
+.admin-nav-item.is-active .admin-nav-dot { background: #fff; }
+.admin-nav-ico { font-size: 1rem; line-height: 1; }
+.admin-side-foot { margin-top: auto; padding-top: .8rem; border-top: 1px solid var(--anzhiyu-card-border); display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.admin-back-home { font-size: .78rem; color: var(--anzhiyu-secondtext); }
+.admin-back-home:hover { color: var(--anzhiyu-main); }
+.admin-main { flex: 1; min-width: 0; }
+.admin-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.admin-head h2 { margin: 0; font-size: 1.35rem; }
+.admin-head-date { color: var(--anzhiyu-secondtext); font-size: .85rem; }
 .admin-panel {
   background: var(--anzhiyu-card-bg); border: var(--style-border-always);
-  border-radius: 12px; padding: 1.25rem 1.4rem;
-  box-shadow: var(--anzhiyu-shadow-border);
+  border-radius: 16px; padding: 1.4rem 1.5rem; box-shadow: var(--anzhiyu-shadow-border);
 }
 .admin-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; gap: .75rem; }
+
+/* ---- 概览仪表盘 ---- */
+.ov-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
+.ov-card {
+  background: var(--anzhiyu-card-bg); border: var(--style-border-always); border-radius: 16px;
+  padding: 1.1rem 1.2rem; box-shadow: var(--anzhiyu-shadow-border); cursor: pointer; transition: .2s;
+}
+.ov-card:hover { transform: translateY(-2px); border-color: var(--anzhiyu-main); }
+.ov-card-ico { font-size: 1.4rem; margin-bottom: .35rem; }
+.ov-card-num { font-size: 1.95rem; font-weight: 700; line-height: 1.1; }
+.ov-card-label { color: var(--anzhiyu-secondtext); font-size: .82rem; margin-top: .2rem; }
+.ov-chart-card { background: var(--anzhiyu-card-bg); border: var(--style-border-always); border-radius: 16px; padding: 1.2rem 1.4rem; box-shadow: var(--anzhiyu-shadow-border); }
+.ov-chart-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: .4rem; }
+.ov-chart-head h3 { margin: 0; font-size: 1rem; }
+.ov-chart-sub { color: var(--anzhiyu-secondtext); font-size: .8rem; }
+.ov-chart { width: 100%; height: 180px; display: block; }
+.ov-chart-axis { display: flex; justify-content: space-between; padding: 0 26px; font-size: .72rem; color: var(--anzhiyu-secondtext); }
+.ov-tip { color: var(--anzhiyu-secondtext); font-size: .8rem; margin: 1rem 0 0; text-align: center; }
+
+@media (max-width: 900px) {
+  .admin-app { flex-direction: column; }
+  .admin-side { width: auto; position: static; }
+  .admin-nav { flex-direction: row; flex-wrap: wrap; }
+  .admin-nav-item { width: auto; }
+  .ov-cards { grid-template-columns: repeat(2, 1fr); }
+}
 
 /* ==================== 分页条 ==================== */
 .pager { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 1.5rem 0 .25rem; }

@@ -262,6 +262,41 @@ app.get("/settings", requireAdmin, async c => {
   return ok(c, await getSettings(c.env.DB));
 });
 
+/**
+ * GET /api/admin/overview  概览仪表盘数据：各内容数量 + 近 7 天评论趋势
+ */
+app.get("/overview", requireAdmin, async c => {
+  const db = c.env.DB;
+  const batch = await db.batch([
+    db.prepare(`SELECT COUNT(*) AS n FROM moments`),
+    db.prepare(`SELECT COUNT(*) AS n FROM posts`),
+    db.prepare(`SELECT COUNT(*) AS n FROM comments`),
+    db.prepare(`SELECT COUNT(*) AS n FROM photos`),
+    db.prepare(
+      `SELECT date(created_at) AS d, COUNT(*) AS n FROM comments
+       WHERE created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-6 days')
+       GROUP BY date(created_at) ORDER BY d ASC`
+    ),
+  ]);
+  const num = (i: number) => Number((batch[i].results[0] as { n: number }).n);
+  // 补齐最近 7 天（含今天），无数据的天补 0
+  const trendMap = new Map<string, number>();
+  for (const r of (batch[4].results as Array<{ d: string; n: number }>)) trendMap.set(r.d, Number(r.n));
+  const trend: Array<{ date: string; count: number }> = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const key = d.toISOString().slice(0, 10);
+    trend.push({ date: key, count: trendMap.get(key) ?? 0 });
+  }
+  return ok(c, {
+    moments: num(0),
+    posts: num(1),
+    comments: num(2),
+    photos: num(3),
+    trend,
+  });
+});
+
 app.put("/settings", requireAdmin, async c => {
   let patch: Record<string, unknown>;
   try {
