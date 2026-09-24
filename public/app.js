@@ -3382,6 +3382,7 @@
     const curTab = ADMIN_TABS.find(t => t.key === state.adminTab) || ADMIN_TABS[0];
     app.innerHTML = `
       <div class="admin-app">
+        <div class="admin-side-mask" data-admin-side-toggle></div>
         <aside class="admin-side">
           <div class="admin-brand">
             <span class="admin-logo">✍️</span>
@@ -3417,11 +3418,23 @@
         </main>
       </div>`;
     loadAdminTab(state.adminTab);
-    // 手机端：汉堡按钮折叠/展开侧栏导航
-    const sideToggle = app.querySelector("[data-admin-side-toggle]");
-    if (sideToggle) {
-      sideToggle.addEventListener("click", () => {
-        app.querySelector(".admin-side")?.classList.toggle("is-open");
+    // 手机端：汉堡按钮 / 遮罩 开合抽屉；点导航项后自动收起；打开时锁背景滚动
+    const appEl = app.querySelector(".admin-app");
+    if (appEl) {
+      const syncScroll = () => {
+        document.body.style.overflow = appEl.classList.contains("is-open") ? "hidden" : "";
+      };
+      app.querySelectorAll("[data-admin-side-toggle]").forEach(el => {
+        el.addEventListener("click", () => {
+          appEl.classList.toggle("is-open");
+          syncScroll();
+        });
+      });
+      appEl.querySelectorAll(".admin-nav-item").forEach(item => {
+        item.addEventListener("click", () => {
+          appEl.classList.remove("is-open");
+          syncScroll();
+        });
       });
     }
   }
@@ -6681,6 +6694,8 @@
   }
 
   function route() {
+    // 后台手机抽屉若曾锁定滚动，任何路由切换都解除，避免页面卡住
+    document.body.style.overflow = "";
     // 兼容旧 hash 外链：静默替换为真实路径
     const legacy = legacyHashToPath();
     if (legacy && legacy !== location.pathname + location.search) {

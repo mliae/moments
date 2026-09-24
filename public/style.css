@@ -1165,6 +1165,7 @@ input:focus, textarea:focus { border-color: var(--anzhiyu-main); box-shadow: var
 .admin-fold-body { padding: .25rem 1rem 1rem; background: var(--anzhiyu-card-bg); border-top: var(--style-border-always); }
 
 .admin-side-toggle { display: none; }
+.admin-side-mask { display: none; }
 
 /* ---- 概览仪表盘 ---- */
 .ov-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
@@ -1185,12 +1186,33 @@ input:focus, textarea:focus { border-color: var(--anzhiyu-main); box-shadow: var
 .ov-tip { color: var(--anzhiyu-secondtext); font-size: .8rem; margin: 1rem 0 0; text-align: center; }
 
 @media (max-width: 900px) {
-  .admin-app { flex-direction: column; }
-  .admin-side { width: auto; position: static; }
-  .admin-side-toggle { display: inline-flex; }
-  .admin-side .admin-nav, .admin-side .admin-side-foot { display: none; }
-  .admin-side.is-open .admin-nav { display: flex; flex-direction: column; }
-  .admin-side.is-open .admin-side-foot { display: flex; }
+  .admin-app { flex-direction: column; position: relative; }
+  /* 遮罩层：打开抽屉时出现，点击关闭 */
+  .admin-side-mask {
+    display: block; position: fixed; inset: 0; z-index: 60;
+    background: rgb(0 0 0 / .42); backdrop-filter: blur(2px);
+    opacity: 0; visibility: hidden; transition: opacity .25s, visibility .25s;
+  }
+  .admin-app.is-open .admin-side-mask { opacity: 1; visibility: visible; }
+  /* 侧栏 → 左侧滑入抽屉 */
+  .admin-side {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 70;
+    width: 270px; max-width: 84vw; margin: 0; padding: 1.1rem .9rem;
+    border-left: none; border-radius: 0 18px 18px 0;
+    transform: translateX(-106%); transition: transform .3s cubic-bezier(.22,.61,.36,1);
+    overflow-y: auto;
+  }
+  .admin-app.is-open .admin-side { transform: translateX(0); }
+  .admin-side .admin-nav, .admin-side .admin-side-foot { display: flex; }
+  .admin-side .admin-nav { flex-direction: column; }
+  /* 汉堡按钮：清晰可见的胶囊（覆盖 ghost 淡色样式） */
+  .admin-head-actions { gap: .5rem; }
+  .admin-head-actions .admin-side-toggle {
+    display: inline-flex !important; align-items: center; gap: 6px;
+    background: var(--anzhiyu-main) !important; color: #fff !important;
+    border-color: var(--anzhiyu-main) !important; box-shadow: var(--anzhiyu-shadow-main);
+    font-weight: 600;
+  }
   .ov-cards { grid-template-columns: repeat(2, 1fr); }
 }
 
