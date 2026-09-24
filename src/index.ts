@@ -238,17 +238,15 @@ async function getIndexHtml(c: Context<HonoEnv>): Promise<string> {
 
 const TITLE_TAG = "<title>Moments</title>";
 const DESC_TAG = '<meta name="description" content="朋友圈式轻博客：图文动态与文章" />';
-const ICON_TAG =
-  '<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Ctext y=\'.9em\' font-size=\'90\'%3E%E2%9C%8D%EF%B8%8F%3C/text%3E%3C/svg%3E" />';
+const ICON_TAG = `<link rel="icon" href="${iconToHref("")}" />`;
 const HEAD_MARK = "<!--SSR_HEAD-->";
 const APP_MARK = '<main id="app" class="page-main"></main>';
 
-/** 站点图标值 → favicon href：URL 直接用；emoji 转 SVG data URI；空=默认 ✍️ */
+/** 站点图标值 → favicon href：URL 直接用；空=默认 lucide pen-nib SVG（不再用 emoji） */
 function iconToHref(v: string): string {
   const val = String(v || "").trim();
   if (/^https?:\/\//i.test(val)) return val;
-  const emoji = val || "✍️";
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${emoji}</text></svg>`;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/><path d='m15 5 4 4'/></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 

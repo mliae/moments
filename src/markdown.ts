@@ -48,7 +48,7 @@ function inline(text: string, r2Domain?: string): string {
 function musicBlock(label: string): string {
   const id = label.replace(/^music=/, "").trim();
   if (!/^\d+$/.test(id)) return "";
-  return `<a class="ssr-music-link" data-music-id="${id}" href="https://music.163.com/song?id=${id}" target="_blank" rel="noopener noreferrer nofollow">🎵 网易云音乐（ID: ${id}）</a>`;
+  return `<a class="ssr-music-link" data-music-id="${id}" href="https://music.163.com/song?id=${id}" target="_blank" rel="noopener noreferrer nofollow">网易云音乐（ID: ${id}）</a>`;
 }
 
 /** @[video](url) 或 @[video](url "封面URL") 视频块（m3u8 输出占位 video，前端水合挂 HLS；mp4 直出 src）。

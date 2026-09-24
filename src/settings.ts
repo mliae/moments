@@ -19,10 +19,10 @@ export interface SiteSettings {
   music_collapsed: boolean; // 初始折叠成球形
   music_volume: string; // 初始音量 0-1
   // 品牌 / 作者
-  brand_avatar: string; // 顶栏品牌头像（emoji 或图片 URL）
+  brand_avatar: string; // 顶栏品牌头像（仅图片 URL；空=lucide 占位图标）
   author_name: string; // 说说作者昵称（卡片头像 fallback 取首字符）
-  author_avatar: string; // 说说作者头像（图片 URL 或 emoji；空=昵称首字符）
-  post_avatar: string; // 文章卡片头像（emoji 或图片 URL）
+  author_avatar: string; // 说说作者头像（图片 URL；空=昵称首字符）
+  post_avatar: string; // 文章卡片头像（仅图片 URL；空=lucide 占位图标）
   // 导航
   nav_links: string; // 自定义导航项，每行一条：名称|链接
   // 横幅
@@ -41,13 +41,13 @@ export interface SiteSettings {
   // AI 评论机器人
   ai_reply_enabled: boolean; // 是否启用评论 @AI 自动回复（Workers AI，消耗每日免费额度）
   ai_bot_name: string; // 机器人昵称（评论中 @此昵称 触发回复），默认「小J」
-  ai_bot_avatar: string; // 机器人头像：图片 URL 或 emoji；空=昵称首字符
+  ai_bot_avatar: string; // 机器人头像：仅图片 URL；空=lucide bot 占位图标
   ai_text_model: string; // 自定义文本模型 ID（@cf/...）；留空=内置默认模型
   // QQ 昵称 API
   qq_nick_apis: string; // QQ 昵称 API 列表，每行一条：URL 模板（{qq} 占位）|解析方式。留空=内置默认列表
   // 安全
   admin_path: string; // 后台秘密入口路径（/admin 或 /sys-xxxx），不通过公开 API 下发
-  site_icon: string; // 站点图标（favicon）：图片 URL 或 emoji；空=默认 ✍️
+  site_icon: string; // 站点图标（favicon）：仅图片 URL；空=默认 lucide 图标
   // 评论头像
   random_avatar_api: string; // 随机头像 API 列表，每行一条，支持 {imgtype} 占位；留空=内置 apihz 默认
   random_avatar_imgtype: string; // 随机头像类型 imgtype（apihz 0-16），默认 9=古风
@@ -73,10 +73,10 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   music_preload: true,
   music_collapsed: false,
   music_volume: "0.7",
-  brand_avatar: "✍️",
+  brand_avatar: "",
   author_name: "Jxe",
   author_avatar: "",
-  post_avatar: "📄",
+  post_avatar: "",
   nav_links: "",
   banner_button_url: "",
   banner_bg_image: "",
@@ -88,7 +88,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   r2_domain: "",
   ai_reply_enabled: false,
   ai_bot_name: "小J",
-  ai_bot_avatar: "🤖",
+  ai_bot_avatar: "",
   ai_text_model: "",
   qq_nick_apis: "",
   admin_path: "/admin",

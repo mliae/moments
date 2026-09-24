@@ -48,10 +48,10 @@
     music_preload: true,
     music_collapsed: false,
     music_volume: "0.7",
-    brand_avatar: "✍️",
+    brand_avatar: "",
     author_name: "Moments",
     author_avatar: "",
-    post_avatar: "📄",
+    post_avatar: "",
     nav_links: "",
     banner_button_url: "",
     banner_bg_image: "",
@@ -63,7 +63,7 @@
     r2_domain: "",
     ai_reply_enabled: false,
     ai_bot_name: "小J",
-    ai_bot_avatar: "🤖",
+    ai_bot_avatar: "",
     ai_text_model: "",
     qq_nick_apis: "",
     site_icon: "",
@@ -193,12 +193,46 @@
     compass: { vb: "0 0 512 512", d: "M256 512a256 256 0 1 0 0-512a256 256 0 1 0 0 512m50.7-186.9l-144.3 55.5c-19.4 7.5-38.5-11.6-31-31l55.5-144.3c3.3-8.5 9.9-15.1 18.4-18.4l144.3-55.5c19.4-7.5 38.5 11.6 31 31l-55.5 144.3c-3.2 8.5-9.9 15.1-18.4 18.4M288 256a32 32 0 1 0-64 0a32 32 0 1 0 64 0" },
     arrowUpRight: { vb: "0 0 24 24", d: "M13.828 7.172a.997.997 0 0 0-1-1h-6a1 1 0 1 0 0 2h3.586l-3.95 3.95a1 1 0 0 0 1.415 1.414l3.95-3.95v3.586a1 1 0 0 0 2 0v-6zM10 20C4.477 20 0 15.523 0 10S4.477 0 10 0s10 4.477 10 10s-4.477 10-10 10" },
     trash: { vb: "0 0 448 512", d: "M135.2 17.7C140.6 6.8 151.7 0 163.8 0h120.4c12.1 0 23.2 6.8 28.6 17.7L320 32h96c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 96 0 81.7 0 64s14.3-32 32-32h96zM32 128h384v320c0 35.3-28.7 64-64 64H96c-35.3 0-64-28.7-64-64zm96 64c-8.8 0-16 7.2-16 16v224c0 8.8 7.2 16 16 16s16-7.2 16-16V208c0-8.8-7.2-16-16-16m96 0c-8.8 0-16 7.2-16 16v224c0 8.8 7.2 16 16 16s16-7.2 16-16V208c0-8.8-7.2-16-16-16m96 0c-8.8 0-16 7.2-16 16v224c0 8.8 7.2 16 16 16s16-7.2 16-16V208c0-8.8-7.2-16-16-16" },
+    /* —— 以下为 lucide 线性图标（多元素 path），用 stroke 字段；svgIcon 据此渲染描边风格 —— */
+    home: { stroke: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' },
+    "layout-dashboard": { stroke: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>' },
+    "message-circle": { stroke: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>' },
+    "message-square": { stroke: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>' },
+    "file-text": { stroke: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>' },
+    image: { stroke: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>' },
+    palette: { stroke: '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>' },
+    folder: { stroke: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>' },
+    bot: { stroke: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>' },
+    shield: { stroke: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>' },
+    "pen-nib": { stroke: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>' },
+    search: { stroke: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>' },
+    smile: { stroke: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/>' },
+    heart: { stroke: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>' },
+    "thumbs-up": { stroke: '<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>' },
+    star: { stroke: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' },
+    "party-popper": { stroke: '<path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/>' },
+    flame: { stroke: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>' },
+    coffee: { stroke: '<path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/>' },
+    sunLine: { stroke: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>' },
+    sparkles: { stroke: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>' },
+    music: { stroke: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>' },
+    dices: { stroke: '<rect width="12" height="12" x="2" y="10" rx="2" ry="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/><path d="M15 6h.01"/><path d="M18 9h.01"/>' },
+    lock: { stroke: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>' },
+    menu: { stroke: '<line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/>' },
+    "triangle-alert": { stroke: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>' },
+    gift: { stroke: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/>' },
   };
 
   function svgIcon(name, size) {
     const ic = ICONS[name];
     if (!ic) return "";
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${ic.vb}" width="${size || 16}" height="${size || 16}" fill="currentColor"><path fill="currentColor" d="${ic.d}"/></svg>`;
+    const s = size || 16;
+    // stroke 字段：lucide 描边风（多元素 path，24 viewBox）
+    if (ic.stroke) {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ic.stroke}</svg>`;
+    }
+    // { vb, d }：FontAwesome 填充风（兼容原有图标）
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${ic.vb}" width="${s}" height="${s}" fill="currentColor"><path fill="currentColor" d="${ic.d}"/></svg>`;
   }
 
   /* ================= 工具 ================= */
@@ -1141,11 +1175,19 @@
     return `<div class="bber-container-img bber-img-${mod}">${cells}</div>`;
   }
 
-  /** 头像渲染：http(s) 链接→图片；非空文本→emoji；空→fallback 字符（昵称首字符） */
-  function avatarSpanHtml(value, fallbackChar, extraClass) {
+  /**
+   * 头像渲染：
+   *  - http(s) 链接 → 图片
+   *  - 否则 → 若传了 fallbackIcon（lucide key）用线性图标占位；否则用 fallbackChar 文本（昵称首字符）
+   * 不再把非空文本当 emoji 渲染（全站去 emoji）。
+   */
+  function avatarSpanHtml(value, fallbackChar, extraClass, fallbackIcon) {
     const cls = "bber-author-avatar" + (extraClass ? " " + extraClass : "");
     if (/^https?:\/\//i.test(value || "")) {
       return `<span class="${cls}"><img src="${esc(value)}" alt="" loading="lazy" referrerpolicy="no-referrer" /></span>`;
+    }
+    if (fallbackIcon) {
+      return `<span class="${cls} bber-author-avatar--fallback">${svgIcon(fallbackIcon, 22)}</span>`;
     }
     const txt = (value || "").trim() ? value : fallbackChar;
     return `<span class="${cls} bber-author-avatar--fallback">${esc(txt)}</span>`;
@@ -1326,12 +1368,11 @@
     </div>`;
   }
 
-  /** 站点图标值 → favicon href（与后端 src/index.ts 的 iconToHref 保持一致） */
+  /** 站点图标值 → favicon href（仅图片 URL；留空用 lucide pen-nib SVG，不再用 emoji） */
   function iconToHref(v) {
     const val = String(v || "").trim();
     if (/^https?:\/\//i.test(val)) return val;
-    const emoji = val || "✍️";
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${emoji}</text></svg>`;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/><path d='m15 5 4 4'/></svg>`;
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
   }
 
@@ -1343,13 +1384,13 @@
     document.querySelector(".brand-name").textContent = s.site_title;
     document.querySelector('[data-route="feed"]').textContent = s.nav_feeds_name;
     document.title = s.site_title;
-    // 品牌头像：http(s) 链接渲染图片，否则按 emoji/文本渲染
+    // 品牌头像：http(s) 链接渲染图片，否则用 lucide pen-nib 占位（不再用 emoji/文本）
     const avatarEl = document.querySelector(".brand-avatar");
     if (avatarEl) {
       if (/^https?:\/\//i.test(s.brand_avatar || "")) {
         avatarEl.innerHTML = `<img src="${esc(s.brand_avatar)}" alt="" referrerpolicy="no-referrer" />`;
       } else {
-        avatarEl.textContent = s.brand_avatar || "✍️";
+        avatarEl.innerHTML = svgIcon("pen-nib", 22);
       }
     }
     // 自定义导航项（每行 名称|链接），追加在"即刻"之后；重复应用先清理
@@ -1486,7 +1527,7 @@
       <a class="bber-post-link" href="/post/${encodeURIComponent(p.slug)}">
         <div class="bber-author-row">
           <span class="bber-author">
-            ${avatarSpanHtml(state.settings.post_avatar, "📄", "bber-author-avatar--post")}
+            ${avatarSpanHtml(state.settings.post_avatar, "", "bber-author-avatar--post", "file-text")}
             <span class="bber-author-nickname">文章</span>
           </span>
           <span class="bber-post-tag">文章</span>
@@ -1515,56 +1556,53 @@
 
   /** 评论内容 @ 提及高亮：转义后包裹 @username */
   function formatCommentContent(text) {
-    return esc(text).replace(/@([^\s@<>，。！？、（）]+)/g, '<span class="comment-mention">@$1</span>');
+    return reactionTokenToSvg(esc(text))
+      .replace(/@([^\s@<>，。！？、（）]+)/g, '<span class="comment-mention">@$1</span>');
   }
 
   /* ================= 评论增强：表情 / 图片 / 随机评论 ================= */
 
-  // 表情分类数据（8 分类，每类精选）
-  const EMOJI_CATS = [
-    { key: "常用", icon: "😊", items: "👍❤️😂🔥👏🎉😍😎🙏😅🤣🥰😊😇🤔💪✨🎉🌹💯🥳😏🙌👀🫶" },
-    { key: "表情", icon: "😀", items: "😀😁😂🤣😃😄😅😆😉😊😋😎😍😘🥰😗😙😚☺️🙂🤗🤩🤔🤨😐😑😶🙄😏😣😥😮🤐😯😪😫😴😌😛😜😝🤤😒😓😔😕🙃🫠🤑😲🙁😖😞😟😤😢😭😦😧😨🤯😬😰😱🥵🥶😳🤪😵🤧🤒🤕🤢🤮😷🥴🤠🥳🥺😎🤓🧐😈👿🤡👻💀☠️👽🤖💩😺😸😹😻😼😽🙀😿😾" },
-    { key: "动物", icon: "🐱", items: "🐶🐱🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮🐷🐽🐸🐵🙈🙉🙊🐒🦍🐔🐧🐦🐤🐣🐥🦆🦅🦉🦇🐺🐗🐴🦄🐝🐛🦋🐌🐞🐜🦟🦗🕷️🦂🐢🐍🦎🦖🦕🐙🦑🦐🦞🦀🐡🐠🐟🐬🐳🐋🦈🐊🐅🐆🦓🦍🦧🦒🐘🦏🐪🐫🦘🦒🐃🐂🐄🐎🐖🐏🐑🐐🦌🐕🐩🦮🐈🐓🦃🦚🦢🦩🕊️🐇🦝🦨🦡" },
-    { key: "美食", icon: "🍕", items: "🍎🍊🍋🍌🍉🍓🍒🍑🥭🍍🥥🥝🍅🥑🍆🥔🥕🌽🌶️🫑🥒🥬🥦🧄🧅🍄🥜🌰🍞🥐🥖🥨🥯🧇🧀🍖🍗🥩🥓🍔🍟🍕🌭🥪🌮🌯🥙🧆🥗🍿🧈🧂🥫🍱🍘🍙🍚🍛🍜🍝🍠🍢🍣🍤🍥🥮🍡🥟🥠🥡🍦🍨🍧🍡🍩🍪🎂🍰🧁🥧🍫🍬🍭🍮🍯🍼🥛☕🍵🍶🍾🍷🍸🍹🍺🍻🥂🥃🥤🧋🧃🧉🧊" },
-    { key: "自然", icon: "🌸", items: "🌸🌺🌻🌼🌷🌱🌿☘️🍀🍁🌾🍄🌊⛰️🏔️🌍🌎🌏🌐🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜☀️🌝🌟⭐️💫✨⚡️☀️☁️⛅️⛈️🌧️🌧💧☔️❄️⛄️🌈🔥💧🎄🌳🌲🌴🌵🌷🌸🌹🌺🌻🌼🌱🌿🍀" },
-    { key: "活动", icon: "⚽", items: "⚽🏀🏈⚾🎾🏐🏉🎱🏓🏸🥅🏒🏑🥍🏏🥏🎯🎳🎮🎰🎲🧩🎮🎨🎭🎬🎤🎧🎼🎹🥁🎷🎺🎸🪕🎻🏆🥇🥈🥉🏅🎖️🏵️🎗️🎫🎟️🎪🤹‍♂️🤸‍♀️🤿🥊🥋🎽🛹🛷⛸️🥌🎿⛷️🏂🪂🏋️‍♀️🏋️‍♂️🤼‍♀️🤼‍♂️🤸‍♀️⛹️‍♀️⛹️‍♂️🤾‍♀️🏌️‍♀️🏌️‍♂️🏄‍♀️🏄‍♂️🏊‍♀️🏊‍♂️🚣‍♀️🚣‍♂️🚴‍♀️🚴‍♂️🚵‍♀️🚵‍♂️🤸‍♂️🎪🎭" },
-    { key: "旅行", icon: "🚗", items: "🚗🚕🚙🚌🚎🏎️🚓🚑🚒🚐🚚🚛🚜🦯🦽🦼🛴🚲🛵🏍️🛺🚨🚔🚍🚘🚖🚡🚠🚟🚃🚋🚞🚝🚄🚅🚈🚂🚆🚇🚊🚉✈️🛫🛬🛩️💺🛰️🚀🛸🚁🛶⛵️🚤🛥️🛳️⛴️🚢⚓️⛽️🚧🚦🚥🚏🗺️🗿🗽🗼🏰🏯🏟️🎡🎢🎠⛲️⛱️🏖️🏝️🏜️🌋⛰️🏔️🗺️🧭" },
-    { key: "物品", icon: "💡", items: "💡🔦🔋🔌💻🖱️⌨️🖥️🖨️📱📲☎️📞📟📠📺📻⏰⏳⌛️📡🔋🔌💡🔦🕯️💎🔧🔨⚒️🛠️⛏️⚙️⛓️🔫💣🧨🔪🗡️⚔️🛡️🚬⚰️⚱️🏺🔮📿🧿💈⚗️🔭🔬🕳️🩹🩺💊💉🩸🧬🦠🧫🧪🌡️🧹🧺🧻🧼🧽🧯🛎️🔑🗝️🚪🪑🛋️🛏️🛌🧸🖼️🪆🪞🪟🧧🎁🎈🎉🎊🎀🪄🧿🔮" },
+  // 评论表情：改用精选 lucide 线性小图标（全站去 emoji）。
+  // 点击图标插入短码 token「:key:」，渲染时由 formatCommentContent 转成内联 SVG。
+  const REACTION_ICONS = [
+    { k: "smile" }, { k: "heart" }, { k: "thumbs-up" }, { k: "star" },
+    { k: "party-popper" }, { k: "flame" }, { k: "coffee" }, { k: "sparkles" },
+    { k: "music" }, { k: "gift" }, { k: "sunLine" },
   ];
+
+  /** 将表情图标集合渲染为可点击的网格（每个格子是 lucide 图标） */
+  function reactionGridHtml() {
+    return REACTION_ICONS.map(r =>
+      `<button type="button" class="emoji-cell" data-reaction="${r.k}" title=":${r.k}:">${svgIcon(r.k, 20)}</button>`
+    ).join("");
+  }
+
+  /** 评论表情短码 → 内联 SVG（供 formatCommentContent 用） */
+  function reactionTokenToSvg(text) {
+    return text.replace(/:([a-z-]+):/g, (m, key) => {
+      if (REACTION_ICONS.some(r => r.k === key)) {
+        return `<span class="comment-reaction">${svgIcon(key, 18)}</span>`;
+      }
+      return m;
+    });
+  }
 
   // 随机评论库（50 条，4 类）
   const RANDOM_COMMENTS = [
     // 夸赞类
-    "写得真好，收藏了！", "太有才了吧！👏", "这篇文章质量很高，感谢分享", "博主写的太好了，学到了", "干货满满，已收藏", "写得非常详细，赞一个", "这也太厉害了吧！🔥", "文章写得真棒，持续关注中", "优质内容，支持博主！", "太赞了，迫不及待想看更多", "这篇必须点赞，太实用了", "博主真是才华横溢！",
+    "写得真好，收藏了！", "太有才了吧！", "这篇文章质量很高，感谢分享", "博主写的太好了，学到了", "干货满满，已收藏", "写得非常详细，赞一个", "这也太厉害了吧！", "文章写得真棒，持续关注中", "优质内容，支持博主！", "太赞了，迫不及待想看更多", "这篇必须点赞，太实用了", "博主真是才华横溢！",
     // 幽默类
-    "笑死我了😂", "这篇文章把我看饿了", "博主你是不是偷偷开了挂？", "我看完了，然后忘了我在干嘛", "这文笔，不去写小说可惜了", "哈哈哈哈太真实了", "看完感觉智商被碾压了", "这篇内容比我的饭还香", "笑不活了，博主是懂幽默的", "看完我直接原地转圈", "这操作我给满分", "博主你是懂生活的",
+    "笑死我了", "这篇文章把我看饿了", "博主你是不是偷偷开了挂？", "我看完了，然后忘了我在干嘛", "这文笔，不去写小说可惜了", "哈哈哈哈太真实了", "看完感觉智商被碾压了", "这篇内容比我的饭还香", "笑不活了，博主是懂幽默的", "看完我直接原地转圈", "这操作我给满分", "博主你是懂生活的",
     // 互动类
     "学到了，感谢博主分享", "刚好需要这个，太及时了", "博主能详细讲讲这个吗？", "收藏了，以后慢慢看", "转发给朋友一起学习", "请问有后续更新吗？期待", "已关注，持续学习中", "这个观点很有启发，谢谢", "做笔记了，受益匪浅", "正好在研究这个，太有帮助了", "已实践，效果很好感谢", "博主能出个系列吗？想看更多",
     // 日常类
-    "打卡签到✅", "路过留个脚印", "每天必看博主的更新", "今天也是元气满满的一天", "摸鱼时看到这篇，值了", "深夜刷到好文，满足了", "上班偷偷看完了哈哈哈", "坐等更新！", "默默支持博主", "又到了催更的时候了", "第一次留言，支持一下", "前排围观！", "沙发！第一！" 
+    "打卡签到", "路过留个脚印", "每天必看博主的更新", "今天也是元气满满的一天", "摸鱼时看到这篇，值了", "深夜刷到好文，满足了", "上班偷偷看完了哈哈哈", "坐等更新！", "默默支持博主", "又到了催更的时候了", "第一次留言，支持一下", "前排围观！", "沙发！第一！" 
   ];
-
-  /** 按字形（grapheme cluster）拆分 emoji 字符串，正确处理 ZWJ 序列和变体选择符 */
-  function splitEmoji(str) {
-    if (typeof Intl !== "undefined" && Intl.Segmenter) {
-      try {
-        const seg = new Intl.Segmenter("en", { granularity: "grapheme" });
-        return [...seg.segment(str)].map(s => s.segment);
-      } catch {}
-    }
-    // 回退：spread 处理代理对（不完美但可用）
-    return [...str];
-  }
-
-  /** 将 emoji 数组渲染为 span HTML */
-  function emojiSpans(str) {
-    return splitEmoji(str).map(e => `<span>${e}</span>`).join("");
-  }
 
   /** 当前表情面板活动 textarea 引用 */
   let emojiPanelTarget = null;
 
-  /** 打开/关闭表情面板，定位在指定 textarea 上方 */
+  /** 打开/关闭表情面板（lucide 小图标），定位在指定 textarea 上方 */
   function toggleEmojiPanel(textarea) {
     let panel = document.getElementById("emojiPanel");
     if (panel && panel.dataset.targetId === textarea.id) {
@@ -1578,10 +1616,7 @@
     panel.className = "emoji-panel";
     panel.dataset.targetId = textarea.id || "";
     panel.innerHTML = `
-      <div class="emoji-tabs">
-        ${EMOJI_CATS.map((c, i) => `<button type="button" class="emoji-tab${i === 0 ? " is-active" : ""}" data-emoji-cat="${i}">${c.icon}</button>`).join("")}
-      </div>
-      <div class="emoji-grid" data-emoji-grid>${emojiSpans(EMOJI_CATS[0].items)}</div>
+      <div class="emoji-grid" data-emoji-grid>${reactionGridHtml()}</div>
     `;
     // 定位
     const rect = textarea.getBoundingClientRect();
@@ -1590,28 +1625,17 @@
     panel.style.bottom = (window.innerHeight - rect.top + 4) + "px";
     panel.style.zIndex = "10001";
     document.body.appendChild(panel);
-    // 分类切换
+    // 点击图标：插入短码 token「:key:」到 textarea 光标位置
     panel.addEventListener("click", e => {
-      const tab = e.target.closest("[data-emoji-cat]");
-      if (tab) {
-        panel.querySelectorAll(".emoji-tab").forEach(t => t.classList.remove("is-active"));
-        tab.classList.add("is-active");
-        const grid = panel.querySelector("[data-emoji-grid]");
-        if (grid) grid.innerHTML = emojiSpans(EMOJI_CATS[Number(tab.dataset.emojiCat)].items);
-        return;
-      }
-      // 点击表情：插入到 textarea 光标位置（必须命中 span，避免点击空白取到全部文本）
-      const emojiSpan = e.target.closest && e.target.closest(".emoji-grid span");
-      if (emojiSpan) {
-        const ch = emojiSpan.textContent;
-        if (ch && emojiPanelTarget) {
-          const ta = emojiPanelTarget;
-          const start = ta.selectionStart;
-          const end = ta.selectionEnd;
-          ta.value = ta.value.slice(0, start) + ch + ta.value.slice(end);
-          ta.selectionStart = ta.selectionEnd = start + ch.length;
-          ta.focus();
-        }
+      const cell = e.target.closest && e.target.closest("[data-reaction]");
+      if (cell && emojiPanelTarget) {
+        const token = `:${cell.dataset.reaction}:`;
+        const ta = emojiPanelTarget;
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        ta.value = ta.value.slice(0, start) + token + ta.value.slice(end);
+        ta.selectionStart = ta.selectionEnd = start + token.length;
+        ta.focus();
       }
     });
     // 点击面板外部关闭
@@ -1680,7 +1704,7 @@
     } catch (err) {
       toast(err.message);
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "📷"; }
+      if (btn) { btn.disabled = false; btn.innerHTML = svgIcon("image", 18); }
     }
   }
 
@@ -1746,11 +1770,11 @@
   function commentItemHtml(cm, isReply, rootId) {
     let avatarInner;
     if (cm.is_ai) {
-      // AI 机器人：图片 URL 用 img，emoji/空 用后台配置的 emoji（兜底 🤖 / 昵称首字符）
-      const botAv = state.settings?.ai_bot_avatar || "🤖";
+      // AI 机器人：图片 URL 用 img，否则用 lucide bot 图标占位（不再用 emoji）
+      const botAv = state.settings?.ai_bot_avatar || "";
       avatarInner = /^https?:\/\//i.test(botAv)
         ? `<img class="comment-avatar comment-avatar--img comment-avatar--ai" src="${esc(botAv)}" alt="" referrerpolicy="no-referrer" loading="lazy" />`
-        : `<span class="comment-avatar comment-avatar--ai">${esc(botAv)}</span>`;
+        : `<span class="comment-avatar comment-avatar--ai">${svgIcon("bot", 20)}</span>`;
     } else if (cm.avatar_url) {
       avatarInner = `<img class="comment-avatar comment-avatar--img" src="${esc(cm.avatar_url)}" alt="" referrerpolicy="no-referrer" loading="lazy" />`;
     } else {
@@ -1921,7 +1945,7 @@
     const bar = document.createElement("div");
     bar.className = "comment-ai-hint";
     bar.setAttribute("data-ai-hint", "");
-    bar.innerHTML = `<span>💬 评论中 @<b></b> 可召唤 AI 回复</span><button type="button" class="comment-ai-mention-btn">@<b></b></button>`;
+    bar.innerHTML = `<span>${svgIcon("message-circle", 16)} 评论中 @<b></b> 可召唤 AI 回复</span><button type="button" class="comment-ai-mention-btn">@<b></b></button>`;
     bar.querySelectorAll("b").forEach(b => { b.textContent = botName; });
     bar.querySelector(".comment-ai-mention-btn").addEventListener("click", () => {
       const prefix = `@${botName} `;
@@ -2192,11 +2216,11 @@
             <input name="website" placeholder="网址（选填，头像可点击跳转）" maxlength="200" value="${esc(getSavedWebsite())}" />
           </div>
           <div class="comment-toolbar">
-            <button type="button" class="comment-tool-btn" data-emoji-btn>😊</button>
-            <button type="button" class="comment-tool-btn" data-img-upload-btn>📷</button>
+            <button type="button" class="comment-tool-btn" data-emoji-btn title="表情">${svgIcon("smile", 18)}</button>
+            <button type="button" class="comment-tool-btn" data-img-upload-btn title="上传图片">${svgIcon("image", 18)}</button>
             <input type="file" accept="image/*" data-img-file hidden />
             <input type="text" class="comment-img-url-input" data-img-url-input placeholder="图片 URL，回车添加" maxlength="500" />
-            <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment>🎲</button>
+            <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="随机一句">${svgIcon("dices", 18)}</button>
           </div>
           <textarea name="content" placeholder="说点什么…（支持 @ 提及他人）" maxlength="500" required style="min-height:80px"></textarea>
           <div class="comment-img-preview" data-comment-img-preview style="display:none"></div>
@@ -2258,11 +2282,11 @@
           <input name="website" placeholder="网址（选填，头像可点击跳转）" maxlength="200" value="${esc(getSavedWebsite())}" />
         </div>
         <div class="comment-toolbar">
-          <button type="button" class="comment-tool-btn" data-emoji-btn>😊</button>
-          <button type="button" class="comment-tool-btn" data-img-upload-btn>📷</button>
+          <button type="button" class="comment-tool-btn" data-emoji-btn title="表情">${svgIcon("smile", 18)}</button>
+          <button type="button" class="comment-tool-btn" data-img-upload-btn title="上传图片">${svgIcon("image", 18)}</button>
           <input type="file" accept="image/*" data-img-file hidden />
           <input type="text" class="comment-img-url-input" data-img-url-input placeholder="图片 URL，回车添加" maxlength="500" />
-          <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment>🎲</button>
+          <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="随机一句">${svgIcon("dices", 18)}</button>
         </div>
         <textarea name="content" placeholder="说点什么…（支持 @ 提及他人）" maxlength="500" required style="min-height:80px"></textarea>
         <div class="comment-img-preview" data-comment-img-preview style="display:none"></div>
@@ -2359,7 +2383,7 @@
             </a>`
                     )
                     .join("")
-                : `<div class="essay-empty"><span style="font-size:2.5rem">📄</span><span>还没有文章</span></div>`
+                : `<div class="essay-empty"><span class="empty-ico">${svgIcon("file-text", 48)}</span><span>还没有文章</span></div>`
             }
             ${pagerHtml(page, pages)}
           </div>
@@ -2417,7 +2441,7 @@
               }
             )
             .join("")}</div>`
-        : `<div class="essay-empty"><span style="font-size:2.5rem">🖼️</span><span>相册还没有图片</span><span style="font-size:.85rem;color:var(--anzhiyu-secondtext)">在后台「相册管理」上传或从说说/文章同步</span></div>`;
+        : `<div class="essay-empty"><span class="empty-ico">${svgIcon("images", 48)}</span><span>相册还没有图片</span><span style="font-size:.85rem;color:var(--anzhiyu-secondtext)">在后台「相册管理」上传或从说说/文章同步</span></div>`;
 
       app.innerHTML = `<div class="essay">${header}<div class="photos-wrap">${grid}${pagerHtml(page, pages)}</div></div>`;
       app.querySelectorAll("[data-pager]").forEach(b =>
@@ -2502,7 +2526,7 @@
       });
     } catch (e) {
       if (state.activeView !== "post") return;
-      app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-empty"><span style="font-size:2.5rem">🚫</span><span>${esc(e.message)}</span><a class="btn" href="/posts">返回</a></div></div></div>`;
+      app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-empty"><span class="empty-ico">${svgIcon("search", 56)}</span><span>${esc(e.message)}</span><a class="btn" href="/posts">返回</a></div></div></div>`;
     }
   }
 
@@ -2561,11 +2585,11 @@
                 <input name="website" placeholder="网址（选填，头像可点击跳转）" maxlength="200" value="${esc(getSavedWebsite())}" />
               </div>
               <div class="comment-toolbar">
-                <button type="button" class="comment-tool-btn" data-emoji-btn>😊</button>
-                <button type="button" class="comment-tool-btn" data-img-upload-btn>📷</button>
+                <button type="button" class="comment-tool-btn" data-emoji-btn title="表情">${svgIcon("smile", 18)}</button>
+                <button type="button" class="comment-tool-btn" data-img-upload-btn title="上传图片">${svgIcon("image", 18)}</button>
                 <input type="file" accept="image/*" data-img-file hidden />
                 <input type="text" class="comment-img-url-input" data-img-url-input placeholder="图片 URL，回车添加" maxlength="500" />
-                <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment>🎲</button>
+                <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="随机一句">${svgIcon("dices", 18)}</button>
               </div>
               <textarea name="content" placeholder="说点什么…（支持 @ 提及他人）" maxlength="500" required style="min-height:100px"></textarea>
               <div class="comment-img-preview" data-comment-img-preview style="display:none"></div>
@@ -2598,7 +2622,7 @@
         comment_count: p.comment_count || 0,
       });
     } catch (e) {
-      app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-empty"><span style="font-size:2.5rem">🚫</span><span>${esc(e.message)}</span><a class="btn" href="/posts">返回</a></div></div></div>`;
+      app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-empty"><span class="empty-ico">${svgIcon("search", 56)}</span><span>${esc(e.message)}</span><a class="btn" href="/posts">返回</a></div></div></div>`;
     }
   }
 
@@ -3265,15 +3289,15 @@
   /* ================= 后台管理页 ================= */
 
   const ADMIN_TABS = [
-    { key: "overview", label: "概览", icon: "📊" },
-    { key: "moments", label: "说说", icon: "💬" },
-    { key: "posts", label: "文章", icon: "📝" },
-    { key: "photos", label: "相册", icon: "🖼️" },
-    { key: "comments", label: "评论", icon: "💭" },
-    { key: "appearance", label: "外观", icon: "🎨" },
-    { key: "media", label: "媒体", icon: "📁" },
-    { key: "ai", label: "AI 助手", icon: "🤖" },
-    { key: "security", label: "安全", icon: "🔒" },
+    { key: "overview", label: "概览", icon: "layout-dashboard" },
+    { key: "moments", label: "说说", icon: "message-circle" },
+    { key: "posts", label: "文章", icon: "file-text" },
+    { key: "photos", label: "相册", icon: "image" },
+    { key: "comments", label: "评论", icon: "message-square" },
+    { key: "appearance", label: "外观", icon: "palette" },
+    { key: "media", label: "媒体", icon: "folder" },
+    { key: "ai", label: "AI 助手", icon: "bot" },
+    { key: "security", label: "安全", icon: "shield" },
   ];
 
   /**
@@ -3285,7 +3309,7 @@
     app.innerHTML = `
       <div class="essay"><div class="admin-wrap">
         <div class="admin-lock">
-          <span class="lock-icon">🔐</span>
+          <span class="lock-icon">${svgIcon("lock", 40)}</span>
           <h3 style="margin:0 0 .5rem">设置初始管理密码</h3>
           <p style="margin:0 0 1rem;color:var(--muted)">首次部署，请设置管理密码（6-128 位）</p>
           <form data-admin-setup>
@@ -3340,7 +3364,7 @@
       app.innerHTML = `
         <div class="essay"><div class="admin-wrap">
           <div class="admin-lock">
-            <span class="lock-icon">🔒</span>
+            <span class="lock-icon">${svgIcon("lock", 40)}</span>
             <h3 style="margin:0 0 .5rem">站主解锁</h3>
             <p>请输入管理密码</p>
             <form data-entry-login>
@@ -3385,14 +3409,13 @@
         <div class="admin-side-mask" data-admin-side-toggle></div>
         <aside class="admin-side">
           <div class="admin-brand">
-            <span class="admin-logo">✍️</span>
+            <span class="admin-logo">${svgIcon("pen-nib", 20)}</span>
             <div class="admin-brand-name"><b>${esc(state.settings.site_title || "moments")}</b><small>管理后台</small></div>
           </div>
           <nav class="admin-nav">
             ${ADMIN_TABS.map(t => `
               <button class="admin-nav-item ${state.adminTab === t.key ? "is-active" : ""}" data-admin-tab="${t.key}">
-                <span class="admin-nav-dot"></span>
-                <span class="admin-nav-ico">${t.icon || ""}</span>
+                <span class="admin-nav-ico">${svgIcon(t.icon, 18)}</span>
                 <span class="admin-nav-label">${t.label}</span>
               </button>`).join("")}
           </nav>
@@ -3408,7 +3431,7 @@
               <span class="admin-head-date">${dateStr} · ${curTab.label}</span>
             </div>
             <div class="admin-head-actions">
-              <button class="btn ghost sm admin-side-toggle" data-admin-side-toggle type="button">☰ 菜单</button>
+              <button class="btn ghost sm admin-side-toggle" data-admin-side-toggle type="button">${svgIcon("menu", 16)} 菜单</button>
               <a class="btn ghost sm" href="/" data-link>查看网站</a>
             </div>
           </header>
@@ -3458,10 +3481,10 @@
     let d;
     try { d = await api("/api/admin/overview"); } catch (e) { panel.innerHTML = `<p>概览加载失败：${esc(e.message)}</p>`; return; }
     const cards = [
-      { label: "说说", icon: "💬", val: d.moments, tab: "moments" },
-      { label: "文章", icon: "📝", val: d.posts, tab: "posts" },
-      { label: "评论", icon: "💭", val: d.comments, tab: "comments" },
-      { label: "相册", icon: "🖼️", val: d.photos, tab: "photos" },
+      { label: "说说", icon: "message-circle", val: d.moments, tab: "moments" },
+      { label: "文章", icon: "file-text", val: d.posts, tab: "posts" },
+      { label: "评论", icon: "message-square", val: d.comments, tab: "comments" },
+      { label: "相册", icon: "image", val: d.photos, tab: "photos" },
     ];
     // 近 7 天评论趋势 SVG 面积图
     const trend = d.trend || [];
@@ -3478,7 +3501,7 @@
       <div class="ov-cards">
         ${cards.map(c => `
           <div class="ov-card" data-admin-tab="${c.tab}">
-            <div class="ov-card-ico">${c.icon}</div>
+            <div class="ov-card-ico">${svgIcon(c.icon, 26)}</div>
             <div class="ov-card-num">${c.val}</div>
             <div class="ov-card-label">${c.label}</div>
           </div>`).join("")}
@@ -3590,7 +3613,7 @@
               <span>${timeAgo(m.created_at)}</span>
               ${m.images && m.images.length ? `<span class="tag-mini">图片×${m.images.length}</span>` : ""}
               ${m.video && m.video.src ? `<span class="tag-mini">${m.video.kind === "hls" ? "M3U8 视频" : "MP4 视频"}</span>` : ""}
-              ${m.location ? `<span>📍 ${esc(m.location)}</span>` : ""}
+              ${m.location ? `<span>${svgIcon("locationDot", 14)} ${esc(m.location)}</span>` : ""}
               <span>赞 ${m.like_count || 0}</span><span>评论 ${m.comment_count || 0}</span>
             </div>
           </div>
@@ -3872,18 +3895,18 @@
           <input name="feed_page_size" type="number" min="1" max="50" value="${esc(s.feed_page_size)}" required />
         </div>
         <div class="field">
-          <label>顶栏品牌头像<br /><small style="color:var(--anzhiyu-secondtext)">emoji（如 ✍️）或图片 URL，也可点击"上传"选择本地图片</small></label>
+          <label>顶栏品牌头像<br /><small style="color:var(--anzhiyu-secondtext)">仅图片 URL，或点击"上传"选择本地图片；留空显示默认笔尖图标</small></label>
           <div style="display:flex;gap:.5rem;align-items:center">
-            <input name="brand_avatar" maxlength="200" value="${esc(s.brand_avatar)}" placeholder="✍️ 或 https://..." style="flex:1" />
+            <input name="brand_avatar" maxlength="200" value="${esc(s.brand_avatar)}" placeholder="https://...（留空=默认图标）" style="flex:1" />
             <button type="button" class="btn" data-avatar-upload="brand_avatar">上传</button>
             <input type="file" accept="image/*" data-avatar-file="brand_avatar" hidden />
           </div>
           <div class="field-hint" data-avatar-preview="brand_avatar" style="margin-top:.4rem">${/^https?:\/\//i.test(s.brand_avatar || "") ? `<img src="${esc(s.brand_avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
         </div>
         <div class="field">
-          <label>站点图标（favicon）<br /><small style="color:var(--anzhiyu-secondtext)">emoji（如 ✨）或图片 URL，也可点"上传"选本地图片；留空=默认 ✍️</small></label>
+          <label>站点图标（favicon）<br /><small style="color:var(--anzhiyu-secondtext)">仅图片 URL，或点"上传"选本地图片；留空=默认笔尖图标</small></label>
           <div style="display:flex;gap:.5rem;align-items:center">
-            <input name="site_icon" maxlength="300" value="${esc(s.site_icon)}" placeholder="✨ 或 https://...，留空=默认 ✍️" style="flex:1" />
+            <input name="site_icon" maxlength="300" value="${esc(s.site_icon)}" placeholder="https://...（留空=默认图标）" style="flex:1" />
             <button type="button" class="btn" data-avatar-upload="site_icon">上传</button>
             <input type="file" accept="image/*" data-avatar-file="site_icon" hidden />
           </div>
@@ -3894,18 +3917,18 @@
           <input name="author_name" maxlength="32" value="${esc(s.author_name)}" />
         </div>
         <div class="field">
-          <label>说说作者头像（可选）<br /><small style="color:var(--anzhiyu-secondtext)">图片 URL / 本地"上传"，或 emoji；留空则用昵称首字符</small></label>
+          <label>说说作者头像（可选）<br /><small style="color:var(--anzhiyu-secondtext)">图片 URL 或本地"上传"；留空则用昵称首字符</small></label>
           <div style="display:flex;gap:.5rem;align-items:center">
-            <input name="author_avatar" maxlength="200" value="${esc(s.author_avatar)}" placeholder="https://... 或 emoji，留空=昵称首字符" style="flex:1" />
+            <input name="author_avatar" maxlength="200" value="${esc(s.author_avatar)}" placeholder="https://...（留空=昵称首字符）" style="flex:1" />
             <button type="button" class="btn" data-avatar-upload="author_avatar">上传</button>
             <input type="file" accept="image/*" data-avatar-file="author_avatar" hidden />
           </div>
           <div class="field-hint" data-avatar-preview="author_avatar" style="margin-top:.4rem">${/^https?:\/\//i.test(s.author_avatar || "") ? `<img src="${esc(s.author_avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
         </div>
         <div class="field">
-          <label>文章卡片头像<br /><small style="color:var(--anzhiyu-secondtext)">emoji（如 📄）或图片 URL，也可点击"上传"选择本地图片</small></label>
+          <label>文章卡片头像<br /><small style="color:var(--anzhiyu-secondtext)">仅图片 URL，或点击"上传"选择本地图片；留空显示默认文档图标</small></label>
           <div style="display:flex;gap:.5rem;align-items:center">
-            <input name="post_avatar" maxlength="200" value="${esc(s.post_avatar)}" placeholder="📄 或 https://..." style="flex:1" />
+            <input name="post_avatar" maxlength="200" value="${esc(s.post_avatar)}" placeholder="https://...（留空=默认图标）" style="flex:1" />
             <button type="button" class="btn" data-avatar-upload="post_avatar">上传</button>
             <input type="file" accept="image/*" data-avatar-file="post_avatar" hidden />
           </div>
@@ -4328,8 +4351,8 @@
           <input name="ai_bot_name" maxlength="20" value="${esc(s.ai_bot_name)}" placeholder="小J" />
         </div>
         <div class="field">
-          <label>机器人头像<br /><small style="color:var(--anzhiyu-secondtext)">填 emoji（如 🤖）或图片 URL；留空则显示昵称首字符</small></label>
-          <input name="ai_bot_avatar" maxlength="200" value="${esc(s.ai_bot_avatar)}" placeholder="🤖 或 https://...（留空=昵称首字符）" />
+          <label>机器人头像<br /><small style="color:var(--anzhiyu-secondtext)">仅图片 URL；留空显示默认机器人图标</small></label>
+          <input name="ai_bot_avatar" maxlength="200" value="${esc(s.ai_bot_avatar)}" placeholder="https://...（留空=默认图标）" />
         </div>
         <div class="field">
           <label>文本模型 ID（高级，可选）<br /><small style="color:var(--anzhiyu-secondtext)">默认使用 Cloudflare 托管免费模型 Qwen3（失败自动回退 Llama 3.2）；如确认其他 @cf/* 模型可用可在此覆盖</small></label>
@@ -4370,7 +4393,7 @@
             <button type="button" class="btn" data-gen-path style="white-space:nowrap">随机生成</button>
           </div>
           <div class="field-hint" style="margin-top:.5rem;color:#e6a23c">
-            ⚠ 修改后浏览器地址会立即跳转到新入口；连续输错 5 次密码将锁定 15 分钟。
+            ${svgIcon("triangle-alert", 14)} 修改后浏览器地址会立即跳转到新入口；连续输错 5 次密码将锁定 15 分钟。
           </div>
           <div data-adminpath-msg style="margin-top:.4rem;font-size:.85rem"></div>
         </div>
@@ -5272,15 +5295,15 @@
           }
         }
         if (!meta || meta.available === false) {
-          card.innerHTML = `<div class="mcc-err">🎵 音乐不可用（已下架或版权限制）</div>`;
+          card.innerHTML = `<div class="mcc-err">${svgIcon("music", 16)} 音乐不可用（已下架或版权限制）</div>`;
           return;
         }
         if (!meta.title && !meta.url) {
-          card.innerHTML = `<div class="mcc-err">🎵 音乐加载失败</div>`;
+          card.innerHTML = `<div class="mcc-err">${svgIcon("music", 16)} 音乐加载失败</div>`;
           return;
         }
         card.innerHTML = `
-          ${meta.cover ? `<img class="mcc-cover" src="${proxyCover(meta.cover)}" alt="" referrerpolicy="no-referrer" />` : `<div class="mcc-cover mcc-cover--ph">🎵</div>`}
+          ${meta.cover ? `<img class="mcc-cover" src="${proxyCover(meta.cover)}" alt="" referrerpolicy="no-referrer" />` : `<div class="mcc-cover mcc-cover--ph">${svgIcon("music", 32)}</div>`}
           <div class="mcc-info">
             <div class="mcc-name">${esc(meta.title)}</div>
             <div class="mcc-artist" data-mcc-artist>${esc(meta.artist)}</div>
@@ -5743,7 +5766,7 @@
         .map(
           id => `
         <div class="editor-music-row">
-          <div class="music-block-card" data-song-id="${id}"><div class="mcc-skeleton">🎵 加载中…</div></div>
+          <div class="music-block-card" data-song-id="${id}"><div class="mcc-skeleton">${svgIcon("music", 16)} 加载中…</div></div>
           <button type="button" class="emd-remove" data-emd-rm="${id}" title="移除该音乐" aria-label="移除该音乐">×</button>
         </div>`
         )
@@ -6689,7 +6712,7 @@
     state.activeView = "404";
     setSeo({ title: `页面不存在 · ${state.settings.site_title}`, path: location.pathname, noindex: true });
     app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-empty">
-      <span style="font-size:2.5rem">🚫</span><span>页面不存在</span>
+      <span class="empty-ico">${svgIcon("search", 56)}</span><span>页面不存在</span>
       <a class="btn" href="/">返回首页</a></div></div></div>`;
   }
 
