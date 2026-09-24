@@ -194,6 +194,8 @@ export function sitemapXml(origin: string, posts: PostRow[]): string {
   add(origin + "/", "1.0", "daily");
   add(origin + "/posts", "0.8", "weekly");
   add(origin + "/photos", "0.7", "weekly");
+  add(origin + "/about", "0.6", "monthly");
+  add(origin + "/links", "0.6", "weekly");
   for (const p of posts) {
     add(origin + "/post/" + encodeURIComponent(p.slug), "0.9", "monthly", p.updated_at);
   }

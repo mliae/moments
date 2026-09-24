@@ -3772,6 +3772,7 @@
     { key: "appearance", label: "外观", icon: "palette" },
     { key: "media", label: "媒体", icon: "folder" },
     { key: "ai", label: "AI 助手", icon: "bot" },
+    { key: "seo", label: "搜索收录", icon: "search" },
     { key: "security", label: "安全", icon: "shield" },
   ];
 
@@ -3950,6 +3951,7 @@
     if (tab === "appearance") return renderAdminAppearance(panel);
     if (tab === "media") return renderAdminMedia(panel);
     if (tab === "ai") return renderAdminAI(panel);
+    if (tab === "seo") return renderAdminSeo(panel);
     if (tab === "security") return renderAdminSecurity(panel);
   }
 
@@ -5117,6 +5119,48 @@
         </div>
         <button class="btn primary" type="submit">保存 QQ API</button>
       </form>`;
+  }
+
+  /* ---------- 后台 Tab：搜索收录 ---------- */
+  async function renderAdminSeo(panel) {
+    setSeo({ title: `搜索收录 · ${state.settings.site_title}`, path: location.pathname, noindex: true });
+    const origin = location.origin.replace(/\/$/, "");
+    const site = (state.settings.site_domain || origin).replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const enc = encodeURIComponent(site);
+    const items = [
+      { label: "站点地图 sitemap.xml", url: `${origin}/sitemap.xml`, tip: "提交给搜索引擎，列出所有可收录页面" },
+      { label: "爬虫规则 robots.txt", url: `${origin}/robots.txt`, tip: "声明允许/禁止抓取的路径与 sitemap 位置" },
+      { label: "RSS 订阅 rss.xml", url: `${origin}/rss.xml`, tip: "文章更新源，也可用于订阅与部分平台抓取" },
+    ];
+    panel.innerHTML = `
+      <div class="admin-panel-head"><h3>搜索收录</h3></div>
+      <p style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:-.4rem 0 1rem">把本站地址提交到各搜索引擎站长平台，加快收录。先复制下方 sitemap 地址，再点对应平台按钮去提交。</p>
+
+      <div style="display:flex;flex-direction:column;gap:.7rem;margin-bottom:1.4rem">
+        ${items.map(it => `
+          <div style="display:flex;align-items:center;gap:.7rem;background:var(--anzhiyu-card-bg);border:var(--style-border);border-radius:12px;padding:.75rem 1rem">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:.9rem">${esc(it.label)}</div>
+              <div style="font-size:.78rem;color:var(--anzhiyu-secondtext);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.url)}</div>
+              <div style="font-size:.72rem;color:var(--anzhiyu-secondtext);opacity:.8">${esc(it.tip)}</div>
+            </div>
+            <button class="btn sm ghost" data-copy="${esc(it.url)}">复制</button>
+            <a class="btn sm ghost" href="${esc(it.url)}" target="_blank" rel="noopener">打开</a>
+          </div>`).join("")}
+      </div>
+
+      <div style="font-weight:700;font-size:.92rem;margin:1.2rem 0 .7rem">站长平台快捷入口</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.8rem">
+        <a class="btn" href="https://ziyuan.baidu.com/linksubmit/index" target="_blank" rel="noopener" style="justify-content:center">百度搜索资源平台</a>
+        <a class="btn" href="https://www.bing.com/webmasters?siteUrl=${enc}" target="_blank" rel="noopener" style="justify-content:center">Bing Webmaster</a>
+        <a class="btn" href="https://search.google.com/search-console?resource_id=${encodeURIComponent("sc-domain:" + site)}" target="_blank" rel="noopener" style="justify-content:center">Google Search Console</a>
+        <a class="btn ghost" href="https://www.bing.com/indexnow" target="_blank" rel="noopener" style="justify-content:center">了解 IndexNow 自动推送</a>
+      </div>
+      <p style="color:var(--anzhiyu-secondtext);margin-top:1rem;font-size:.78rem">提示：各平台需先验证站点归属（按平台指引添加 TXT 或上传文件），验证后即可提交 sitemap 并查看收录情况。</p>`;
+    panel.querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(btn.dataset.copy); toast("已复制：" + btn.dataset.copy); }
+      catch { toast("复制失败，请手动复制", 1); }
+    }));
   }
 
   /* ---------- 后台 Tab：安全 ---------- */
