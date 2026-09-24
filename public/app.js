@@ -2659,8 +2659,15 @@
         : "";
 
       // 赞助 / 收款码：咖啡主题卡 + 金额按钮切换二维码
-      // about_qr_amounts 每行：金额|二维码URL（URL 可空，空则不切图）
-      const amounts = parseRows(s.about_qr_amounts).map(r => ({ label: String(r[0] || "").trim(), src: String(r[1] || "").trim() })).filter(x => x.label);
+      // about_qr_amounts 每行：金额|二维码URL，或 金额|描述|二维码URL（兼容 2/3 列）
+      // URL 可空；自动识别哪一列是 http(s) 开头，并去掉反引号/引号包裹
+      const cleanUrl = v => String(v || "").trim().replace(/^[`'"]+|[`'"]+$/g, "").trim();
+      const amounts = parseRows(s.about_qr_amounts).map(r => {
+        const label = String(r[0] || "").trim();
+        // 从第 2 列起找第一个以 http 开头的作为二维码 URL
+        const src = r.slice(1).map(cleanUrl).find(v => /^https?:\/\//i.test(v)) || cleanUrl(r[r.length - 1]);
+        return { label, src: /^https?:\/\//i.test(src) ? src : "" };
+      }).filter(x => x.label);
       const firstSrc = amounts.find(x => /^https?:\/\//i.test(x.src))?.src || "";
       const btnHtml = amounts.length
         ? amounts.map((a, i) => `<button type="button" class="about-amt-btn${i === 0 ? " is-active" : ""}" data-qr-src="${esc(a.src)}">${esc(a.label)}</button>`).join("")
