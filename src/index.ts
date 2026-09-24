@@ -226,6 +226,16 @@ app.get("/rss.xml", async c => {
   });
 });
 
+// /feed 作为 RSS 订阅源别名（通用惯例），与 /rss.xml 输出一致
+app.get("/feed", async c => {
+  const origin = new URL(c.req.url).origin;
+  const s = await getSettings(c.env.DB);
+  const posts = await publishedPosts(c.env.DB, 50);
+  return c.text(rssXml(origin, s, posts), 200, {
+    "content-type": "application/rss+xml; charset=utf-8",
+  });
+});
+
 /* ==================== HTML SSR ==================== */
 
 // index.html 短缓存（30s），减少对 ASSETS 的重复子请求；发布后最多 30s 生效

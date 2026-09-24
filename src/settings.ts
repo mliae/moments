@@ -119,7 +119,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   about_contacts:
     "GitHub|孤鸿剑尊|https://github.com/mliae\n" +
     "邮箱|hi@jxe.me|mailto:hi@jxe.me\n" +
-    "RSS|订阅本站|/feed",
+    "RSS|订阅本站|/rss.xml",
   about_qr_text: "这里没有广告，全是一杯杯陈酿。扫码或留言，跟我打个招呼。",
   about_qr_amounts: "10元|请我喝杯咖啡\n30元|支持我继续写下去\n60元|加个鸡腿，再接再厉",
   nav_links: "",
