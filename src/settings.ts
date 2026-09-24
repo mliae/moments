@@ -25,6 +25,9 @@ export interface SiteSettings {
   post_avatar: string; // 文章卡片头像（仅图片 URL；空=lucide 占位图标）
   // 关于我页面（/about）
   about_enabled: boolean; // 是否启用关于我页面（顶栏入口与路由）
+  links_enabled: boolean; // 是否启用友情链接（顶栏入口与路由）
+  photos_enabled: boolean; // 是否启用相册入口（顶栏入口；相册功能本身一直在）
+  links_categories: string; // 友链分类，每行一个（默认：技术/设计/生活随笔/摄影），后台可增删改
   about_greeting: string; // 顶部问候大标题（如「先认识一下，再慢慢读。」）
   about_greeting_sub: string; // 问候标题下方小字
   about_avatar: string; // 关于页大头像（图片 URL；空=用 author_avatar）
@@ -92,6 +95,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   post_avatar: "",
   // 关于我（默认开启，带演示内容，可在后台「设置 - 关于我」修改）
   about_enabled: true,
+  links_enabled: true,
+  photos_enabled: true,
+  links_categories: "技术\n设计\n生活随笔\n摄影",
   about_greeting: "先认识一下，再慢慢读。",
   about_greeting_sub: "记录生活中的每一个瞬间，图文、视频与心情。",
   about_avatar: "",
@@ -167,6 +173,7 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   about_contacts: 1000,
   about_qr_text: 300,
   about_qr_amounts: 1000,
+  links_categories: 500,
   nav_links: 1000,
   banner_button_url: 500,
   banner_bg_image: 500,
@@ -212,6 +219,8 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "music_collapsed",
   "ai_reply_enabled",
   "about_enabled",
+  "links_enabled",
+  "photos_enabled",
 ];
 
 export function clampSetting(value: unknown, max: number): string {

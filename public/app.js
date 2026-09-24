@@ -54,6 +54,9 @@
     author_avatar: "",
     post_avatar: "",
     about_enabled: true,
+    links_enabled: true,
+    photos_enabled: true,
+    links_categories: "技术\n设计\n生活随笔\n摄影",
     about_greeting: "先认识一下，再慢慢读。",
     about_greeting_sub: "记录生活中的每一个瞬间，图文、视频与心情。",
     about_avatar: "",
@@ -250,6 +253,12 @@
     "at-sign": { stroke: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>' },
     send: { stroke: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>' },
     link: { stroke: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>' },
+    /* —— 友情链接页面用到的图标 —— */
+    "arrow-up-right": { stroke: '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>' },
+    "arrow-right": { stroke: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>' },
+    "scroll-text": { stroke: '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>' },
+    info: { stroke: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>' },
+    check: { stroke: '<path d="M20 6 9 17l-5-5"/>' },
   };
 
   function svgIcon(name, size) {
@@ -1429,6 +1438,9 @@
     document.title = s.site_title;
     // 「关于」入口：about_enabled 开启时显示（桌面端 + 移动端）
     document.querySelectorAll(".about-nav-link").forEach(a => { a.hidden = !s.about_enabled; });
+    // 「友情链接」「相册」入口独立开关
+    document.querySelectorAll(".links-nav-link").forEach(a => { a.hidden = !s.links_enabled; });
+    document.querySelectorAll(".photos-nav-link").forEach(a => { a.hidden = !s.photos_enabled; });
     // 品牌头像：http(s) 链接渲染图片，否则用 lucide pen-nib 占位（不再用 emoji/文本）
     const avatarEl = document.querySelector(".brand-avatar");
     if (avatarEl) {
@@ -2717,6 +2729,190 @@
     }
   }
 
+  /* ================= 友情链接（/links） ================= */
+
+  /** 相对时间：x 天前 / 刚刚 */
+  function timeAgo(iso) {
+    if (!iso) return "";
+    const t = new Date(iso).getTime();
+    if (!t) return "";
+    const diff = Date.now() - t;
+    const d = Math.floor(diff / 86400000);
+    if (d <= 0) return "今天";
+    if (d === 1) return "昨天";
+    if (d < 30) return `${d} 天前`;
+    if (d < 365) return `${Math.floor(d / 30)} 个月前`;
+    return `${Math.floor(d / 365)} 年前`;
+  }
+
+  /** 友站卡片头像：有图显示图片（裂图回退首字），无图直接首字 */
+  function friendAvatar(name, url) {
+    const initial = (name || "?").trim().charAt(0).toUpperCase();
+    const img = url
+      ? `<img src="${esc(url)}" alt="${esc(name)}" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />`
+      : "";
+    const fb = `<span class="links-avatar-fb" style="${url ? "display:none" : "display:flex"}">${esc(initial)}</span>`;
+    return `<div class="links-avatar">${img}${fb}</div>`;
+  }
+
+  async function renderLinks() {
+    const activeCat = new URLSearchParams(location.search).get("category") || "全部";
+    app.innerHTML = `<div class="essay"><div class="links-wrap"><div class="essay-empty">加载中…</div></div></div>`;
+    try {
+      const res = await api(`/api/friends?category=${encodeURIComponent(activeCat)}`);
+      const { list = [], stats = {}, categories = [] } = res;
+      const cats = ["全部", ...categories];
+      const filterHtml = cats.map(c => {
+        const href = c === "全部" ? "/links" : `/links?category=${encodeURIComponent(c)}`;
+        return `<a class="links-cat${c === activeCat ? " is-active" : ""}" href="${href}">${esc(c)}</a>`;
+      }).join("");
+
+      const gridHtml = list.length
+        ? list.map(f => `
+            <a class="links-card" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer nofollow">
+              <div class="links-card-top">
+                ${friendAvatar(f.name, f.avatar)}
+                <div class="links-card-info">
+                  <div class="links-card-name">${esc(f.name)}</div>
+                  <div class="links-card-domain">${esc((f.url || "").replace(/^https?:\/\//i, "").replace(/\/$/, ""))}</div>
+                </div>
+                <span class="links-card-arrow">${svgIcon("arrow-up-right", 16)}</span>
+              </div>
+              <div class="links-card-desc">${esc(f.description || "这个人很懒，什么都没留下。")}</div>
+              <div class="links-card-foot">
+                ${f.category ? `<span class="links-card-cat">${esc(f.category)}</span>` : ""}
+                <span class="links-card-time">${timeAgo(f.last_checked || f.updated_at)}更新</span>
+              </div>
+            </a>`).join("")
+        : `<div class="essay-empty">还没有友链，去<a href="/links/apply">申请友链</a>吧～</div>`;
+
+      app.innerHTML = `<div class="essay"><div class="links-wrap">
+        <div class="links-page-head">
+          <div class="links-eyebrow">友情链接 · FRIENDS</div>
+          <h1 class="links-title">友情链接</h1>
+          <p class="links-subtitle">这里收集了我常去翻阅的独立博客与友站。每一家都有自己的节奏，值得慢下来读一读。</p>
+          <div class="links-stats">
+            <div class="links-stat"><b>${stats.total ?? 0}</b><span>友站总数</span></div>
+            <div class="links-stat"><b>${stats.categories ?? 0}</b><span>站点分类</span></div>
+            <div class="links-stat"><b>${stats.newThisMonth ?? 0}</b><span>本月新增</span></div>
+          </div>
+        </div>
+        <div class="links-cats">${filterHtml}</div>
+        <div class="links-grid">${gridHtml}</div>
+        <div class="links-apply-banner">
+          <div>
+            <div class="links-apply-title">想让你的站点也出现在这里？</div>
+            <div class="links-apply-desc">交换友链只需提交站点信息，或直接发邮件给我。通常 48 小时内回复，通过后就会加入这面友链墙。</div>
+          </div>
+          <a class="links-apply-btn" href="/links/apply">申请友链 ${svgIcon("arrow-right", 16)}</a>
+        </div>
+      </div></div>`;
+    } catch (e) {
+      app.innerHTML = `<div class="essay"><div class="links-wrap"><div class="essay-empty">${esc(e.message)}</div></div></div>`;
+    }
+  }
+
+  /* ================= 申请友链（/links/apply） ================= */
+  async function renderLinksApply() {
+    const s = state.settings;
+    const cats = String(s.links_categories || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const catOpts = cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+    const siteUrl = s.site_domain ? s.site_domain.replace(/\/$/, "") : location.origin;
+
+    app.innerHTML = `<div class="essay"><div class="links-apply-wrap">
+      <div class="links-page-head">
+        <div class="links-eyebrow">交换友链 · APPLY</div>
+        <h1 class="links-title">申请友链</h1>
+        <p class="links-subtitle">如果你也在写博客，欢迎交换友链。请先确认自己的站点符合下面的规则，再填写信息提交申请。</p>
+      </div>
+      <div class="links-apply-grid">
+        <div class="links-apply-side">
+          <div class="links-info-card">
+            <div class="links-info-title">${svgIcon("scroll-text", 18)} 友链规则</div>
+            <p>为了保证友链墙的阅读感，这里只收录内容原创、长期更新的个人站点。</p>
+            <ol class="links-rules">
+              <li>内容以原创为主，无违规、采集与广告信息</li>
+              <li>站点已稳定运行 6 个月以上，并有持续更新</li>
+              <li>站点首页已放置本站链接，且可以正常访问</li>
+              <li>无强制跳转、弹窗与其他干扰性广告</li>
+              <li>站点方向与阅读、摄影、设计或技术相关</li>
+            </ol>
+          </div>
+          <div class="links-info-card">
+            <div class="links-info-title">${svgIcon("info", 18)} 本站信息</div>
+            <p>复制以下信息，填写到你的友链页面即可。</p>
+            <div class="links-siteinfo">
+              <div><span>站点名称</span><b data-copy="${esc(s.site_title || "")}">${esc(s.site_title || "")}</b></div>
+              <div><span>站点地址</span><b data-copy="${esc(siteUrl)}">${esc(siteUrl)}</b></div>
+              <div><span>站点简介</span><b data-copy="${esc(s.essay_subtitle || "")}">${esc(s.essay_subtitle || "")}</b></div>
+            </div>
+          </div>
+        </div>
+        <form class="links-info-card links-apply-form" id="linksApplyForm">
+          <div class="links-info-title">${svgIcon("send", 18)} 提交申请</div>
+          <p style="margin:.2rem 0 1rem">填写后我会尽快查看，通过后站点会自动加入友链墙。</p>
+          <div class="field"><label>站点名称 *</label><input name="name" maxlength="60" placeholder="例：云间随笔" required /></div>
+          <div class="field">
+            <label>站点地址 *</label>
+            <div style="display:flex;gap:.5rem">
+              <input name="url" placeholder="https://example.com" required style="flex:1" />
+              <button type="button" class="btn" id="linksFetchBtn">自动获取</button>
+            </div>
+          </div>
+          <div class="field"><label>站点简介</label><input name="description" maxlength="300" placeholder="一句话介绍你的站点" /></div>
+          <div class="field"><label>联系邮箱</label><input name="email" type="email" maxlength="120" placeholder="you@example.com" /></div>
+          <div class="field"><label>站点分类</label><select name="category">${catOpts}</select></div>
+          <button class="btn primary" type="submit">提交申请 ${svgIcon("check", 16)}</button>
+          <div class="links-review">
+            <div class="links-info-title">审核流程</div>
+            <ol class="links-review-steps">
+              <li class="is-done"><b>已提交申请</b><span>表单提交成功</span></li>
+              <li><b>人工审核</b><span>通常 48 小时内回复，结果会发到你的邮箱</span></li>
+              <li><b>上线展示</b><span>通过后自动加入友链墙</span></li>
+            </ol>
+          </div>
+        </form>
+      </div>
+    </div></div>`;
+
+    // 自动获取站点信息
+    const form = document.getElementById("linksApplyForm");
+    const fetchBtn = document.getElementById("linksFetchBtn");
+    if (fetchBtn && form) {
+      fetchBtn.addEventListener("click", async () => {
+        const url = form.querySelector('[name="url"]').value.trim();
+        if (!url) { toast("请先填写站点地址"); return; }
+        fetchBtn.disabled = true; fetchBtn.textContent = "获取中…";
+        try {
+          const info = await api(`/api/friends/info?url=${encodeURIComponent(url)}`);
+          if (info.name) form.querySelector('[name="name"]').value = info.name;
+          if (info.description) form.querySelector('[name="description"]').value = info.description;
+          if (info.url) form.querySelector('[name="url"]').value = info.url;
+          toast("已自动获取站点信息，可再微调");
+        } catch (err) {
+          toast(err.message || "获取失败，请手动填写");
+        } finally {
+          fetchBtn.disabled = false; fetchBtn.textContent = "自动获取";
+        }
+      });
+      form.addEventListener("submit", async e => {
+        e.preventDefault();
+        const fd = new FormData(form);
+        const btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        try {
+          await api("/api/friends/apply", { method: "POST", body: Object.fromEntries(fd) });
+          toast("已提交申请，站长审核通过后会出现在友链列表");
+          navigate("/links");
+        } catch (err) {
+          toast(err.message || "提交失败");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    }
+  }
+
   /** 联系方式 → lucide 图标名映射，未知类型回退 link */
   function contactIcon(type) {
     const t = String(type || "").toLowerCase();
@@ -3568,6 +3764,7 @@
     { key: "moments", label: "说说", icon: "message-circle" },
     { key: "posts", label: "文章", icon: "file-text" },
     { key: "photos", label: "相册", icon: "image" },
+    { key: "friends", label: "友链", icon: "link" },
     { key: "comments", label: "评论", icon: "message-square" },
     { key: "appearance", label: "外观", icon: "palette" },
     { key: "media", label: "媒体", icon: "folder" },
@@ -3744,6 +3941,7 @@
     if (tab === "moments") return renderAdminMoments(panel);
     if (tab === "posts") return renderAdminPosts(panel);
     if (tab === "photos") return renderAdminPhotos(panel);
+    if (tab === "friends") return renderAdminFriends(panel);
     if (tab === "comments") return renderAdminComments(panel);
     if (tab === "appearance") return renderAdminAppearance(panel);
     if (tab === "media") return renderAdminMedia(panel);
@@ -4096,6 +4294,148 @@
     });
   }
 
+  /* ================= 后台：友链管理 ================= */
+  async function renderAdminFriends(panel) {
+    panel.innerHTML = `<h3>友链管理</h3><div class="field-hint">加载中…</div>`;
+    let data;
+    try {
+      data = await api("/api/admin/friends");
+    } catch (e) {
+      panel.innerHTML = `<h3>友链管理</h3><div class="field-hint">${esc(e.message)}</div>`;
+      return;
+    }
+    const list = data.list || [];
+    const cats = String(state.settings.links_categories || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const catOpts = cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+    const statusText = { pending: "待审核", approved: "已上架", rejected: "已拒绝" };
+
+    const rows = list.map(f => `
+      <div class="friend-admin-row" data-id="${f.id}">
+        <div class="friend-admin-main">
+          ${friendAvatar(f.name, f.avatar)}
+          <div class="friend-admin-info">
+            <div class="friend-admin-name">
+              ${esc(f.name)}
+              ${f.category ? `<span class="links-card-cat">${esc(f.category)}</span>` : ""}
+              <span class="friend-admin-status s-${f.status}">${statusText[f.status] || f.status}</span>
+            </div>
+            <a class="friend-admin-url" href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.url)}</a>
+            <div class="friend-admin-desc">${esc(f.description || "—")}</div>
+          </div>
+        </div>
+        <div class="friend-admin-actions">
+          ${f.status === "pending" ? `<button class="btn sm" data-act="approve">通过</button><button class="btn sm ghost" data-act="reject">拒绝</button>` : ""}
+          <button class="btn sm ghost" data-act="edit">编辑</button>
+          <button class="btn sm danger" data-act="del">删除</button>
+        </div>
+      </div>`).join("");
+
+    panel.innerHTML = `
+      <h3>友链管理（${list.length}）${data.pending_count ? ` <span class="friend-pending-badge">${data.pending_count} 条待审核</span>` : ""}</h3>
+      <div class="field-hint" style="margin-bottom:1rem">访客在 /links/apply 提交的申请会进入「待审核」，通过后自动上架到 /links。也可在此直接新增友站。分类在「外观 → 友链分类」维护。</div>
+
+      <details class="friend-add-box" ${list.length === 0 ? "open" : ""}>
+        <summary><b>＋ 新增友站</b></summary>
+        <form id="friendAddForm" class="friend-form">
+          <div class="friend-form-grid">
+            <div class="field"><label>站点名称 *</label><input name="name" maxlength="60" required /></div>
+            <div class="field">
+              <label>站点地址 *</label>
+              <div style="display:flex;gap:.5rem">
+                <input name="url" placeholder="https://example.com" required style="flex:1" />
+                <button type="button" class="btn" id="friendFetchBtn">自动获取</button>
+              </div>
+            </div>
+            <div class="field"><label>站点简介</label><input name="description" maxlength="300" /></div>
+            <div class="field"><label>图标 URL（可选）</label><input name="avatar" maxlength="500" placeholder="留空自动取对方 favicon" /></div>
+            <div class="field"><label>分类</label><select name="category"><option value="">未分类</option>${catOpts}</select></div>
+            <div class="field"><label>排序（升序）</label><input name="sort_order" type="number" value="0" /></div>
+          </div>
+          <button class="btn primary" type="submit">添加</button>
+        </form>
+      </details>
+
+      <div class="friend-admin-list">${rows || '<div class="field-hint">暂无友站</div>'}</div>
+    `;
+
+    // 新增
+    const addForm = panel.querySelector("#friendAddForm");
+    const fetchBtn = panel.querySelector("#friendFetchBtn");
+    if (fetchBtn) {
+      fetchBtn.addEventListener("click", async () => {
+        const url = addForm.querySelector('[name="url"]').value.trim();
+        if (!url) { toast("请先填写站点地址"); return; }
+        fetchBtn.disabled = true; fetchBtn.textContent = "获取中…";
+        try {
+          const info = await api(`/api/friends/info?url=${encodeURIComponent(url)}`);
+          if (info.name) addForm.querySelector('[name="name"]').value = info.name;
+          if (info.description) addForm.querySelector('[name="description"]').value = info.description;
+          if (!addForm.querySelector('[name="avatar"]').value && info.avatar) addForm.querySelector('[name="avatar"]').value = info.avatar;
+          if (info.url) addForm.querySelector('[name="url"]').value = info.url;
+          toast("已自动获取，可再微调");
+        } catch (err) { toast(err.message || "获取失败，请手动填写"); }
+        finally { fetchBtn.disabled = false; fetchBtn.textContent = "自动获取"; }
+      });
+    }
+    if (addForm) {
+      addForm.addEventListener("submit", async e => {
+        e.preventDefault();
+        const fd = new FormData(addForm);
+        const btn = addForm.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        try {
+          await api("/api/admin/friends", { method: "POST", body: Object.fromEntries(fd) });
+          toast("已添加");
+          renderAdminFriends(panel);
+        } catch (err) { toast(err.message); }
+        finally { btn.disabled = false; }
+      });
+    }
+
+    // 列表操作
+    panel.querySelectorAll(".friend-admin-row").forEach(row => {
+      const id = row.dataset.id;
+      const act = (sel) => row.querySelector(`[data-act="${sel}"]`);
+      const a = act("approve"); if (a) a.addEventListener("click", async () => { await api(`/api/admin/friends/${id}/approve`, { method: "POST" }); toast("已通过"); renderAdminFriends(panel); });
+      const rj = act("reject"); if (rj) rj.addEventListener("click", async () => { await api(`/api/admin/friends/${id}/reject`, { method: "POST" }); toast("已拒绝"); renderAdminFriends(panel); });
+      const dl = act("del"); if (dl) dl.addEventListener("click", async () => { if (!confirm("确定删除该友站？")) return; await api(`/api/admin/friends/${id}`, { method: "DELETE" }); toast("已删除"); renderAdminFriends(panel); });
+      const ed = act("edit"); if (ed) ed.addEventListener("click", () => openFriendEditor(panel, id, list.find(x => String(x.id) === id), cats));
+    });
+  }
+
+  /** 编辑友站：内联替换该行内容为表单 */
+  function openFriendEditor(panel, id, f, cats) {
+    if (!f) return;
+    const row = panel.querySelector(`.friend-admin-row[data-id="${id}"]`);
+    if (!row) return;
+    const catOpts = ['<option value="">未分类</option>', ...cats.map(c => `<option value="${esc(c)}"${c === f.category ? " selected" : ""}>${esc(c)}</option>`)].join("");
+    row.innerHTML = `
+      <form class="friend-form friend-edit-form" style="width:100%">
+        <div class="friend-form-grid">
+          <div class="field"><label>名称</label><input name="name" maxlength="60" value="${esc(f.name)}" required /></div>
+          <div class="field"><label>地址</label><input name="url" value="${esc(f.url)}" required /></div>
+          <div class="field"><label>简介</label><input name="description" maxlength="300" value="${esc(f.description)}" /></div>
+          <div class="field"><label>图标 URL</label><input name="avatar" maxlength="500" value="${esc(f.avatar)}" /></div>
+          <div class="field"><label>分类</label><select name="category">${catOpts}</select></div>
+          <div class="field"><label>排序</label><input name="sort_order" type="number" value="${f.sort_order ?? 0}" /></div>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn primary sm" type="submit">保存</button>
+          <button class="btn ghost sm" type="button" data-act="cancel">取消</button>
+        </div>
+      </form>`;
+    row.querySelector('[data-act="cancel"]').addEventListener("click", () => renderAdminFriends(panel));
+    row.querySelector(".friend-edit-form").addEventListener("submit", async e => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      try {
+        await api(`/api/admin/friends/${id}`, { method: "PUT", body: Object.fromEntries(fd) });
+        toast("已保存");
+        renderAdminFriends(panel);
+      } catch (err) { toast(err.message); }
+    });
+  }
+
   async function renderAdminComments(panel) {
     panel.innerHTML = `<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
     let list = [];
@@ -4308,6 +4648,24 @@
         </div>
           </div>
         </details>
+
+        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>顶栏入口开关</h3></div>
+        <div class="field">
+          <label class="admin-check-cell" style="justify-content:flex-start;gap:.5rem;margin-top:.35rem">
+            <input type="checkbox" name="links_enabled" ${s.links_enabled ? "checked" : ""} />
+            <span>显示「友情链接」入口（/links）</span>
+          </label>
+          <label class="admin-check-cell" style="justify-content:flex-start;gap:.5rem;margin-top:.35rem">
+            <input type="checkbox" name="photos_enabled" ${s.photos_enabled ? "checked" : ""} />
+            <span>显示「相册」入口（/photos）</span>
+          </label>
+          <small style="color:var(--anzhiyu-secondtext)">「关于」入口开关在下方「关于我页面」分区；三个入口可独立开关，关闭后顶栏与移动端菜单均不显示。</small>
+        </div>
+
+        <div class="field">
+          <label>友链分类（每行一个）<br /><small style="color:var(--anzhiyu-secondtext)">列表页会自动加「全部」；此处可增删改，新增友站时分类下拉同步更新</small></label>
+          <textarea name="links_categories" maxlength="500" rows="4" placeholder="技术&#10;设计&#10;生活随笔&#10;摄影">${esc(s.links_categories)}</textarea>
+        </div>
 
         <div class="admin-panel-head" style="margin-top:1.75rem"><h3>关于我页面</h3></div>
         <div class="field">
@@ -6681,7 +7039,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
@@ -6690,6 +7048,11 @@
       // about_enabled 复选框：勾选=启用（表单含该字段时才提交，避免跨 Tab 覆盖）
       const aboutEnabledEl = settingsForm.querySelector('[name="about_enabled"]');
       if (aboutEnabledEl) patch.about_enabled = aboutEnabledEl.checked;
+      // 顶栏入口独立开关：关于/友链/相册
+      const linksEnabledEl = settingsForm.querySelector('[name="links_enabled"]');
+      if (linksEnabledEl) patch.links_enabled = linksEnabledEl.checked;
+      const photosEnabledEl = settingsForm.querySelector('[name="photos_enabled"]');
+      if (photosEnabledEl) patch.photos_enabled = photosEnabledEl.checked;
       const btn = settingsForm.querySelector('button[type="submit"]');
       btn.disabled = true;
       try {
@@ -6998,6 +7361,20 @@
     navigate(u.pathname + u.search);
   });
 
+  // 点击带 data-copy 的元素：复制其值/文本到剪贴板
+  document.addEventListener("click", e => {
+    const el = e.target.closest && e.target.closest("[data-copy]");
+    if (!el) return;
+    const text = el.getAttribute("data-copy") || el.textContent || "";
+    const done = () => toast("已复制到剪贴板");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => {
+        const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta);
+        ta.select(); try { document.execCommand("copy"); done(); } catch { toast("复制失败"); } ta.remove();
+      });
+    }
+  });
+
   /* ================= SEO meta 管理（客户端切换路由时同步） ================= */
 
   function upsertMeta(attr, key, content) {
@@ -7074,6 +7451,7 @@
         (key === "feed" && path === "/") ||
         (key === "posts" && (path === "/posts" || path.startsWith("/post/"))) ||
         (key === "photos" && path === "/photos") ||
+        (key === "links" && (path === "/links" || path.startsWith("/links/"))) ||
         (key === "about" && path === "/about") ||
         (key === "admin" && (path === state.adminPath || path === "/admin"));
       a.classList.toggle("active", isActive);
@@ -7085,6 +7463,10 @@
       renderFeed();
     } else if (path === "/about") {
       renderAbout();
+    } else if (path === "/links") {
+      renderLinks();
+    } else if (path === "/links/apply") {
+      renderLinksApply();
     } else if (path === "/posts") {
       renderPostList();
     } else if (path === "/photos") {

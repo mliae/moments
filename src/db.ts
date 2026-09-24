@@ -90,6 +90,22 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   locked_until TEXT,
   updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS friends (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL DEFAULT '',
+  url         TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  avatar      TEXT NOT NULL DEFAULT '',
+  category    TEXT NOT NULL DEFAULT '',
+  email       TEXT NOT NULL DEFAULT '',
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  status      TEXT NOT NULL DEFAULT 'approved', -- approved 已上架 / pending 待审核 / rejected 已拒绝
+  last_checked TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_friends_status ON friends (status, sort_order ASC, id DESC);
 `;
 
 let schemaPromise: Promise<void> | null = null;
@@ -97,6 +113,8 @@ let schemaPromise: Promise<void> | null = null;
 /**
  * 幂等建表：首次请求时检测 moments 表是否存在，不存在则执行完整 schema。
  * 模块级 Promise 缓存，同一 Worker 隔离体内只跑一次；失败重置以便下次重试。
+ * 对已存在数据的老库，新增表请通过 migrations/ 目录 + `wrangler d1 migrations apply` 应用，
+ * 不要依赖这里（此处只在全新库时跑全量 schema）。
  */
 export function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaPromise) {

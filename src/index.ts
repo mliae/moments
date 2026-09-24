@@ -19,6 +19,7 @@ import feedRoutes from "./routes/feed";
 import musicRoutes from "./routes/music";
 import miscRoutes from "./routes/misc";
 import photoRoutes, { adminPhotoRoutes } from "./routes/photos";
+import friendRoutes, { adminFriendRoutes } from "./routes/friends";
 import { getSettings } from "./settings";
 import { keyToSrc, ensureSchema, type PostRow } from "./db";
 import { isAdmin, hasAdminPassword } from "./auth";
@@ -91,6 +92,8 @@ app.get("/api/settings", async c => {
 
 app.route("/api/photos", photoRoutes);
 app.route("/api/admin/photos", adminPhotoRoutes);
+app.route("/api/friends", friendRoutes);
+app.route("/api/admin/friends", adminFriendRoutes);
 app.route("/api/admin", adminRoutes);
 app.route("/api/moments", momentRoutes);
 app.route("/api/moments", socialRoutes);
@@ -320,6 +323,40 @@ app.get("/photos", async c => {
     path: "/photos",
     siteName: s.site_title,
     jsonLd: collectionJsonLd(origin, s, count),
+  });
+  const html = await getIndexHtml(c);
+  return serveSsr(c, html, { title, description, head });
+});
+
+app.get("/links", async c => {
+  const s = await getSettings(c.env.DB);
+  const origin = new URL(c.req.url).origin;
+  const countRow = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM friends WHERE status = 'approved'`).first<{ n: number }>();
+  const count = Number(countRow?.n ?? 0);
+  const title = `友情链接 · ${s.site_title}`;
+  const description = `${s.site_title} 的友情链接，共收录 ${count} 个优秀站点`;
+  const head = buildSeoHead(origin, {
+    title,
+    description,
+    path: "/links",
+    siteName: s.site_title,
+    jsonLd: collectionJsonLd(origin, s, count),
+  });
+  const html = await getIndexHtml(c);
+  return serveSsr(c, html, { title, description, head });
+});
+
+app.get("/links/apply", async c => {
+  const s = await getSettings(c.env.DB);
+  const origin = new URL(c.req.url).origin;
+  const title = `申请友链 · ${s.site_title}`;
+  const description = `向 ${s.site_title} 申请交换友情链接`;
+  const head = buildSeoHead(origin, {
+    title,
+    description,
+    path: "/links/apply",
+    siteName: s.site_title,
+    noindex: true,
   });
   const html = await getIndexHtml(c);
   return serveSsr(c, html, { title, description, head });
