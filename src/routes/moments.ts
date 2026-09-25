@@ -16,7 +16,7 @@ import {
   queryMoments,
   queryMomentById,
   parseImages,
-  parseVideo,
+  parseVideos,
   mediaKeyFrom,
   type VideoRef,
 } from "../db";
@@ -30,7 +30,7 @@ const MAX_LOCATION = 100;
 interface MomentInput {
   content: string;
   images: string[]; // R2 key
-  video: VideoRef | null; // src 存储为 key（本站）或 URL（外链）
+  videos: VideoRef[]; // src 存储为 key（本站）或 URL（外链）
   location: string;
 }
 
@@ -57,57 +57,68 @@ function validateMomentInput(raw: unknown, r2Domain?: string): MomentInput | str
     images = [...new Set(images)];
   }
 
-  // 视频：mp4 可本站 key 或外链；hls 仅 http(s) 外链且 .m3u8；poster 可选
-  let video: VideoRef | null = null;
-  if (body.video && typeof body.video === "object") {
-    const v = body.video as Record<string, unknown>;
-    const kind = String(v.kind ?? "");
-    const src = String(v.src ?? "").trim();
-    // embed 视频用 provider+vid 标识，不需要 src；mp4/hls 才要求地址
-    if (kind !== "embed" && !src) return "视频地址不能为空";
-    let poster: string | null = null;
-    const posterRaw = typeof v.poster === "string" ? v.poster.trim() : "";
-    if (posterRaw) {
-      if (!/^https?:\/\//i.test(posterRaw) && !posterRaw.startsWith("/media/") && !/^uploads\//.test(posterRaw)) {
-        return "封面地址非法";
-      }
-      poster = posterRaw;
-    }
-    if (kind === "mp4") {
-      // 先尝试提取本站 key（/media/、纯 key、R2 直连 URL）；提取不到才视为外链
-      const key = mediaKeyFrom(src, r2Domain) ?? (/^https?:\/\//i.test(src) ? src : null);
-      if (!key) return "MP4 地址非法";
-      video = { kind: "mp4", src: key, poster };
-    } else if (kind === "hls") {
-      let u: URL;
-      try {
-        u = new URL(src);
-      } catch {
-        return "M3U8 地址非法";
-      }
-      if (u.protocol !== "http:" && u.protocol !== "https:") return "M3U8 仅支持 http(s) 外链";
-      if (!/\.m3u8($|\?)/i.test(u.pathname + u.search)) return "M3U8 地址必须以 .m3u8 结尾";
-      video = { kind: "hls", src, poster };
-    } else if (kind === "embed") {
-      // 站外嵌入（B站/YouTube）：前端可直接给 provider+vid，也可只给分享链接由后端解析
-      let provider = String(v.provider ?? "");
-      let vid = String(v.vid ?? "");
-      if ((provider !== "bilibili" && provider !== "youtube") || !vid) {
-        const parsed = parseEmbed(src || v.url || "");
-        if (!parsed) return "不支持的视频平台（仅支持 B站 / YouTube）";
-        provider = parsed.provider;
-        vid = parsed.vid;
-      }
-      if (provider === "youtube" && !/^[\w-]{11}$/.test(vid)) return "YouTube 视频 ID 非法";
-      if (provider === "bilibili" && !/^BV[0-9A-Za-z]{10}$/.test(vid)) return "B站视频 ID 非法（需 BV 号）";
-      video = { kind: "embed", src: "", provider: provider as "bilibili" | "youtube", vid, poster: null };
-    } else {
-      return "视频类型非法";
-    }
+  // 视频：兼容单对象 body.video 或数组 body.videos，统一存数组（最多 9 个）
+  const rawVideos: unknown[] = [];
+  if (Array.isArray(body.videos)) rawVideos.push(...body.videos);
+  else if (body.videos && typeof body.videos === "object") rawVideos.push(body.videos);
+  if (body.video && typeof body.video === "object" && !Array.isArray(body.video)) rawVideos.push(body.video);
+
+  const videos: VideoRef[] = [];
+  for (const rv of rawVideos.slice(0, 9)) {
+    const res = validateVideoObj(rv, r2Domain);
+    if (typeof res === "string") return res;
+    if (res) videos.push(res);
   }
 
-  if (!content && images.length === 0 && !video) return "内容不能为空";
-  return { content, images, video, location };
+  if (!content && images.length === 0 && videos.length === 0) return "内容不能为空";
+  return { content, images, videos, location };
+}
+
+/** 校验单个视频对象 → 返回 VideoRef，或错误字符串；空对象返回 null */
+function validateVideoObj(rv: unknown, r2Domain?: string): VideoRef | string | null {
+  if (!rv || typeof rv !== "object") return null;
+  const v = rv as Record<string, unknown>;
+  const kind = String(v.kind ?? "");
+  const src = String(v.src ?? "").trim();
+  if (kind !== "embed" && !src) return "视频地址不能为空";
+  let poster: string | null = null;
+  const posterRaw = typeof v.poster === "string" ? v.poster.trim() : "";
+  if (posterRaw) {
+    if (!/^https?:\/\//i.test(posterRaw) && !posterRaw.startsWith("/media/") && !/^uploads\//.test(posterRaw)) {
+      return "封面地址非法";
+    }
+    poster = posterRaw;
+  }
+  if (kind === "mp4") {
+    const key = mediaKeyFrom(src, r2Domain) ?? (/^https?:\/\//i.test(src) ? src : null);
+    if (!key) return "MP4 地址非法";
+    return { kind: "mp4", src: key, poster };
+  }
+  if (kind === "hls") {
+    let u: URL;
+    try {
+      u = new URL(src);
+    } catch {
+      return "M3U8 地址非法";
+    }
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "M3U8 仅支持 http(s) 外链";
+    if (!/\.m3u8($|\?)/i.test(u.pathname + u.search)) return "M3U8 地址必须以 .m3u8 结尾";
+    return { kind: "hls", src, poster };
+  }
+  if (kind === "embed") {
+    let provider = String(v.provider ?? "");
+    let vid = String(v.vid ?? "");
+    if ((provider !== "bilibili" && provider !== "youtube") || !vid) {
+      const parsed = parseEmbed(src || v.url || "");
+      if (!parsed) return "不支持的视频平台（仅支持 B站 / YouTube）";
+      provider = parsed.provider;
+      vid = parsed.vid;
+    }
+    if (provider === "youtube" && !/^[\w-]{11}$/.test(vid)) return "YouTube 视频 ID 非法";
+    if (provider === "bilibili" && !/^BV[0-9A-Za-z]{10}$/.test(vid)) return "B站视频 ID 非法（需 BV 号）";
+    return { kind: "embed", src: "", provider: provider as "bilibili" | "youtube", vid, poster: null };
+  }
+  return "视频类型非法";
 }
 
 app.get("/", async c => {
@@ -144,7 +155,7 @@ app.post("/", requireAdmin, async c => {
     `INSERT INTO moments (content, images, video, location, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?) RETURNING *`
   )
-    .bind(input.content, JSON.stringify(input.images), JSON.stringify(input.video ?? {}), input.location, now, now)
+    .bind(input.content, JSON.stringify(input.images), JSON.stringify(input.videos), input.location, now, now)
     .first();
 
   const created = await queryMomentById(c.env.DB, Number((result as { id: number }).id), undefined, false, s.r2_domain);
@@ -161,13 +172,14 @@ app.delete("/:id", requireAdmin, async c => {
   }>();
   if (!row) return fail(c, "动态不存在", 404);
 
-  // 收集本站 R2 对象（图片 + mp4）
+  // 收集本站 R2 对象（图片 + 所有 mp4 视频）
   const keys: string[] = [...parseImages(row.images)];
-  const video = parseVideo(row.video);
-  if (video && video.kind === "mp4") {
-    // mediaKeyFrom 兼容历史数据里存的 R2 直连完整 URL（按配置的 r2_domain 提取 key）
-    const key = mediaKeyFrom(video.src, (await getSettings(c.env.DB)).r2_domain);
-    if (key && key.startsWith("uploads/")) keys.push(key);
+  const r2Domain = (await getSettings(c.env.DB)).r2_domain;
+  for (const video of parseVideos(row.video)) {
+    if (video.kind === "mp4") {
+      const key = mediaKeyFrom(video.src, r2Domain);
+      if (key) keys.push(key);
+    }
   }
   const r2Keys = keys.filter(k => k.startsWith("uploads/"));
 
@@ -202,10 +214,11 @@ app.post("/batch-delete", requireAdmin, async c => {
   const r2Keys = new Set<string>();
   for (const r of rows.results) {
     for (const k of parseImages(r.images)) if (k.startsWith("uploads/")) r2Keys.add(k);
-    const v = parseVideo(r.video);
-    if (v && v.kind === "mp4") {
-      const k = mediaKeyFrom(v.src, r2Domain);
-      if (k && k.startsWith("uploads/")) r2Keys.add(k);
+    for (const v of parseVideos(r.video)) {
+      if (v.kind === "mp4") {
+        const k = mediaKeyFrom(v.src, r2Domain);
+        if (k && k.startsWith("uploads/")) r2Keys.add(k);
+      }
     }
   }
 
@@ -253,7 +266,7 @@ app.put("/:id", requireAdmin, async c => {
     .bind(
       input.content,
       JSON.stringify(input.images),
-      JSON.stringify(input.video ?? {}),
+      JSON.stringify(input.videos),
       input.location,
       now,
       id

@@ -195,7 +195,8 @@ export interface MomentView {
   id: number;
   content: string;
   images: string[];
-  video: VideoRef | null;
+  video: VideoRef | null; // 兼容字段：首个视频（无则 null）
+  videos: VideoRef[]; // 视频列表（统一用这个）
   location: string;
   created_at: string;
   updated_at: string;
@@ -215,23 +216,45 @@ export function parseImages(raw: string | null | undefined): string[] {
   }
 }
 
+/** 把任意对象归一化为 VideoRef；非法返回 null */
+function normalizeVideo(v: unknown): VideoRef | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Partial<VideoRef>;
+  if (o.kind === "embed") {
+    if ((o.provider === "bilibili" || o.provider === "youtube") && typeof o.vid === "string" && o.vid) {
+      return { kind: "embed", src: "", provider: o.provider, vid: o.vid, poster: null };
+    }
+    return null;
+  }
+  if ((o.kind === "mp4" || o.kind === "hls") && typeof o.src === "string" && o.src) {
+    return { kind: o.kind, src: o.src, poster: typeof o.poster === "string" && o.poster ? o.poster : null };
+  }
+  return null;
+}
+
 export function parseVideo(raw: string | null | undefined): VideoRef | null {
   if (!raw) return null;
   try {
-    const v = JSON.parse(raw) as Partial<VideoRef>;
-    if (v.kind === "embed") {
-      if ((v.provider === "bilibili" || v.provider === "youtube") && typeof v.vid === "string" && v.vid) {
-        return { kind: "embed", src: "", provider: v.provider, vid: v.vid, poster: null };
-      }
-      return null;
-    }
-    if ((v.kind === "mp4" || v.kind === "hls") && typeof v.src === "string" && v.src) {
-      return { kind: v.kind, src: v.src, poster: typeof v.poster === "string" && v.poster ? v.poster : null };
-    }
-    return null;
+    return normalizeVideo(JSON.parse(raw));
   } catch {
     return null;
   }
+}
+
+/** 解析视频字段：兼容历史单对象与新的数组结构，统一返回数组 */
+export function parseVideos(raw: string | null | undefined): VideoRef[] {
+  if (!raw) return [];
+  let v: unknown;
+  try {
+    v = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (Array.isArray(v)) {
+    return v.map(normalizeVideo).filter((x): x is VideoRef => !!x);
+  }
+  const one = normalizeVideo(v);
+  return one ? [one] : [];
 }
 
 /** 本站图片 R2 key → 可访问路径；外链原样返回。
@@ -276,17 +299,19 @@ export function mediaKeyFrom(src: string, r2Domain?: string): string | null {
 }
 
 export function serializeMoment(row: MomentRow, withComments?: CommentRow[], r2Domain?: string): MomentView {
-  return {
+  const out: MomentView = {
     id: row.id,
     content: row.content ?? "",
     images: parseImages(row.images).map(k => keyToSrc(k, r2Domain)),
-    video: (() => {
-      const v = parseVideo(row.video);
-      if (!v) return null;
-      if (v.kind === "embed") return { kind: "embed", src: "", provider: v.provider, vid: v.vid, poster: null };
-      const poster = v.poster ? (/^https?:\/\//i.test(v.poster) || v.poster.startsWith("/media/") ? v.poster : keyToSrc(v.poster, r2Domain)) : null;
-      return /^https?:\/\//i.test(v.src) || v.src.startsWith("/media/") ? { ...v, poster } : { kind: v.kind, src: keyToSrc(v.src, r2Domain), poster };
+    videos: (() => {
+      const transform = (v: VideoRef): VideoRef => {
+        if (v.kind === "embed") return { kind: "embed", src: "", provider: v.provider, vid: v.vid, poster: null };
+        const poster = v.poster ? (/^https?:\/\//i.test(v.poster) || v.poster.startsWith("/media/") ? v.poster : keyToSrc(v.poster, r2Domain)) : null;
+        return /^https?:\/\//i.test(v.src) || v.src.startsWith("/media/") ? { ...v, poster } : { kind: v.kind, src: keyToSrc(v.src, r2Domain), poster };
+      };
+      return parseVideos(row.video).map(transform);
     })(),
+    video: null,
     location: row.location ?? "",
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -295,6 +320,8 @@ export function serializeMoment(row: MomentRow, withComments?: CommentRow[], r2D
     liked: Number(row.liked ?? 0) === 1,
     ...(withComments ? { comments: withComments } : {}),
   };
+  out.video = out.videos[0] ?? null; // 兼容字段：首个视频
+  return out;
 }
 
 export function serializePost(row: PostRow, withContent = false, r2Domain?: string) {

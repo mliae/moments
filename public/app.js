@@ -1060,6 +1060,11 @@
     const label = e.provider === "youtube" ? "YouTube" : "哔哩哔哩";
     return `<div class="video-embed" data-embed-provider="${e.provider}" data-embed-vid="${esc(e.vid)}"><div class="video-embed-cover"><img src="${embedCoverUrl(e)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" /><span class="video-embed-play" aria-hidden="true">▶</span><span class="video-embed-badge">${label}</span></div></div>`;
   }
+  // 一条说说的全部视频（兼容旧的单视频字段 m.video）
+  function videosHtml(m) {
+    const arr = Array.isArray(m.videos) ? m.videos : m.video ? [m.video] : [];
+    return arr.map(videoHtml).join("");
+  }
 
   // 外链媒体（封面图等）统一走自家 Worker 反代：部分图床域名在国内被 TLS 阻断，
   // 浏览器直连永远失败；站内相对路径原样返回
@@ -1315,7 +1320,7 @@
             <span class="bber-author-nickname">${esc(s.author_name || "Moments")}</span>
           </span>
         </div>
-        <div class="datacont">${renderContentHtml(m.content)}${videoHtml(m.video)}</div>
+        <div class="datacont">${renderContentHtml(m.content)}${videosHtml(m)}</div>
         ${imagesGridHtml(m)}
       </div>
       <hr />
@@ -3317,8 +3322,8 @@
           ${m.location ? `<span class="mv-loc">${svgIcon("locationDot", 14)}${esc(m.location)}</span>` : ""}
           <span class="mv-stats">赞 ${m.like_count || 0} · 评论 ${m.comment_count || 0}</span>
         </div>
-        ${m.content || (m.video && m.video.src) || (m.images && m.images.length)
-          ? `<div class="datacont">${renderContentHtml(m.content)}${videoHtml(m.video)}</div>${imagesGridHtml(m)}`
+        ${m.content || (Array.isArray(m.videos) ? m.videos.length : m.video ? 1 : 0) || (m.images && m.images.length)
+          ? `<div class="datacont">${renderContentHtml(m.content)}${videosHtml(m)}</div>${imagesGridHtml(m)}`
           : `<div class="comment-hint">这条说说没有正文内容</div>`}
       </div>`);
     modal.querySelector("[data-close]").addEventListener("click", closeModal);
@@ -3331,7 +3336,9 @@
     const isEdit = !!existing;
     const draft = {
       images: Array.isArray(existing?.images) ? [...existing.images] : [],
-      video: existing?.video ? { ...existing.video } : null,
+      videos: Array.isArray(existing?.videos)
+        ? existing.videos.map(v => ({ ...v }))
+        : existing?.video ? [{ ...existing.video }] : [],
     };
     const modal = openModal(`
       <div class="modal-head composer-head">
@@ -3381,11 +3388,12 @@
           <div data-vpanel="url" hidden>
             <div class="emp-row">
               <input type="url" name="video-url" placeholder="粘贴 B站 / YouTube 分享链接，或 .m3u8 / .mp4 直链" />
+              <button type="button" class="btn primary" data-video-add-url>添加</button>
             </div>
             <div class="emp-row">
-              <input type="url" data-moment-poster placeholder="封面图地址（选填，不填显示纯色占位）" />
+              <input type="url" data-moment-poster placeholder="封面图地址（选填，仅直链视频需要）" />
             </div>
-            <div class="emp-help">支持粘贴 B站 / YouTube 分享链接（自动取封面、点击播放）；也支持 .m3u8 或 .mp4 直链。</div>
+            <div class="emp-help">支持粘贴 B站 / YouTube 分享链接（自动取封面、点击播放）；也支持 .m3u8 或 .mp4 直链。可添加多条。</div>
           </div>
           <div class="video-preview" data-video-preview hidden></div>
         </div>
@@ -3445,32 +3453,33 @@
     // 视频预览卡片
     const videoFileInput = modal.querySelector('input[name="video-file"]');
     const videoPreview = modal.querySelector("[data-video-preview]");
-    function renderVideoPreview() {
-      if (!draft.video) { videoPreview.hidden = true; return; }
-      videoPreview.hidden = false;
-      const p = draft.video.poster;
-      const isEmbed = draft.video.kind === "embed";
-      const kindLabel = isEmbed ? (draft.video.provider === "youtube" ? "YouTube" : "哔哩哔哩") : draft.video.kind === "hls" ? "M3U8" : "MP4";
-      const posterSrc = isEmbed ? embedCoverUrl({ provider: draft.video.provider, vid: draft.video.vid }) : p;
-      videoPreview.innerHTML = `
+    const vpCard = (v, idx) => {
+      const isEmbed = v.kind === "embed";
+      const kindLabel = isEmbed ? (v.provider === "youtube" ? "YouTube" : "哔哩哔哩") : v.kind === "hls" ? "M3U8" : "MP4";
+      const posterSrc = isEmbed ? embedCoverUrl({ provider: v.provider, vid: v.vid }) : v.poster;
+      return `
         <div class="vp-card">
           ${posterSrc ? `<img class="vp-poster" src="${esc(posterSrc)}" alt="封面" referrerpolicy="no-referrer" />` : `<div class="vp-no-poster">无封面</div>`}
           <div class="vp-info">
             <span class="vp-kind">${kindLabel}</span>
-            <span class="vp-src">${esc(isEmbed ? draft.video.vid : (draft.video.src || "").slice(0, 60))}</span>
+            <span class="vp-src">${esc(isEmbed ? v.vid : (v.src || "").slice(0, 60))}</span>
           </div>
-          <button type="button" class="btn ghost sm" data-rm-video>移除</button>
+          <button type="button" class="btn ghost sm" data-rm-video data-idx="${idx}">移除</button>
         </div>`;
-      videoPreview.querySelector("[data-rm-video]").addEventListener("click", () => {
-        draft.video = null;
-        videoFileInput.value = "";
-        const vu = modal.querySelector('input[name="video-url"]');
-        if (vu) vu.value = "";
-        const mp = modal.querySelector("[data-moment-poster]");
-        if (mp) mp.value = "";
-        renderVideoPreview();
-      });
+    };
+    function renderVideoPreview() {
+      if (!draft.videos.length) { videoPreview.hidden = true; videoPreview.innerHTML = ""; return; }
+      videoPreview.hidden = false;
+      videoPreview.innerHTML = draft.videos.map(vpCard).join("");
     }
+    // 事件委托：移除某个视频
+    videoPreview.addEventListener("click", e => {
+      const btn = e.target.closest("[data-rm-video]");
+      if (!btn) return;
+      const idx = Number(btn.dataset.idx);
+      if (Number.isInteger(idx)) draft.videos.splice(idx, 1);
+      renderVideoPreview();
+    });
 
     // 音乐插入面板：面板显示时初始化音乐搜索
     const musicBox = modal.querySelector("[data-music-box]");
@@ -3489,15 +3498,7 @@
       ta.value = existing.content || "";
       const locInput0 = modal.querySelector('input[name="location"]');
       if (locInput0 && existing.location) locInput0.value = existing.location;
-      if (draft.video) {
-        const urlTab = modal.querySelector('[data-vtab="url"]');
-        if (urlTab) urlTab.click();
-        const vu = modal.querySelector('input[name="video-url"]');
-        if (vu) vu.value = draft.video.src || "";
-        const mp = modal.querySelector("[data-moment-poster]");
-        if (mp && draft.video.poster) mp.value = draft.video.poster;
-        renderVideoPreview();
-      }
+      if (draft.videos.length) renderVideoPreview();
     }
     // 封面后台任务 Promise：发布前等待它完成（带超时兜底），避免封面还没传完
     // 就提交导致该条说说永久无封面
@@ -3524,7 +3525,8 @@
           if (modal.isConnected) prog.textContent = `上传视频 ${Math.round(videoToUpload.size / 1048576)}MB，${Math.round(p * 100)}%`;
         });
         if (!modal.isConnected) return;
-        draft.video = { kind: "mp4", src: data.src, poster: null };
+        const added = { kind: "mp4", src: data.src, poster: null };
+        draft.videos.push(added);
         const uploadedSrc = data.src;
         renderVideoPreview();
         // 视频上传完成后异步截取并上传封面（不阻塞插入，失败静默；用户也可事后自定义）
@@ -3535,9 +3537,9 @@
             const posterBlob = await extractVideoPoster(videoToUpload);
             if (!posterBlob) { if (modal.isConnected) prog.textContent = ""; return; }
             const posterData = await uploadFile(new File([posterBlob], "poster.jpg", { type: "image/jpeg" }), "image");
-            // 弹窗已关，或用户已改用其他视频（URL 面板/重新上传）：不写 draft
-            if (!modal.isConnected || draft.video?.src !== uploadedSrc) return;
-            draft.video = { ...draft.video, poster: posterData.src };
+            // 弹窗已关，或该视频已被用户移除：不写 draft
+            if (!modal.isConnected || !draft.videos.includes(added) || added.src !== uploadedSrc) return;
+            added.poster = posterData.src;
             renderVideoPreview();
           } catch {}
           if (modal.isConnected) prog.textContent = "";
@@ -3546,6 +3548,35 @@
         if (modal.isConnected) { prog.textContent = ""; toast(err.message); }
       }
     });
+
+    // 在线地址「添加」：把 B站/YouTube 链接或直链加入视频列表
+    const addUrlBtn = modal.querySelector("[data-video-add-url]");
+    if (addUrlBtn) {
+      const doAddUrl = () => {
+        const vu = modal.querySelector('input[name="video-url"]');
+        const mp = modal.querySelector("[data-moment-poster]");
+        const url = (vu?.value || "").trim();
+        if (!url) return toast("请输入视频链接");
+        const poster = (mp?.value || "").trim();
+        const emb = parseEmbedUrl(url);
+        if (emb) {
+          draft.videos.push({ kind: "embed", provider: emb.provider, vid: emb.vid, src: "", poster: null });
+        } else {
+          const isHls = /\.m3u8($|\?)/i.test(url.split("?")[0] + "?");
+          const ok = isHls || /\.mp4($|\?)/i.test(url.split("?")[0] + "?");
+          if (!ok) return toast("请输入 B站/YouTube 分享链接，或 .m3u8 / .mp4 直链");
+          draft.videos.push({ kind: isHls ? "hls" : "mp4", src: url, poster: poster || null });
+        }
+        if (vu) vu.value = "";
+        if (mp) mp.value = "";
+        if (draft.videos.length > 9) draft.videos.length = 9;
+        renderVideoPreview();
+        toast("已添加视频");
+      };
+      addUrlBtn.addEventListener("click", doAddUrl);
+      const vu = modal.querySelector('input[name="video-url"]');
+      if (vu) vu.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doAddUrl(); } });
+    }
 
     // 图片：上传 / 链接添加 / 缩略图删除与拖拽排序
     function renderPicks() {
@@ -3713,23 +3744,8 @@
       e.preventDefault();
       const content = form.content.value.trim();
       const location = form.location.value.trim();
-      if (vtab === "url") {
-        const url = form["video-url"].value.trim();
-        const posterInput = modal.querySelector("[data-moment-poster]");
-        const poster = posterInput ? posterInput.value.trim() : "";
-        if (url) {
-          const emb = parseEmbedUrl(url);
-          if (emb) {
-            draft.video = { kind: "embed", provider: emb.provider, vid: emb.vid, src: "", poster: null };
-          } else {
-            const isHls = /\.m3u8($|\?)/i.test(url.split("?")[0] + "?");
-            draft.video = { kind: isHls ? "hls" : "mp4", src: url, poster: poster || null };
-          }
-        } else {
-          draft.video = null;
-        }
-      }
-      if (!content && !draft.images.length && !draft.video) return toast("内容不能为空");
+      // 视频已通过「添加」按钮进入 draft.videos；提交前兜底清掉未添加的残留输入
+      if (!content && !draft.images.length && !draft.videos.length) return toast("内容不能为空");
       const btn = form.querySelector('button[type="submit"]');
       btn.disabled = true;
       // 封面仍在后台截取/上传时等待完成（最多 15s 兜底，超时先发布保证不卡死），
@@ -3744,14 +3760,14 @@
         if (isEdit) {
           await api(`/api/moments/${existing.id}`, {
             method: "PUT",
-            body: { content, images: draft.images, video: draft.video, location },
+            body: { content, images: draft.images, videos: draft.videos, location },
           });
           closeModal();
           toast("已更新");
         } else {
           await api("/api/moments", {
             method: "POST",
-            body: { content, images: draft.images, video: draft.video, location },
+            body: { content, images: draft.images, videos: draft.videos, location },
           });
           closeModal();
           toast("发布成功");
@@ -4178,11 +4194,11 @@
         <div class="admin-row">
           <label class="admin-check-cell"><input type="checkbox" class="admin-check" value="${m.id}" /></label>
           <div class="row-main">
-            <div class="row-title">${esc(plainText(m.content, 80) || (m.video ? "[视频说说]" : "[图片说说]"))}</div>
+            <div class="row-title">${esc(plainText(m.content, 80) || ((Array.isArray(m.videos) ? m.videos.length : m.video ? 1 : 0) ? "[视频说说]" : "[图片说说]"))}</div>
             <div class="row-sub">
               <span>${timeAgo(m.created_at)}</span>
               ${m.images && m.images.length ? `<span class="tag-mini">图片×${m.images.length}</span>` : ""}
-              ${m.video && m.video.src ? `<span class="tag-mini">${m.video.kind === "hls" ? "M3U8 视频" : "MP4 视频"}</span>` : ""}
+              ${(Array.isArray(m.videos) ? m.videos.length : m.video ? 1 : 0) ? `<span class="tag-mini">视频×${Array.isArray(m.videos) ? m.videos.length : 1}</span>` : ""}
               ${m.location ? `<span>${svgIcon("locationDot", 14)} ${esc(m.location)}</span>` : ""}
               <span>赞 ${m.like_count || 0}</span><span>评论 ${m.comment_count || 0}</span>
             </div>

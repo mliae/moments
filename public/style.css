@@ -770,6 +770,11 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
   background: rgba(0,0,0,.6); color: #fff; font-size: 12px; padding: 2px 8px; border-radius: 6px;
 }
 .video-embed-frame { width: 100%; height: 100%; border: 0; display: block; }
+/* 一条说说多个视频时的纵向间距 */
+.datacont > .video-embed + .video-embed,
+.datacont > .video-embed + .essay-media-video,
+.datacont > .essay-media-video + .video-embed,
+.datacont > .essay-media-video + .essay-media-video { margin-top: 10px; }
 /* 居中块（文章正文 / 说说 datacont / 编辑器预览通用） */
 .text-center { text-align: center; }
 .article-body .text-center, .datacont .text-center { margin: .9rem 0; }
@@ -977,7 +982,7 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
 }
 
 /* 视频预览卡片 */
-.video-preview { margin-top: 10px; }
+.video-preview { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .vp-card {
   display: flex; align-items: center; gap: 10px; padding: 8px;
   border-radius: 8px; background: var(--anzhiyu-background); border: 1px solid var(--anzhiyu-card-border);
