@@ -140,12 +140,12 @@ async function getPlaylistDetail(id: string): Promise<{
   songs: PlaylistSong[];
 }> {
   const res = await fetch(
-    `https://music.163.com/api/playlist/detail?id=${id}`,
-    { headers: { "User-Agent": UA, Referer: "https://music.163.com/" } }
+    `https://music.163.com/api/v6/playlist/detail?id=${encodeURIComponent(id)}&n=1000`,
+    { headers: { "User-Agent": UA, Referer: "https://music.163.com/", Cookie: `NMTID=${Math.random().toString(36).slice(2)}` } }
   );
   const data = (await res.json()) as {
     code: number;
-    result?: {
+    playlist?: {
       id?: number;
       name?: string;
       coverImgUrl?: string;
@@ -154,25 +154,27 @@ async function getPlaylistDetail(id: string): Promise<{
       trackIds?: Array<{ id: number }>;
     };
   };
-  const result = data.result;
-  if (!result || data.code !== 200) {
+  const pl = data.playlist;
+  if (!pl || data.code !== 200) {
     throw new Error("歌单不存在或解析失败");
   }
 
-  const directTracks = (result.tracks || [])
-    .map(normalizeTrack)
-    .filter((s): s is PlaylistSong => s !== null);
-
-  let songs = directTracks;
-  if (songs.length === 0 && Array.isArray(result.trackIds) && result.trackIds.length > 0) {
-    songs = await getTracksByIds(result.trackIds.map(t => t.id));
+  // v6 内联 tracks 只含前若干首，完整列表在 trackIds；优先用 trackIds 逐首补齐
+  const ids = Array.isArray(pl.trackIds) ? pl.trackIds.map(t => t.id).filter(Boolean) : [];
+  let songs: PlaylistSong[];
+  if (ids.length > 0) {
+    songs = await getTracksByIds(ids);
+  } else {
+    songs = (pl.tracks || [])
+      .map(normalizeTrack)
+      .filter((s): s is PlaylistSong => s !== null);
   }
 
   return {
-    id: result.id || Number(id),
-    name: result.name || "未知歌单",
-    cover: toHttps(result.coverImgUrl || ""),
-    creator: result.creator?.nickname || "",
+    id: pl.id || Number(id),
+    name: pl.name || "未知歌单",
+    cover: toHttps(pl.coverImgUrl || ""),
+    creator: pl.creator?.nickname || "",
     songs,
   };
 }
