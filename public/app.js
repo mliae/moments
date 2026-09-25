@@ -4317,8 +4317,8 @@
       <form class="settings-form" data-settings-form>
         <div class="field">
           <label for="about_enabled">启用「关于我」页面<br /><small style="color:var(--anzhiyu-secondtext)">开启后顶栏显示「关于」入口，访问 /about 可查看</small></label>
-          <label class="admin-check-cell" style="justify-content:flex-start;gap:.5rem;margin-top:.35rem">
-            <input type="checkbox" name="about_enabled" id="about_enabled" ${s.about_enabled ? "checked" : ""} />
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="about_enabled" id="about_enabled" ${s.about_enabled ? "checked" : ""} /><span></span></span>
             <span>启用关于我页面（/about）</span>
           </label>
         </div>
@@ -4741,8 +4741,8 @@
         <div class="field" style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc)">
           <label style="font-weight:600">刷新头像缓存</label>
           <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">扫描历史评论里的邮箱，把缺失的头像补拉到本地（已缓存的默认跳过）。</div>
-          <label style="display:flex;align-items:center;gap:.45rem;font-weight:normal;margin-bottom:.5rem;cursor:pointer">
-            <input type="checkbox" data-refresh-avatars-force />
+          <label class="switch-row" style="margin-bottom:.5rem">
+            <span class="toggle"><input type="checkbox" data-refresh-avatars-force /><span></span></span>
             <span>强制覆盖已缓存头像（较慢，随机头像会重新抽取）</span>
           </label>
           <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
@@ -4781,12 +4781,12 @@
 
         <div class="admin-panel-head" style="margin-top:1.75rem"><h3>导航入口开关</h3></div>
         <div class="field">
-          <label class="admin-check-cell" style="justify-content:flex-start;gap:.5rem;margin-top:.35rem">
-            <input type="checkbox" name="links_enabled" ${s.links_enabled ? "checked" : ""} />
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="links_enabled" ${s.links_enabled ? "checked" : ""} /><span></span></span>
             <span>显示「友链」入口（/links）</span>
           </label>
-          <label class="admin-check-cell" style="justify-content:flex-start;gap:.5rem;margin-top:.35rem">
-            <input type="checkbox" name="photos_enabled" ${s.photos_enabled ? "checked" : ""} />
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="photos_enabled" ${s.photos_enabled ? "checked" : ""} /><span></span></span>
             <span>显示「相册」入口（/photos）</span>
           </label>
           <small style="color:var(--anzhiyu-secondtext)">「关于我」入口开关在「关于我」Tab。三个入口可独立开关，关闭后顶栏与移动端菜单均不显示。</small>
