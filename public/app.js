@@ -1545,10 +1545,11 @@
   function renderFeed() {
     state.activeView = "feed";
     const s0 = state.settings;
+    const fq = new URLSearchParams(location.search).get("q") || "";
     setSeo({
-      title: s0.site_title,
+      title: fq ? `搜索「${fq}」 · ${s0.site_title}` : s0.site_title,
       description: s0.essay_subtitle,
-      path: "/",
+      path: fq ? "/?q=" + encodeURIComponent(fq) : "/",
       image: s0.banner_bg_image,
     });
     state.feed = [];
@@ -1557,9 +1558,15 @@
     feedEls = [];
     syncFeedRO(); // 首页重建，断开旧卡片观察
     state.commentTarget = null;
+    const filterBanner = fq ? `
+      <div class="feed-filter-bar">
+        <span>🔍 只显示包含「<b>${esc(fq)}</b>」的说说</span>
+        <a class="feed-filter-clear" href="/" data-route="feed">清除筛选</a>
+      </div>` : "";
     app.innerHTML = `
       <div class="essay">
         ${bannerHtml()}
+        ${filterBanner}
         <div class="essay-list-container">
           <div class="essay-content-wrapper">
             <div class="layout-loading-placeholder">
@@ -2374,8 +2381,10 @@
     state.feedLoading = true;
     setLoadMoreText();
     try {
+      const fq = new URLSearchParams(location.search).get("q") || "";
       const q = new URLSearchParams({ voter_id: state.voterId, limit: String(feedPageSize()) });
       if (state.cursor) q.set("cursor", String(state.cursor));
+      if (fq) q.set("q", fq);
       const data = await api("/api/feed?" + q.toString());
       if (state.activeView !== "feed" || !document.getElementById("waterfall")) return;
       state.feed = state.feed.concat(data.list);
@@ -6872,11 +6881,15 @@
   }
   function renderSearchResults(data) {
     const q = data.query || "";
+    const feedHref = "/?q=" + encodeURIComponent(q);
     const groups = [
-      { key: "posts", label: "文章", icon: "file-text", list: (data.posts || []).map(p => ({ title: p.title, sub: p.excerpt, href: "/post/" + encodeURIComponent(p.slug) })) },
-      { key: "moments", label: "说说", icon: "message-circle", list: (data.moments || []).map(m => ({ title: m.content || "（无文字）", sub: m.location ? "📍 " + m.location : m.created_at?.slice(0, 10) || "", href: "/" })) },
-      { key: "friends", label: "友链", icon: "link", list: (data.friends || []).map(f => ({ title: f.name, sub: f.description || f.url, href: f.url || "/links", external: !!f.url })) },
-    ].filter(g => g.list.length);
+      { key: "posts", label: "文章", icon: "file-text", more: !!data.posts_more, moreHref: "/posts",
+        list: (data.posts || []).map(p => ({ title: p.title, sub: p.excerpt, href: "/post/" + encodeURIComponent(p.slug) })) },
+      { key: "moments", label: "说说", icon: "message-circle", more: !!data.moments_more, moreHref: feedHref,
+        list: (data.moments || []).map(m => ({ title: m.content || "（无文字）", sub: m.location ? "📍 " + m.location : m.created_at?.slice(0, 10) || "", href: feedHref })) },
+      { key: "friends", label: "友链", icon: "link", more: !!data.friends_more, moreHref: "/links",
+        list: (data.friends || []).map(f => ({ title: f.name, sub: f.description || f.url, href: f.url || "/links", external: !!f.url })) },
+    ].filter(g => g.list.length || g.more);
     if (!groups.length) {
       searchItems = []; searchActive = -1;
       searchResults.innerHTML = `<div class="search-empty">没有找到与「${esc(q)}」相关的内容</div>`;
@@ -6885,7 +6898,8 @@
     searchItems = [];
     let html = "";
     for (const g of groups) {
-      html += `<div class="search-group"><div class="search-group-title">${svgIcon(g.icon, 14)} ${esc(g.label)} · ${g.list.length}</div>`;
+      if (!g.list.length) continue;
+      html += `<div class="search-group"><div class="search-group-title">${svgIcon(g.icon, 14)} ${esc(g.label)} · ${g.list.length}${g.more ? "+" : ""}</div>`;
       for (const it of g.list) {
         const idx = searchItems.length;
         searchItems.push({ href: it.href, external: it.external });
@@ -6893,6 +6907,9 @@
           <div class="search-item-main"><div class="search-item-title">${highlight(q, it.title)}</div>${it.sub ? `<div class="search-item-sub">${highlight(q, it.sub)}</div>` : ""}</div>
           ${it.external ? '<span class="search-item-ext">↗</span>' : ""}
         </a>`;
+      }
+      if (g.more) {
+        html += `<a class="search-more" href="${esc(g.moreHref)}" data-search-more>查看更多「${esc(g.label)}」结果 →</a>`;
       }
       html += `</div>`;
     }
@@ -6928,6 +6945,8 @@
   searchBtn?.addEventListener("click", () => openSearch());
   searchOverlay.addEventListener("click", e => {
     if (e.target.closest("[data-search-close]")) closeSearch();
+    const more = e.target.closest("[data-search-more]");
+    if (more) { e.preventDefault(); const href = more.getAttribute("href"); closeSearch(); if (href) navigate(href); return; }
     const item = e.target.closest(".search-item");
     if (item) {
       e.preventDefault();

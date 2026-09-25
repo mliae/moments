@@ -386,43 +386,48 @@ export function decodeFeedCursor(raw: string): FeedCursor | null {
  */
 export async function queryFeed(
   db: D1Database,
-  opts: { cursor?: FeedCursor | null; limit?: number; voterId?: string; r2Domain?: string }
+  opts: { cursor?: FeedCursor | null; limit?: number; voterId?: string; r2Domain?: string; q?: string }
 ): Promise<{ list: FeedItem[]; nextCursor: string | null }> {
   const limit = Math.min(50, Math.max(1, opts.limit ?? 20));
   const voter = safeVoter(opts.voterId);
   const r2 = opts.r2Domain;
   const cur = opts.cursor ?? null;
+  // 关键词过滤：有 q 时只检索匹配的说说（内容/位置），不混入文章
+  const q = (opts.q || "").trim();
+  const like = q ? `%${q}%` : "";
   const fetchN = limit + 1;
 
   // 说说
   const mBinds: (string | number)[] = [];
   if (voter) mBinds.push(voter);
-  let mWhere = "";
-  if (cur) {
-    mWhere = `WHERE m.created_at < ? OR (m.created_at = ? AND m.id < ?)`;
-    mBinds.push(cur.ts, cur.ts, cur.id);
-  }
+  const mConds: string[] = [];
+  if (like) { mConds.push("(m.content LIKE ? OR m.location LIKE ?)"); mBinds.push(like, like); }
+  if (cur) { mConds.push("(m.created_at < ? OR (m.created_at = ? AND m.id < ?))"); mBinds.push(cur.ts, cur.ts, cur.id); }
+  const mWhere = mConds.length ? "WHERE " + mConds.join(" AND ") : "";
   mBinds.push(fetchN);
   const mSql = `${momentSelectColumns(voter)} ${mWhere} ORDER BY m.created_at DESC, m.id DESC LIMIT ?`;
   const mRows = (await db.prepare(mSql).bind(...mBinds).all<MomentRow>()).results;
 
-  // 已发布文章
-  const pBinds: (string | number)[] = [];
-  let pWhere = `WHERE status = 'published'`;
-  if (cur) {
-    pWhere += ` AND (created_at < ? OR (created_at = ? AND id < ?))`;
-    pBinds.push(cur.ts, cur.ts, cur.id);
-  }
-  pBinds.push(fetchN);
-  const pRows = (
-    await db
-      .prepare(
-        `SELECT id, slug, title, excerpt, cover, status, created_at, updated_at
+  // 已发布文章（关键词过滤模式下不返回文章）
+  let pRows: PostRow[] = [];
+  if (!like) {
+    const pBinds: (string | number)[] = [];
+    let pWhere = `WHERE status = 'published'`;
+    if (cur) {
+      pWhere += ` AND (created_at < ? OR (created_at = ? AND id < ?))`;
+      pBinds.push(cur.ts, cur.ts, cur.id);
+    }
+    pBinds.push(fetchN);
+    pRows = (
+      await db
+        .prepare(
+          `SELECT id, slug, title, excerpt, cover, status, created_at, updated_at
          FROM posts ${pWhere} ORDER BY created_at DESC, id DESC LIMIT ?`
-      )
-      .bind(...pBinds)
-      .all<PostRow>()
-  ).results;
+        )
+        .bind(...pBinds)
+        .all<PostRow>()
+    ).results;
+  }
 
   const items: FeedItem[] = [
     ...mRows.map<MomentFeedView>(r => ({ kind: "moment", ...serializeMoment(r, undefined, r2) })),

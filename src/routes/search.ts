@@ -31,7 +31,7 @@ app.get("/", async c => {
   const like = `%${q}%`;
 
   // 已发布文章：标题 / 摘要 / 正文
-  const posts = (
+  const postRows = (
     await c.env.DB.prepare(
       `SELECT id, slug, title, excerpt, cover, created_at FROM posts
        WHERE status = 'published' AND (title LIKE ? OR excerpt LIKE ? OR content_md LIKE ?)
@@ -39,7 +39,9 @@ app.get("/", async c => {
     )
       .bind(like, like, like, MAX)
       .all<{ id: number; slug: string; title: string; excerpt: string; cover: string; created_at: string }>()
-  ).results.map(p => ({
+  ).results;
+  const posts_more = postRows.length >= MAX;
+  const posts = postRows.map(p => ({
     id: p.id,
     slug: p.slug,
     title: p.title,
@@ -49,7 +51,7 @@ app.get("/", async c => {
   }));
 
   // 说说：内容 / 位置
-  const moments = (
+  const momentRows = (
     await c.env.DB.prepare(
       `SELECT id, content, location, created_at FROM moments
        WHERE content LIKE ? OR location LIKE ?
@@ -57,15 +59,17 @@ app.get("/", async c => {
     )
       .bind(like, like, MAX)
       .all<{ id: number; content: string; location: string; created_at: string }>()
-  ).results.map(m => ({
+  ).results;
+  const moments_more = momentRows.length >= MAX;
+  const moments = momentRows.map(m => ({
     id: m.id,
-    content: snippet(m.content, q),
+    content: snippet(m.content, q, 120),
     location: m.location || "",
     created_at: m.created_at,
   }));
 
   // 已通过友链：名称 / 描述
-  const friends = (
+  const friendRows = (
     await c.env.DB.prepare(
       `SELECT id, name, url, description, avatar, category FROM friends
        WHERE status = 'approved' AND (name LIKE ? OR description LIKE ?)
@@ -73,7 +77,9 @@ app.get("/", async c => {
     )
       .bind(like, like, MAX)
       .all<{ id: number; name: string; url: string; description: string; avatar: string; category: string }>()
-  ).results.map(f => ({
+  ).results;
+  const friends_more = friendRows.length >= MAX;
+  const friends = friendRows.map(f => ({
     id: f.id,
     name: f.name,
     url: f.url,
@@ -83,7 +89,7 @@ app.get("/", async c => {
   }));
 
   const total = posts.length + moments.length + friends.length;
-  return ok(c, { query: q, total, posts, moments, friends });
+  return ok(c, { query: q, total, posts, moments, friends, posts_more, moments_more, friends_more });
 });
 
 export default app;

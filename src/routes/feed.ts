@@ -13,6 +13,7 @@ const app = new Hono<HonoEnv>();
 app.get("/", async c => {
   const voterId = c.req.query("voter_id");
   const limit = Number(c.req.query("limit")) || undefined;
+  const q = c.req.query("q") || "";
   const cursorRaw = c.req.query("cursor") || "";
   const cursor = cursorRaw ? decodeFeedCursor(cursorRaw) : null;
   // 游标非法时当作没有更多，避免异常参数导致 500
@@ -20,7 +21,7 @@ app.get("/", async c => {
     return ok(c, { list: [], nextCursor: null });
   }
   const s = await getSettings(c.env.DB);
-  const result = await queryFeed(c.env.DB, { cursor, limit, voterId, r2Domain: s.r2_domain });
+  const result = await queryFeed(c.env.DB, { cursor, limit, voterId, r2Domain: s.r2_domain, q });
   return ok(c, result);
 });
 

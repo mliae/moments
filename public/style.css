@@ -2049,3 +2049,13 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   .search-panel { max-height: 84vh; }
 }
 
+/* 首页信息流关键词筛选条 */
+.feed-filter-bar { display: flex; align-items: center; justify-content: space-between; gap: .8rem; max-width: 720px; margin: 0 auto 1rem; padding: .6rem 1rem; background: var(--anzhiyu-secondbg); border: var(--style-border); border-radius: 12px; font-size: .85rem; color: var(--anzhiyu-fontcolor); }
+.feed-filter-bar b { color: var(--anzhiyu-main); }
+.feed-filter-clear { color: var(--anzhiyu-main); font-size: .8rem; text-decoration: none; white-space: nowrap; }
+.feed-filter-clear:hover { text-decoration: underline; }
+
+/* 搜索「查看更多」行 */
+.search-more { display: block; padding: .5rem .7rem; font-size: .8rem; color: var(--anzhiyu-main); text-decoration: none; border-radius: 8px; }
+.search-more:hover { background: var(--anzhiyu-secondbg); }
+
