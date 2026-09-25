@@ -159,7 +159,7 @@
         renderer(token) {
           const url = String(token.url || "");
           const emb = parseEmbedUrl(url);
-          if (emb) return `<div class="article-video">${embedPlaceholderHtml(emb)}</div>`;
+          if (emb) return `<div class="article-video">${embedIframeHtml(emb)}</div>`;
           const poster = resolveVideoPoster(token.poster);
           const posterAttr = poster ? ` poster="${esc(poster)}"` : "";
           const cls = /\.m3u8(?:[?#]|$)/i.test(url) ? "essay-media-video essay-media-video--hls" : "essay-media-video";
@@ -1024,7 +1024,7 @@
   function videoHtml(video) {
     if (!video) return "";
     if (video.kind === "embed" && video.provider && video.vid) {
-      return embedPlaceholderHtml({ provider: video.provider, vid: video.vid });
+      return embedIframeHtml({ provider: video.provider, vid: video.vid });
     }
     if (!video.src) return "";
     const poster = resolveVideoPoster(video.poster);
@@ -1056,9 +1056,9 @@
   function embedCoverUrl(e) {
     return `/api/embed/cover?provider=${e.provider}&vid=${encodeURIComponent(e.vid)}`;
   }
-  function embedPlaceholderHtml(e) {
-    const label = e.provider === "youtube" ? "YouTube" : "哔哩哔哩";
-    return `<div class="video-embed" data-embed-provider="${e.provider}" data-embed-vid="${esc(e.vid)}"><div class="video-embed-cover"><img src="${embedCoverUrl(e)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" /><span class="video-embed-play" aria-hidden="true">▶</span><span class="video-embed-badge">${label}</span></div></div>`;
+  // 站外嵌入视频直接渲染播放器 iframe（不再用封面占位层）
+  function embedIframeHtml(e) {
+    return `<div class="video-embed"><iframe class="video-embed-frame" src="${esc(embedIframeUrl(e))}" frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"></iframe></div>`;
   }
   // 一条说说的全部视频（兼容旧的单视频字段 m.video）
   function videosHtml(m) {
@@ -1086,31 +1086,6 @@
   }
 
   function hydrateVideos(root) {
-    // 站外嵌入视频：占位封面 → 点击才加载 iframe（省流量，封面由 /api/embed/cover 解析）
-    root.querySelectorAll(".video-embed:not([data-embed-ready])").forEach(el => {
-      el.dataset.embedReady = "1";
-      const provider = el.dataset.embedProvider;
-      const vid = el.dataset.embedVid;
-      if (!provider || !vid) return;
-      if (!el.querySelector(".video-embed-cover")) {
-        const label = provider === "youtube" ? "YouTube" : "哔哩哔哩";
-        el.innerHTML = `<div class="video-embed-cover"><img src="${embedCoverUrl({ provider, vid })}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" /><span class="video-embed-play" aria-hidden="true">▶</span><span class="video-embed-badge">${label}</span></div>`;
-      }
-      el.style.cursor = "pointer";
-      el.addEventListener("click", () => {
-        if (el.dataset.embedLoaded) return;
-        el.dataset.embedLoaded = "1";
-        const iframe = document.createElement("iframe");
-        iframe.src = embedIframeUrl({ provider, vid });
-        iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen");
-        iframe.setAttribute("allowfullscreen", "");
-        iframe.setAttribute("frameborder", "0");
-        iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups");
-        iframe.className = "video-embed-frame";
-        el.innerHTML = "";
-        el.appendChild(iframe);
-      });
-    });
     // 预连接外部视频域名（提前建 TCP 连接，HLS 首请求快几百毫秒）
     const preconnected = new Set();
     root.querySelectorAll("video.essay-media-video").forEach(v => {
