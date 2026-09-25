@@ -1100,7 +1100,8 @@
       iframe.frameBorder = "0";
       iframe.allowFullscreen = true;
       iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen");
-      iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups");
+      // 去掉 allow-popups：拦截 B 站播放器内点击（up主/标题等）打开新标签页跳走
+      iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation");
       el.innerHTML = "";
       el.appendChild(iframe);
     });
@@ -6736,10 +6737,14 @@
     const posterInput = panel.querySelector("[data-evp-poster]");
     const okUrl = () => {
       const u = urlInput.value.trim();
-      // B站 / YouTube 分享链接：直接插入，由渲染端解析为封面+点击播放
+      // B站 / YouTube：从任意文本（含标题、分享参数）里提取 provider+vid，重建规范链接，
+      // 丢弃无关文字和 query，避免带空格的脏串导致 @[video] 解析失败
       const emb = parseEmbedUrl(u);
       if (emb) {
-        mdInsertBlock(ta, `@[video](${u})`);
+        const clean = emb.provider === "youtube"
+          ? `https://youtu.be/${emb.vid}`
+          : `https://www.bilibili.com/video/${emb.vid}`;
+        mdInsertBlock(ta, `@[video](${clean})`);
         panel.remove();
         toast(`${emb.provider === "youtube" ? "YouTube" : "B站"}视频已插入`);
         return;
