@@ -109,3 +109,54 @@ export async function getIndexNowLog(db: D1Database, limit = 50): Promise<
     .all<{ id: number; url: string; endpoint: string; status: string; message: string; created_at: string }>();
   return rows.results;
 }
+
+/**
+ * 百度收录推送（独立 API，非 IndexNow）。
+ * 文档：百度搜索资源平台 - 普通收录工具。POST 一行一个 URL 到
+ * http://data.zz.baidu.com/urls?site=<site>&token=<token>
+ * 成功返回 { remain, success }；失败返回 { error, message }。
+ */
+export async function baiduPush(
+  db: D1Database,
+  settings: SiteSettings,
+  relUrls: string[],
+  fallbackOrigin: string
+): Promise<{ ok: boolean; message: string }> {
+  const site = (settings.baidu_push_site || "").trim();
+  const token = (settings.baidu_push_token || "").trim();
+  if (!settings.baidu_push_enabled || !site || !token || !relUrls.length) {
+    return { ok: false, message: "未启用或缺少 site/token" };
+  }
+  const host = indexNowHost(settings, fallbackOrigin);
+  const urlList = relUrls.map(u => (u.startsWith("http") ? u : `${host}${u.startsWith("/") ? "" : "/"}${u}`));
+  const body = urlList.join("\n");
+  const ep = `http://data.zz.baidu.com/urls?site=${encodeURIComponent(site)}&token=${encodeURIComponent(token)}`;
+  try {
+    const res = await fetch(ep, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body,
+    });
+    const text = await res.text();
+    let remain = "", success = "";
+    try {
+      const j = JSON.parse(text) as { remain?: number; success?: number; error?: number; message?: string };
+      remain = j.remain != null ? `remain=${j.remain}` : "";
+      success = j.success != null ? `success=${j.success}` : "";
+      if (j.error) return logReturn(false, `百度 error=${j.error} ${j.message || text.slice(0, 120)}`);
+    } catch {
+      /* 非 JSON，按 HTTP 状态判断 */
+    }
+    const okStatus = res.status >= 200 && res.status < 300;
+    const msg = [okStatus ? "HTTP " + res.status : "HTTP " + res.status, success, remain].filter(Boolean).join(" ");
+    return logReturn(okStatus, msg);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return logReturn(false, msg.slice(0, 200));
+  }
+
+  async function logReturn(ok: boolean, message: string) {
+    await writeLog(db, urlList.join(", "), "baidu", ok ? "ok" : "fail", message);
+    return { ok, message };
+  }
+}

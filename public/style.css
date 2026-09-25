@@ -1288,6 +1288,7 @@ input:focus, textarea:focus { border-color: var(--anzhiyu-main); box-shadow: var
 }
 .toggle input:checked + span { background: var(--anzhiyu-main); }
 .toggle input:checked + span::before { transform: translateX(18px); }
+.switch-row { display: inline-flex; align-items: center; gap: .6rem; font-size: .88rem; cursor: pointer; user-select: none; }
 
 /* ==================== 音乐播放器 ==================== */
 .music-player {

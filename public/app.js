@@ -5182,9 +5182,9 @@
           <label>推送端点（每行一个，留空恢复默认）</label>
           <textarea name="indexnow_endpoints" rows="4" placeholder="${esc(defEndpoints)}">${esc(cfg.indexnow_endpoints || defEndpoints)}</textarea>
         </div>
-        <label style="display:flex;align-items:center;gap:.5rem;font-size:.88rem;cursor:pointer">
-          <input type="checkbox" name="indexnow_auto" ${cfg.indexnow_auto !== false ? "checked" : ""} />
-          发布/更新已发布文章时自动推送
+        <label class="switch-row">
+          <span class="toggle"><input type="checkbox" name="indexnow_auto" ${cfg.indexnow_auto !== false ? "checked" : ""} /><span></span></span>
+          发布/更新已发布文章时自动推送 IndexNow
         </label>
         <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
           <button class="btn primary" type="submit">保存配置</button>
@@ -5196,6 +5196,32 @@
         <button class="btn" type="button" data-indexnow-push>推送最近 10 篇</button>
         <input type="number" min="1" max="50" value="10" data-indexnow-n style="width:90px" aria-label="推送篇数" />
         <span data-indexnow-push-msg style="font-size:.82rem;color:var(--anzhiyu-secondtext)"></span>
+      </div>
+
+      <div class="admin-panel-head" style="margin-top:1.8rem"><h3>百度收录推送</h3></div>
+      <p style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:-.4rem 0 1rem">百度不支持 IndexNow，用其独立的「普通收录」API。需先在 <a href="https://ziyuan.baidu.com/linksubmit/index" target="_blank" rel="noopener" style="color:var(--anzhiyu-main)">百度搜索资源平台</a> 添加站点并拿到「推送接口调用地址」里的 site 与 token。</p>
+      <form class="settings-form" data-baidu-form style="max-width:640px;display:flex;flex-direction:column;gap:.75rem">
+        <label class="switch-row">
+          <span class="toggle"><input type="checkbox" name="baidu_push_enabled" ${cfg.baidu_push_enabled ? "checked" : ""} /><span></span></span>
+          启用百度自动推送（发布/更新已发布文章时推送）
+        </label>
+        <div class="field">
+          <label>站点 site（如 jxe.me，不带 http）</label>
+          <input name="baidu_push_site" value="${esc(cfg.baidu_push_site || "")}" placeholder="jxe.me" maxlength="100" />
+        </div>
+        <div class="field">
+          <label>推送 token</label>
+          <input name="baidu_push_token" value="${esc(cfg.baidu_push_token || "")}" placeholder="百度平台给出的 token" maxlength="64" />
+        </div>
+        <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+          <button class="btn primary" type="submit">保存配置</button>
+          <span data-baidu-msg style="font-size:.82rem;color:var(--anzhiyu-secondtext)"></span>
+        </div>
+      </form>
+      <div style="margin-top:1rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+        <button class="btn" type="button" data-baidu-push>推送最近 10 篇到百度</button>
+        <input type="number" min="1" max="50" value="10" data-baidu-n style="width:90px" aria-label="推送篇数" />
+        <span data-baidu-push-msg style="font-size:.82rem;color:var(--anzhiyu-secondtext)"></span>
       </div>
 
       <details class="indexnow-log" style="margin-top:1.6rem">
@@ -5250,6 +5276,34 @@
       try {
         const d = await api("/api/admin/indexnow/push", { method: "POST", body: { n } });
         msg.textContent = `✓ 推送 ${d.pushed} 篇，${d.ok}/${d.total} 端点成功`;
+        loadLog();
+      } catch (err) { msg.textContent = err.message || "推送失败"; }
+    });
+
+    // 保存百度配置
+    const bdForm = panel.querySelector("[data-baidu-form]");
+    bdForm?.addEventListener("submit", async e => {
+      e.preventDefault();
+      const msg = panel.querySelector("[data-baidu-msg]");
+      const fd = new FormData(bdForm);
+      const patch = {
+        baidu_push_enabled: bdForm.querySelector("[name=baidu_push_enabled]").checked,
+        baidu_push_site: String(fd.get("baidu_push_site") || "").trim(),
+        baidu_push_token: String(fd.get("baidu_push_token") || "").trim(),
+      };
+      try {
+        await api("/api/admin/settings", { method: "PUT", body: patch });
+        msg.textContent = "已保存 ✓";
+        setTimeout(() => { msg.textContent = ""; }, 2000);
+      } catch (err) { msg.textContent = err.message || "保存失败"; }
+    });
+    panel.querySelector("[data-baidu-push]")?.addEventListener("click", async () => {
+      const n = Number(panel.querySelector("[data-baidu-n]").value) || 10;
+      const msg = panel.querySelector("[data-baidu-push-msg]");
+      msg.textContent = "推送中…";
+      try {
+        const d = await api("/api/admin/baidu/push", { method: "POST", body: { n } });
+        msg.textContent = d.ok ? `✓ ${d.message}` : `✗ ${d.message}`;
         loadLog();
       } catch (err) { msg.textContent = err.message || "推送失败"; }
     });

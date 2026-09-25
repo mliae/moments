@@ -78,6 +78,10 @@ export interface SiteSettings {
   indexnow_key: string; // IndexNow 密钥（去 Bing 站长平台生成）；空=未启用推送
   indexnow_endpoints: string; // 推送端点列表，每行一个 URL（默认含 Bing/统一入口/百度）
   indexnow_auto: boolean; // 发布/更新已发布文章时是否自动推送
+  // 百度收录推送（独立 API，非 IndexNow）
+  baidu_push_enabled: boolean; // 是否启用百度自动推送
+  baidu_push_site: string; // 百度搜索资源平台的站点（如 jxe.me）
+  baidu_push_token: string; // 百度推送 token（私密，不公开）
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -156,6 +160,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
     "https://api.indexnow.org/indexnow\n" +
     "https://www.bing.com/indexnow",
   indexnow_auto: true,
+  baidu_push_enabled: false,
+  baidu_push_site: "",
+  baidu_push_token: "",
 };
 
 /** 字符串字段约束：最大长度 */
@@ -210,6 +217,8 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   qq_pskey: 256,
   indexnow_key: 128,
   indexnow_endpoints: 1500,
+  baidu_push_site: 100,
+  baidu_push_token: 64,
 };
 
 /**
@@ -236,6 +245,7 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "links_enabled",
   "photos_enabled",
   "indexnow_auto",
+  "baidu_push_enabled",
 ];
 
 export function clampSetting(value: unknown, max: number): string {

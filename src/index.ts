@@ -22,6 +22,7 @@ import photoRoutes, { adminPhotoRoutes } from "./routes/photos";
 import friendRoutes, { adminFriendRoutes } from "./routes/friends";
 import searchRoutes from "./routes/search";
 import indexnowAdminRoutes from "./routes/indexnow";
+import baiduAdminRoutes from "./routes/baidu";
 import { getSettings } from "./settings";
 import { keyToSrc, ensureSchema, type PostRow } from "./db";
 import { isAdmin, hasAdminPassword } from "./auth";
@@ -84,10 +85,10 @@ app.get("/api/settings", async c => {
   // 私密字段绝不下发：后台入口、apihz 凭证、QQ 登录态
   const {
     admin_path: _h1, apihz_id: _h2, apihz_key: _h3, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
-    indexnow_key: _h7,
+    indexnow_key: _h7, baidu_push_token: _h8,
     ...publicSettings
   } = s;
-  void [_h1, _h2, _h3, _h4, _h5, _h6, _h7];
+  void [_h1, _h2, _h3, _h4, _h5, _h6, _h7, _h8];
   const res = ok(c, publicSettings);
   res.headers.set("Cache-Control", "public, max-age=60, s-maxage=300");
   return res;
@@ -106,6 +107,7 @@ app.route("/api/music", musicRoutes);
 app.route("/api", miscRoutes);
 app.route("/api/search", searchRoutes);
 app.route("/api/admin/indexnow", indexnowAdminRoutes);
+app.route("/api/admin/baidu", baiduAdminRoutes);
 
 app.get("/media/*", serveMedia);
 

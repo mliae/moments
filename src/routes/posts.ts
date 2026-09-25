@@ -11,7 +11,7 @@ import { ok, fail } from "../respond";
 import type { HonoEnv } from "../types";
 import { requireAdmin, isAdmin } from "../auth";
 import { getSettings } from "../settings";
-import { pingIndexNow } from "../indexnow";
+import { pingIndexNow, baiduPush } from "../indexnow";
 import { serializePost, srcToKey, type PostRow } from "../db";
 import {
   parseCommentBody,
@@ -168,10 +168,12 @@ app.post("/", requireAdmin, async c => {
   if (!row) return fail(c, "保存失败", 500);
 
   const s = await getSettings(c.env.DB);
-  // 发布即自动推送 IndexNow（best-effort，失败不影响保存）
-  if (input.status === "published" && s.indexnow_auto && s.indexnow_key?.trim()) {
-    const origin = new URL(c.req.url).origin;
-    pingIndexNow(c.env.DB, s, [`/post/${encodeURIComponent(slug)}`], origin).catch(() => {});
+  const url = `/post/${encodeURIComponent(slug)}`;
+  const origin = new URL(c.req.url).origin;
+  // 发布即自动推送（best-effort，失败不影响保存）
+  if (input.status === "published") {
+    if (s.indexnow_auto && s.indexnow_key?.trim()) pingIndexNow(c.env.DB, s, [url], origin).catch(() => {});
+    if (s.baidu_push_enabled && s.baidu_push_site?.trim() && s.baidu_push_token?.trim()) baiduPush(c.env.DB, s, [url], origin).catch(() => {});
   }
   return ok(c, serializePost(row, true, s.r2_domain), "文章已保存");
 });
@@ -207,9 +209,11 @@ app.put("/:id", requireAdmin, async c => {
   if (!row) return fail(c, "更新失败", 500);
 
   const s = await getSettings(c.env.DB);
-  if (input.status === "published" && s.indexnow_auto && s.indexnow_key?.trim()) {
+  const url = `/post/${encodeURIComponent(slug)}`;
+  if (input.status === "published") {
     const origin = new URL(c.req.url).origin;
-    pingIndexNow(c.env.DB, s, [`/post/${encodeURIComponent(slug)}`], origin).catch(() => {});
+    if (s.indexnow_auto && s.indexnow_key?.trim()) pingIndexNow(c.env.DB, s, [url], origin).catch(() => {});
+    if (s.baidu_push_enabled && s.baidu_push_site?.trim() && s.baidu_push_token?.trim()) baiduPush(c.env.DB, s, [url], origin).catch(() => {});
   }
   return ok(c, serializePost(row, true, s.r2_domain), "文章已更新");
 });
