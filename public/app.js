@@ -159,7 +159,7 @@
         renderer(token) {
           const url = String(token.url || "");
           const emb = parseEmbedUrl(url);
-          if (emb) return `<div class="article-video">${embedIframeHtml(emb)}</div>`;
+          if (emb) return `<div class="article-video">${embedBoxHtml(emb)}</div>`;
           const poster = resolveVideoPoster(token.poster);
           const posterAttr = poster ? ` poster="${esc(poster)}"` : "";
           const cls = /\.m3u8(?:[?#]|$)/i.test(url) ? "essay-media-video essay-media-video--hls" : "essay-media-video";
@@ -1024,7 +1024,7 @@
   function videoHtml(video) {
     if (!video) return "";
     if (video.kind === "embed" && video.provider && video.vid) {
-      return embedIframeHtml({ provider: video.provider, vid: video.vid });
+      return embedBoxHtml({ provider: video.provider, vid: video.vid });
     }
     if (!video.src) return "";
     const poster = resolveVideoPoster(video.poster);
@@ -1056,9 +1056,10 @@
   function embedCoverUrl(e) {
     return `/api/embed/cover?provider=${e.provider}&vid=${encodeURIComponent(e.vid)}`;
   }
-  // 站外嵌入视频直接渲染播放器 iframe（不再用封面占位层）
-  function embedIframeHtml(e) {
-    return `<div class="video-embed"><iframe class="video-embed-frame" src="${esc(embedIframeUrl(e))}" frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"></iframe></div>`;
+  // 站外嵌入视频：输出带 provider/vid 的占位容器，由 hydrateVideos 用 createElement 注入 iframe。
+  // 不能直接在 HTML 里写 <iframe>——sanitizeHtml 会过滤掉 iframe，导致只剩空黑盒。
+  function embedBoxHtml(e) {
+    return `<div class="video-embed" data-embed-provider="${e.provider}" data-embed-vid="${esc(e.vid)}"></div>`;
   }
   // 一条说说的全部视频（兼容旧的单视频字段 m.video）
   function videosHtml(m) {
@@ -1086,6 +1087,23 @@
   }
 
   function hydrateVideos(root) {
+    // 站外嵌入视频：占位容器 → 注入真正的 iframe（用 createElement，避开 sanitizeHtml 过滤）
+    root.querySelectorAll(".video-embed[data-embed-provider]:not([data-embed-ready])").forEach(el => {
+      el.dataset.embedReady = "1";
+      const provider = el.dataset.embedProvider;
+      const vid = el.dataset.embedVid;
+      if (!provider || !vid) return;
+      const iframe = document.createElement("iframe");
+      iframe.src = embedIframeUrl({ provider, vid });
+      iframe.className = "video-embed-frame";
+      iframe.loading = "lazy";
+      iframe.frameBorder = "0";
+      iframe.allowFullscreen = true;
+      iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen");
+      iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups");
+      el.innerHTML = "";
+      el.appendChild(iframe);
+    });
     // 预连接外部视频域名（提前建 TCP 连接，HLS 首请求快几百毫秒）
     const preconnected = new Set();
     root.querySelectorAll("video.essay-media-video").forEach(v => {
