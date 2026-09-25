@@ -20,6 +20,7 @@ import musicRoutes from "./routes/music";
 import miscRoutes from "./routes/misc";
 import photoRoutes, { adminPhotoRoutes } from "./routes/photos";
 import friendRoutes, { adminFriendRoutes } from "./routes/friends";
+import searchRoutes from "./routes/search";
 import { getSettings } from "./settings";
 import { keyToSrc, ensureSchema, type PostRow } from "./db";
 import { isAdmin, hasAdminPassword } from "./auth";
@@ -101,6 +102,7 @@ app.route("/api/posts", postRoutes);
 app.route("/api/feed", feedRoutes);
 app.route("/api/music", musicRoutes);
 app.route("/api", miscRoutes);
+app.route("/api/search", searchRoutes);
 
 app.get("/media/*", serveMedia);
 

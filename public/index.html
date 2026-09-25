@@ -1,4 +1,4 @@
-﻿<!doctype html>
+﻿﻿﻿﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -18,7 +18,7 @@
     })();
   </script>
   <link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml" />
-  <link rel="stylesheet" href="/style.css?v=20260924z" />
+  <link rel="stylesheet" href="/style.css?v=20260925a" />
   <!--SSR_HEAD-->
 </head>
 <body>
@@ -34,6 +34,9 @@
         <a href="/admin" data-route="admin" class="admin-only-nav" hidden>后台</a>
       </nav>
       <div class="topbar-actions">
+        <button class="topbar-btn" id="searchBtn" title="搜索" aria-label="搜索">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </button>
         <button class="topbar-btn" id="themeToggle" title="深色/浅色显示模式"></button>
         <button class="topbar-btn menu-toggle" id="menuToggle" aria-label="打开菜单" aria-expanded="false" aria-controls="mobileMenu">
           <svg class="i-menu" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
@@ -212,8 +215,22 @@
   <!-- 灯箱容器：独立于 modalRoot，避免开/关灯箱冲掉评论弹窗 -->
   <div id="lightboxRoot"></div>
 
+  <!-- 站内搜索弹层 -->
+  <div id="searchOverlay" class="search-overlay" hidden>
+    <div class="search-backdrop" data-search-close></div>
+    <div class="search-panel" role="dialog" aria-label="站内搜索">
+      <div class="search-box">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="searchInput" type="search" placeholder="搜索文章、说说、友链…" autocomplete="off" spellcheck="false" />
+        <button class="search-clear" id="searchClear" aria-label="清除" hidden>×</button>
+      </div>
+      <div class="search-results" id="searchResults"></div>
+      <div class="search-hint"><span>↑↓ 选择</span><span>Enter 打开</span><span>Esc 关闭</span></div>
+    </div>
+  </div>
+
   <script src="/vendor/hls.min.js"></script>
   <script src="/vendor/marked.min.js"></script>
-  <script src="/app.js?v=20260924z"></script>
+  <script src="/app.js?v=20260925a"></script>
 </body>
 </html>

@@ -6835,6 +6835,131 @@
   });
   renderThemeBtn();
 
+  /* ================= 站内搜索弹层 ================= */
+
+  const searchBtn = document.getElementById("searchBtn");
+  const searchOverlay = document.getElementById("searchOverlay");
+  const searchInput = document.getElementById("searchInput");
+  const searchClear = document.getElementById("searchClear");
+  const searchResults = document.getElementById("searchResults");
+  let searchTimer = null;
+  let searchItems = []; // {href, external} 与结果 DOM 顺序对齐
+  let searchActive = -1;
+
+  function openSearch(prefill) {
+    if (prefill != null) searchInput.value = prefill;
+    searchOverlay.hidden = false;
+    requestAnimationFrame(() => { searchInput.focus(); searchInput.select(); });
+    if (searchInput.value.trim()) runSearch(); else renderSearchEmpty();
+  }
+  function closeSearch() {
+    if (searchOverlay.hidden) return;
+    searchOverlay.hidden = true;
+    searchActive = -1;
+  }
+  function highlight(q, text) {
+    const safe = esc(text || "");
+    if (!q) return safe;
+    const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    return safe.replace(re, m => `<mark>${m}</mark>`);
+  }
+  function renderSearchEmpty() {
+    searchItems = []; searchActive = -1;
+    searchResults.innerHTML = `<div class="search-empty">输入关键词，搜索文章、说说、友链</div>`;
+  }
+  function renderSearchLoading() {
+    searchResults.innerHTML = `<div class="search-empty">搜索中…</div>`;
+  }
+  function renderSearchResults(data) {
+    const q = data.query || "";
+    const groups = [
+      { key: "posts", label: "文章", icon: "file-text", list: (data.posts || []).map(p => ({ title: p.title, sub: p.excerpt, href: "/post/" + encodeURIComponent(p.slug) })) },
+      { key: "moments", label: "说说", icon: "message-circle", list: (data.moments || []).map(m => ({ title: m.content || "（无文字）", sub: m.location ? "📍 " + m.location : m.created_at?.slice(0, 10) || "", href: "/" })) },
+      { key: "friends", label: "友链", icon: "link", list: (data.friends || []).map(f => ({ title: f.name, sub: f.description || f.url, href: f.url || "/links", external: !!f.url })) },
+    ].filter(g => g.list.length);
+    if (!groups.length) {
+      searchItems = []; searchActive = -1;
+      searchResults.innerHTML = `<div class="search-empty">没有找到与「${esc(q)}」相关的内容</div>`;
+      return;
+    }
+    searchItems = [];
+    let html = "";
+    for (const g of groups) {
+      html += `<div class="search-group"><div class="search-group-title">${svgIcon(g.icon, 14)} ${esc(g.label)} · ${g.list.length}</div>`;
+      for (const it of g.list) {
+        const idx = searchItems.length;
+        searchItems.push({ href: it.href, external: it.external });
+        html += `<a class="search-item" data-search-idx="${idx}" href="${esc(it.href)}"${it.external ? ' target="_blank" rel="noopener"' : ""}>
+          <div class="search-item-main"><div class="search-item-title">${highlight(q, it.title)}</div>${it.sub ? `<div class="search-item-sub">${highlight(q, it.sub)}</div>` : ""}</div>
+          ${it.external ? '<span class="search-item-ext">↗</span>' : ""}
+        </a>`;
+      }
+      html += `</div>`;
+    }
+    html += `<div class="search-total">共 ${data.total} 条结果</div>`;
+    searchResults.innerHTML = html;
+    searchActive = -1;
+  }
+  async function runSearch() {
+    const q = searchInput.value.trim();
+    searchClear.hidden = !q;
+    if (!q) { renderSearchEmpty(); return; }
+    if (searchTimer) clearTimeout(searchTimer);
+    renderSearchLoading();
+    searchTimer = setTimeout(async () => {
+      try {
+        const data = await api("/api/search?q=" + encodeURIComponent(q));
+        if (searchOverlay.hidden || searchInput.value.trim() !== q) return; // 已关闭或又改了词
+        renderSearchResults(data);
+      } catch (e) {
+        if (!searchOverlay.hidden) searchResults.innerHTML = `<div class="search-empty">${esc(e.message || "搜索失败")}</div>`;
+      }
+    }, 220);
+  }
+  function setSearchActive(delta) {
+    const n = searchItems.length;
+    if (!n) return;
+    searchActive = (searchActive + delta + n) % n;
+    const els = searchResults.querySelectorAll(".search-item");
+    els.forEach((el, i) => el.classList.toggle("is-active", i === searchActive));
+    els[searchActive]?.scrollIntoView({ block: "nearest" });
+  }
+
+  searchBtn?.addEventListener("click", () => openSearch());
+  searchOverlay.addEventListener("click", e => {
+    if (e.target.closest("[data-search-close]")) closeSearch();
+    const item = e.target.closest(".search-item");
+    if (item) {
+      e.preventDefault();
+      const idx = Number(item.dataset.searchIdx);
+      const it = searchItems[idx];
+      closeSearch();
+      if (it.external) window.open(it.href, "_blank", "noopener");
+      else navigate(it.href);
+    }
+  });
+  searchInput.addEventListener("input", runSearch);
+  searchClear.addEventListener("click", () => { searchInput.value = ""; searchInput.focus(); runSearch(); });
+  searchInput.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setSearchActive(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSearchActive(-1); }
+    else if (e.key === "Enter") {
+      if (searchActive >= 0) {
+        e.preventDefault();
+        const it = searchItems[searchActive];
+        if (it) { closeSearch(); if (it.external) window.open(it.href, "_blank", "noopener"); else navigate(it.href); }
+      }
+    } else if (e.key === "Escape") { e.preventDefault(); closeSearch(); }
+  });
+  // 快捷键：Ctrl/Cmd+K 或 斜杠 唤起；Esc 关闭
+  document.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openSearch(); return; }
+    if (e.key === "Escape") { if (!searchOverlay.hidden) { e.preventDefault(); closeSearch(); } return; }
+    if (e.key === "/" && !searchOverlay.hidden && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || "")) {
+      e.preventDefault(); openSearch();
+    }
+  });
+
   /* ================= 移动端汉堡菜单 ================= */
 
   const topbarEl = document.querySelector(".topbar");
