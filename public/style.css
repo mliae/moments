@@ -1035,6 +1035,7 @@ input:focus, textarea:focus { border-color: var(--anzhiyu-main); box-shadow: var
 }
 
 /* ==================== 移动端汉堡导航 ==================== */
+.menu-toggle { display: none; } /* 仅手机端显示，电脑端隐藏 */
 .menu-toggle .i-close { display: none; }
 .mobile-menu { display: none; }
 
