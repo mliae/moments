@@ -3403,7 +3403,7 @@
           <div class="pick-grid" data-pick-grid></div>
           <input type="file" name="images" accept="image/jpeg,image/png,image/gif,image/webp" multiple hidden />
           <div class="upload-progress" data-img-progress></div>
-          <p class="field-hint">支持 JPG/PNG/WebP，最多 9 张；可拖拽缩略图调整顺序。</p>
+          <p class="field-hint">支持 JPG/PNG/WebP，最多 9 张；可拖拽排序，也可 Ctrl+V 粘贴图片上传。</p>
         </div>
         <!-- 视频面板 -->
         <div class="composer-panel" data-panel="video" hidden>
@@ -3412,8 +3412,10 @@
             <button type="button" data-vtab="url">在线地址</button>
           </div>
           <div data-vpanel="mp4-upload">
-            <input type="file" accept="video/mp4" name="video-file" />
+            <button type="button" class="btn pt-upload" data-video-pick>${mdIcon("upload")}上传 MP4</button>
+            <input type="file" accept="video/mp4" name="video-file" hidden />
             <div class="upload-progress" data-video-progress></div>
+            <p class="field-hint">也可直接 Ctrl+V 粘贴视频文件上传（建议 ≤100MB）。</p>
           </div>
           <div data-vpanel="url" hidden>
             <div class="emp-row">
@@ -3422,7 +3424,10 @@
             </div>
             <div class="emp-row">
               <input type="url" data-moment-poster placeholder="封面图地址（选填，仅直链视频需要）" />
+              <button type="button" class="btn" data-moment-poster-upload>上传</button>
+              <input type="file" accept="image/*" data-moment-poster-file hidden />
             </div>
+            <p class="field-hint">可点「上传」或 Ctrl+V 粘贴图片，自动回填封面地址。</p>
             <div class="emp-help">支持粘贴 B站 / YouTube 分享链接（自动取封面、点击播放）；也支持 .m3u8 或 .mp4 直链。可添加多条。</div>
           </div>
           <div class="video-preview" data-video-preview hidden></div>
@@ -3550,9 +3555,8 @@
     // 封面后台任务 Promise：发布前等待它完成（带超时兜底），避免封面还没传完
     // 就提交导致该条说说永久无封面
     let videoPosterPromise = null;
-    videoFileInput.addEventListener("change", async () => {
-      const file = videoFileInput.files[0];
-      videoFileInput.value = ""; // 允许再次选择同一个文件
+    // 上传本地 MP4（文件选择 / 粘贴共用）
+    async function uploadMomentVideo(file) {
       if (!file) return;
       const prog = modal.querySelector("[data-video-progress]");
       prog.textContent = `上传视频 ${Math.round(file.size / 1048576)}MB，0%`;
@@ -3594,6 +3598,13 @@
       } catch (err) {
         if (modal.isConnected) { prog.textContent = ""; toast(err.message); }
       }
+    }
+    // 美化：点按钮唤起文件选择
+    modal.querySelector("[data-video-pick]").addEventListener("click", () => videoFileInput.click());
+    videoFileInput.addEventListener("change", () => {
+      const f = videoFileInput.files[0];
+      videoFileInput.value = ""; // 允许再次选择同一个文件
+      uploadMomentVideo(f);
     });
 
     // 在线地址「添加」：把 B站/YouTube 链接或直链加入视频列表
@@ -3679,6 +3690,74 @@
       if (e.key === "Enter") {
         e.preventDefault();
         addUrlImg();
+      }
+    });
+
+    // 粘贴单张图片 → 上传并加入草稿（图片面板粘贴用）
+    async function addPastedImage(file) {
+      if (draft.images.length >= 9) return toast("最多 9 张图片");
+      const prog = modal.querySelector("[data-img-progress]");
+      prog.textContent = `处理粘贴图片 …`;
+      try {
+        const data = await uploadMedia(file, "image", p => {
+          if (modal.isConnected) prog.textContent = `上传粘贴图片 ${Math.round(p * 100)}%`;
+        });
+        draft.images.push(data.src);
+        renderPicks();
+      } catch (err) {
+        toast(err.message);
+      }
+      if (modal.isConnected) prog.textContent = draft.images.length ? `已选 ${draft.images.length} 张` : "";
+    }
+
+    // 上传封面图并回填到指定输入框（封面上传按钮 / 封面框粘贴共用）
+    async function uploadMomentPoster(input, file) {
+      const old = input.value;
+      input.value = "上传中…";
+      try {
+        const data = await uploadMedia(file, "image", () => {});
+        if (input.isConnected) { input.value = data.src; input.dispatchEvent(new Event("input")); }
+        toast("封面已上传");
+      } catch (err) {
+        if (input.isConnected) input.value = old;
+        toast(err.message);
+      }
+    }
+    const posterInputM = modal.querySelector("[data-moment-poster]");
+    const posterFileInput = modal.querySelector("[data-moment-poster-file]");
+    modal.querySelector("[data-moment-poster-upload]").addEventListener("click", () => posterFileInput.click());
+    posterFileInput.addEventListener("change", () => {
+      const f = posterFileInput.files[0];
+      posterFileInput.value = "";
+      if (f) uploadMomentPoster(posterInputM, f);
+    });
+
+    // 弹窗内粘贴分流：按当前激活面板 / 焦点决定去向（仅拦截文件，文本粘贴照常）
+    modal.addEventListener("paste", e => {
+      const cd = e.clipboardData;
+      if (!cd) return;
+      const items = [...cd.items];
+      const imgFile = items.find(it => it.kind === "file" && it.type.startsWith("image/"))?.getAsFile();
+      const videoFile = items.find(it => it.kind === "file" && (it.type.startsWith("video/") || /\.mp4$/i.test(it.getAsFile?.()?.name || "")))?.getAsFile();
+      // 1) 焦点在封面框：粘贴图片 → 回填封面
+      if (document.activeElement === posterInputM && imgFile) {
+        e.preventDefault();
+        uploadMomentPoster(posterInputM, imgFile);
+        return;
+      }
+      // 2) 图片面板可见：图片文件 → 加图；图片 URL 文本 → 当链接图
+      const imgPanel = modal.querySelector('[data-panel="img"]');
+      if (imgPanel && !imgPanel.hidden) {
+        if (imgFile) { e.preventDefault(); addPastedImage(imgFile); return; }
+        const txt = cd.getData("text/plain").trim();
+        if (/^https?:\/\//i.test(txt)) { e.preventDefault(); urlInput.value = txt; addUrlImg(); return; }
+      }
+      // 3) 视频面板 + 上传 MP4 标签可见：粘贴视频文件 → 上传
+      const videoPanel = modal.querySelector('[data-panel="video"]');
+      const mp4Panel = videoPanel?.querySelector('[data-vpanel="mp4-upload"]');
+      if (videoPanel && !videoPanel.hidden && mp4Panel && !mp4Panel.hidden && videoFile) {
+        e.preventDefault();
+        uploadMomentVideo(videoFile);
       }
     });
 
@@ -6713,9 +6792,10 @@
         <button type="button" data-vtab="url">在线地址</button>
       </div>
       <div data-vpanel="mp4-upload">
-        <input type="file" accept="video/mp4" />
+        <button type="button" class="btn pt-upload" data-evp-pick>${mdIcon("upload")}上传 MP4</button>
+        <input type="file" accept="video/mp4" data-evp-file hidden />
         <div class="upload-progress" data-evp-progress></div>
-        <div class="emp-help">MP4 建议 ≤100MB；更大的视频请先传到对象存储/网盘，再用「在线地址」插入 <code>.m3u8</code> 或 <code>.mp4</code> 直链。</div>
+        <div class="emp-help">MP4 建议 ≤100MB；支持 Ctrl+V 粘贴视频上传。更大的视频请先传到对象存储/网盘，再用「在线地址」插入 <code>.m3u8</code> 或 <code>.mp4</code> 直链。</div>
       </div>
       <div data-vpanel="url" hidden>
         <div class="emp-row">
@@ -6724,8 +6804,10 @@
         </div>
         <div class="emp-row">
           <input type="url" data-evp-poster placeholder="封面图地址（选填，仅直链视频需要）" />
+          <button type="button" class="btn" data-evp-poster-upload>上传</button>
+          <input type="file" accept="image/*" data-evp-poster-file hidden />
         </div>
-        <div class="emp-help">支持粘贴 B站 / YouTube 分享链接（自动取封面、点击播放）；也支持 .m3u8 或 .mp4 直链。</div>
+        <div class="emp-help">支持粘贴 B站 / YouTube 分享链接（自动取封面、点击播放）；也支持 .m3u8 或 .mp4 直链。封面可点「上传」或 Ctrl+V 粘贴图片自动回填。</div>
       </div>`;
     container.appendChild(panel);
     const progress = panel.querySelector("[data-evp-progress]");
@@ -6739,10 +6821,9 @@
       switchTab("url");
       panel.querySelector('input[type="url"]').focus();
     }
-    // 本地上传
-    panel.querySelector('input[type="file"]').addEventListener("change", async e => {
-      const file = e.target.files[0];
-      e.target.value = ""; // 允许再次选择同一个文件
+    // 本地上传（文件选择 / 粘贴共用）
+    const evpFile = panel.querySelector("[data-evp-file]");
+    async function uploadArticleVideo(file) {
       if (!file) return;
       if (!/video\/mp4|mp4/i.test(file.type) && !/\.mp4$/i.test(file.name)) {
         return toast("仅支持 MP4 文件");
@@ -6783,6 +6864,50 @@
         })();
       } catch (err) {
         if (panel.isConnected) progress.textContent = err.message || "上传失败";
+      }
+    }
+    panel.querySelector("[data-evp-pick]").addEventListener("click", () => evpFile.click());
+    evpFile.addEventListener("change", () => {
+      const f = evpFile.files[0];
+      evpFile.value = ""; // 允许再次选择同一个文件
+      uploadArticleVideo(f);
+    });
+    // 封面：上传按钮 / 粘贴图片 → 回填封面地址
+    const posterFile = panel.querySelector("[data-evp-poster-file]");
+    const uploadEvpPoster = async file => {
+      const old = posterInput.value;
+      posterInput.value = "上传中…";
+      try {
+        const d = await uploadMedia(file, "image", () => {});
+        if (posterInput.isConnected) { posterInput.value = d.src; posterInput.dispatchEvent(new Event("input")); }
+        toast("封面已上传");
+      } catch (err) {
+        if (posterInput.isConnected) posterInput.value = old;
+        toast(err.message);
+      }
+    };
+    panel.querySelector("[data-evp-poster-upload]").addEventListener("click", () => posterFile.click());
+    posterFile.addEventListener("change", () => {
+      const f = posterFile.files[0];
+      posterFile.value = "";
+      if (f) uploadEvpPoster(f);
+    });
+    // 面板内粘贴分流：封面框聚焦→回填封面；上传 MP4 标签可见→粘贴视频上传
+    panel.addEventListener("paste", e => {
+      const cd = e.clipboardData;
+      if (!cd) return;
+      const items = [...cd.items];
+      const imgFile = items.find(it => it.kind === "file" && it.type.startsWith("image/"))?.getAsFile();
+      const videoFile = items.find(it => it.kind === "file" && (it.type.startsWith("video/") || /\.mp4$/i.test(it.getAsFile?.()?.name || "")))?.getAsFile();
+      if (document.activeElement === posterInput && imgFile) {
+        e.preventDefault();
+        uploadEvpPoster(imgFile);
+        return;
+      }
+      const mp4p = panel.querySelector('[data-vpanel="mp4-upload"]');
+      if (mp4p && !mp4p.hidden && videoFile) {
+        e.preventDefault();
+        uploadArticleVideo(videoFile);
       }
     });
     // 在线地址
