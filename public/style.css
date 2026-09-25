@@ -593,6 +593,12 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
 }
 .emoji-grid span { display: inline-block; cursor: pointer; padding: .1rem; border-radius: 4px; transition: background .1s; }
 .emoji-grid span:hover { background: var(--anzhiyu-main-op); }
+/* 表情格子（lucide 图标 / OwO 图片统一） */
+.emoji-cell { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: none; background: transparent; border-radius: 6px; cursor: pointer; }
+.emoji-cell:hover { background: var(--anzhiyu-main-op); }
+.emoji-cell img { width: 26px; height: 26px; object-fit: contain; display: block; }
+/* 评论正文里渲染出的图片表情 */
+.comment-emoji { display: inline-block; height: 24px; width: auto; vertical-align: -0.35em; margin: 0 1px; }
 /* 评论图片展示 */
 .comment-images { display: flex; gap: .4rem; flex-wrap: wrap; margin: .4rem 0; }
 .comment-img { width: 80px; height: 80px; border-radius: 6px; object-fit: cover; cursor: pointer; border: 1px solid var(--anzhiyu-card-border); }

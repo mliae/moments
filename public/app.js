@@ -91,6 +91,7 @@
     ai_text_model: "",
     qq_nick_apis: "",
     site_icon: "",
+    comment_emoji_owo_url: "/owo.json",
   };
 
   const state = {
@@ -1525,6 +1526,8 @@
   /** 把站点设置应用到顶栏品牌名 / 导航文字 / 文档标题 */
   function applySettings() {
     const s = state.settings;
+    // 表情包 URL 可能在后台变更，清缓存后下次打开面板重新拉取
+    resetOwoCache();
     const iconLink = document.querySelector('link[rel="icon"]');
     if (iconLink) iconLink.href = iconToHref(s.site_icon);
     document.querySelector(".brand-name").textContent = s.site_title;
@@ -1714,7 +1717,7 @@
 
   /** 评论内容 @ 提及高亮：转义后包裹 @username */
   function formatCommentContent(text) {
-    return reactionTokenToSvg(esc(text))
+    return owoTokenToImg(reactionTokenToSvg(esc(text)))
       .replace(/@([^\s@<>，。！？、（）]+)/g, '<span class="comment-mention">@$1</span>');
   }
 
@@ -1745,6 +1748,53 @@
     });
   }
 
+  /* ---------- OwO 表情包（后台 comment_emoji_owo_url 指向的 owo.json） ---------- */
+  let owoPacksCache = null; // [{ name, items:[{ token, slug, url }] }]
+  let owoSlugMap = null; // slug -> 图片 url
+  /** 加载并解析 OwO 包；失败返回空数组，不影响 lucide 默认表情 */
+  async function loadOwoPacks() {
+    if (owoPacksCache) return owoPacksCache;
+    owoPacksCache = [];
+    owoSlugMap = {};
+    const url = (state.settings?.comment_emoji_owo_url || "/owo.json").trim() || "/owo.json";
+    try {
+      const r = await fetch(url, { cache: "no-cache" });
+      if (!r.ok) throw new Error("owo http " + r.status);
+      const data = await r.json();
+      for (const [name, pack] of Object.entries(data)) {
+        if (!pack || pack.type !== "image" || !Array.isArray(pack.container)) continue;
+        const items = [];
+        for (const it of pack.container) {
+          if (!it || !it.icon) continue;
+          const m = String(it.icon).match(/src\s*=\s*["']([^"']+)["']/i);
+          if (!m) continue;
+          let token = it.data && String(it.data).trim() ? String(it.data).trim() : `::(${it.text})`;
+          if (!/^::\(.+\)$/.test(token)) token = `::(${token.replace(/^::\(|\)$/g, "")})`;
+          const slug = token.slice(3, -1); // 去掉 ::( 与 )
+          items.push({ token, slug, url: m[1] });
+          if (!(slug in owoSlugMap)) owoSlugMap[slug] = m[1];
+        }
+        if (items.length) owoPacksCache.push({ name, items });
+      }
+    } catch (e) {
+      console.warn("[owo] 表情包加载失败：", e);
+    }
+    return owoPacksCache;
+  }
+  /** 评论里 ::(slug): → <img>（供 formatCommentContent 用） */
+  function owoTokenToImg(text) {
+    if (!owoSlugMap) return text;
+    return text.replace(/::\(([^()\n]+)\)/g, (m, slug) => {
+      const u = owoSlugMap[slug];
+      return u ? `<img class="comment-emoji" src="${esc(u)}" alt="${esc(slug)}" loading="lazy">` : m;
+    });
+  }
+  /** 清空 OwO 缓存（后台更换表情包 URL 后调用） */
+  function resetOwoCache() {
+    owoPacksCache = null;
+    owoSlugMap = null;
+  }
+
   // 随机评论库（50 条，4 类）
   const RANDOM_COMMENTS = [
     // 夸赞类
@@ -1760,8 +1810,27 @@
   /** 当前表情面板活动 textarea 引用 */
   let emojiPanelTarget = null;
 
-  /** 打开/关闭表情面板（lucide 小图标），定位在指定 textarea 上方 */
-  function toggleEmojiPanel(textarea) {
+  /** 向当前表情面板目标 textarea 的光标处插入文本 */
+  function insertIntoTarget(token) {
+    const ta = emojiPanelTarget;
+    if (!ta) return;
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    ta.value = ta.value.slice(0, start) + token + ta.value.slice(end);
+    ta.selectionStart = ta.selectionEnd = start + token.length;
+    ta.focus();
+  }
+
+  /** 渲染某分类表情网格：type=lucide 用内置图标，type=owo 用图片 */
+  function emojiGridHtml(type, pack) {
+    if (type === "lucide") return reactionGridHtml();
+    return pack.items.map(it =>
+      `<button type="button" class="emoji-cell" data-owo="${esc(it.token)}" title="${esc(it.slug)}"><img src="${esc(it.url)}" alt="${esc(it.slug)}" loading="lazy"></button>`
+    ).join("");
+  }
+
+  /** 打开/关闭表情面板（默认 lucide + 后台 OwO 包，多 Tab），定位在 textarea 上方 */
+  async function toggleEmojiPanel(textarea) {
     let panel = document.getElementById("emojiPanel");
     if (panel && panel.dataset.targetId === textarea.id) {
       panel.remove();
@@ -1769,13 +1838,32 @@
     }
     if (panel) panel.remove();
     emojiPanelTarget = textarea;
+    const packs = await loadOwoPacks();
     panel = document.createElement("div");
     panel.id = "emojiPanel";
     panel.className = "emoji-panel";
     panel.dataset.targetId = textarea.id || "";
+    // 分类：默认（lucide）+ 后台 OwO 各包
+    const tabs = [{ t: "lucide", name: "默认" }].concat(packs.map((p, i) => ({ t: "owo", name: p.name, idx: i })));
     panel.innerHTML = `
-      <div class="emoji-grid" data-emoji-grid>${reactionGridHtml()}</div>
+      <div class="emoji-tabs">
+        ${tabs.map((tb, i) => `<button type="button" class="emoji-tab${i === 0 ? " is-active" : ""}" data-etab="${i}">${esc(tb.name)}</button>`).join("")}
+      </div>
+      <div class="emoji-grid" data-emoji-grid></div>
     `;
+    const grid = panel.querySelector("[data-emoji-grid]");
+    function renderTab(i) {
+      const tb = tabs[i];
+      grid.innerHTML = tb.t === "lucide" ? emojiGridHtml("lucide") : emojiGridHtml("owo", packs[tb.idx]);
+    }
+    renderTab(0);
+    panel.querySelector(".emoji-tabs").addEventListener("click", e => {
+      const btn = e.target.closest && e.target.closest("[data-etab]");
+      if (!btn) return;
+      panel.querySelectorAll(".emoji-tab").forEach(b => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
+      renderTab(Number(btn.dataset.etab));
+    });
     // 定位
     const rect = textarea.getBoundingClientRect();
     panel.style.position = "fixed";
@@ -1783,18 +1871,11 @@
     panel.style.bottom = (window.innerHeight - rect.top + 4) + "px";
     panel.style.zIndex = "10001";
     document.body.appendChild(panel);
-    // 点击图标：插入短码 token「:key:」到 textarea 光标位置
+    // 点击格子：插入对应 token（lucide→:key:，owo→::(slug)）
     panel.addEventListener("click", e => {
-      const cell = e.target.closest && e.target.closest("[data-reaction]");
-      if (cell && emojiPanelTarget) {
-        const token = `:${cell.dataset.reaction}:`;
-        const ta = emojiPanelTarget;
-        const start = ta.selectionStart;
-        const end = ta.selectionEnd;
-        ta.value = ta.value.slice(0, start) + token + ta.value.slice(end);
-        ta.selectionStart = ta.selectionEnd = start + token.length;
-        ta.focus();
-      }
+      const cell = e.target.closest && e.target.closest("[data-reaction], [data-owo]");
+      if (!cell || !emojiPanelTarget) return;
+      insertIntoTarget(cell.dataset.reaction ? `:${cell.dataset.reaction}:` : cell.dataset.owo);
     });
     // 点击面板外部关闭
     setTimeout(() => {
@@ -4876,6 +4957,10 @@
           <div class="field-hint" data-avatar-preview="site_icon" style="margin-top:.4rem">${/^https?:\/\//i.test(s.site_icon || "") ? `<img src="${esc(s.site_icon)}" alt="" style="width:48px;height:48px;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
         </div>
         <div class="field">
+          <label>评论表情包（OwO JSON 地址）<br /><small style="color:var(--anzhiyu-secondtext)">评论区表情面板的图片表情来源，OwO 格式 JSON；默认站内 /owo.json。可换成任意 owo.json 直链（如 Twikoo/Artalk 表情包），留空=用默认</small></label>
+          <input name="comment_emoji_owo_url" maxlength="500" value="${esc(s.comment_emoji_owo_url)}" placeholder="/owo.json" />
+        </div>
+        <div class="field">
           <label>说说作者昵称<br /><small style="color:var(--anzhiyu-secondtext)">卡片左上角昵称；未设置作者头像时，头像显示昵称首字符</small></label>
           <input name="author_name" maxlength="32" value="${esc(s.author_name)}" />
         </div>
@@ -7748,7 +7833,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
@@ -8256,6 +8341,7 @@
       /* 后端不可用时使用兜底默认值 */
     }
     applySettings();
+    await loadOwoPacks(); // 预加载表情包，确保首屏评论里的 ::(slug): 能渲染成图片
     await refreshAdmin();
     route();
     initMusicPlayer();
