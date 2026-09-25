@@ -1227,17 +1227,17 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
 
 @media (max-width: 900px) {
   .admin-app { flex-direction: column; position: relative; }
-  /* 遮罩层：打开抽屉时出现，点击关闭 */
+  /* 遮罩层：打开抽屉时出现，点击关闭（层级高于站点顶栏 z-index:90，避免被盖住） */
   .admin-side-mask {
-    display: block; position: fixed; inset: 0; z-index: 60;
+    display: block; position: fixed; inset: 0; z-index: 95;
     background: rgb(0 0 0 / .42); backdrop-filter: blur(2px);
     opacity: 0; visibility: hidden; transition: opacity .25s, visibility .25s;
   }
   .admin-app.is-open .admin-side-mask { opacity: 1; visibility: visible; }
-  /* 侧栏 → 左侧滑入抽屉 */
+  /* 侧栏 → 左侧滑入抽屉（层级高于顶栏，避免顶部被导航条遮挡） */
   .admin-side {
-    position: fixed; top: 0; left: 0; bottom: 0; z-index: 70;
-    width: 270px; max-width: 84vw; margin: 0; padding: 1.1rem .9rem;
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 100;
+    width: 270px; max-width: 84vw; margin: 0; padding: calc(1.1rem + env(safe-area-inset-top, 0px)) .9rem 1.1rem;
     border-left: none; border-radius: 0 18px 18px 0;
     transform: translateX(-106%); transition: transform .3s cubic-bezier(.22,.61,.36,1);
     overflow-y: auto;
