@@ -1644,14 +1644,14 @@ body.music-visible .fab-publish { bottom: 6rem; }
   background: var(--anzhiyu-background); border: var(--style-border-always);
   border-radius: 10px; animation: music-fade-up .2s ease;
 }
-.editor-music-panel .emp-row { display: flex; gap: 6px; }
-.editor-music-panel .emp-row input {
-  flex: 1; padding: 7px 10px; font-size: .85rem;
+.emp-row { display: flex; gap: 6px; align-items: center; }
+.emp-row input {
+  flex: 1; min-width: 0; padding: 7px 10px; font-size: .85rem;
   border: var(--style-border-always); border-radius: 6px;
   background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcolor); outline: none;
 }
-.editor-music-panel .emp-row input:focus { border-color: var(--anzhiyu-main); }
-.editor-music-panel .emp-row .btn { padding: 5px 12px; font-size: .8rem; }
+.emp-row input:focus { border-color: var(--anzhiyu-main); }
+.emp-row .btn { padding: 5px 12px; font-size: .8rem; flex-shrink: 0; white-space: nowrap; }
 .editor-music-panel .emp-help { margin-top: 6px; font-size: .72rem; color: var(--anzhiyu-secondtext); line-height: 1.6; }
 .editor-music-panel .emp-help code { background: var(--anzhiyu-main-op); color: var(--anzhiyu-main); padding: 1px 5px; border-radius: 3px; font-size: .7rem; }
 .editor-music-panel input[type="file"] { font-size: .8rem; margin-bottom: 6px; }
