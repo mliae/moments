@@ -3412,7 +3412,7 @@
             <button type="button" data-vtab="url">在线地址</button>
           </div>
           <div data-vpanel="mp4-upload">
-            <button type="button" class="btn block" data-video-pick>${mdIcon("upload")}上传 MP4</button>
+            <button type="button" class="btn block" data-video-pick>上传 MP4</button>
             <input type="file" accept="video/mp4" name="video-file" hidden />
             <div class="upload-progress" data-video-progress></div>
             <p class="field-hint">也可直接 Ctrl+V 粘贴视频文件上传（建议 ≤100MB）。</p>
@@ -6792,7 +6792,7 @@
         <button type="button" data-vtab="url">在线地址</button>
       </div>
       <div data-vpanel="mp4-upload">
-        <button type="button" class="btn block" data-evp-pick>${mdIcon("upload")}上传 MP4</button>
+        <button type="button" class="btn block" data-evp-pick>上传 MP4</button>
         <input type="file" accept="video/mp4" data-evp-file hidden />
         <div class="upload-progress" data-evp-progress></div>
         <div class="emp-help">MP4 建议 ≤100MB；支持 Ctrl+V 粘贴视频上传。更大的视频请先传到对象存储/网盘，再用「在线地址」插入 <code>.m3u8</code> 或 <code>.mp4</code> 直链。</div>
