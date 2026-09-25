@@ -1092,8 +1092,7 @@
     iframe.frameBorder = "0";
     iframe.allowFullscreen = true;
     iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen");
-    // 去掉 allow-popups：拦截播放器内点击（up主/标题等）打开新标签页跳走
-    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation");
+    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups");
     el.innerHTML = "";
     el.appendChild(iframe);
   }
