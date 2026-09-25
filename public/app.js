@@ -1398,7 +1398,7 @@
 
   function bannerHtml() {
     const s = state.settings;
-    const bg = /^https?:\/\//i.test(s.banner_bg_image || "") ? s.banner_bg_image : "";
+    const bg = s.banner_bg_mode === "random" ? "/api/bg" : (/^https?:\/\//i.test(s.banner_bg_image || "") ? s.banner_bg_image : "");
     const customUrl = /^https?:\/\//i.test(s.banner_button_url || "") ? s.banner_button_url : "";
     return `
     <div class="banner-card">
@@ -1550,7 +1550,7 @@
       title: fq ? `搜索「${fq}」 · ${s0.site_title}` : s0.site_title,
       description: s0.essay_subtitle,
       path: fq ? "/?q=" + encodeURIComponent(fq) : "/",
-      image: s0.banner_bg_image,
+      image: s0.banner_bg_mode === "random" ? location.origin + "/api/bg" : s0.banner_bg_image,
     });
     state.feed = [];
     state.cursor = null;
@@ -2480,7 +2480,7 @@
       const s = state.settings;
       setSeo({ title: `相册 · ${s.site_title}`, description: `共 ${total} 张图片`, path: "/photos" });
       // 横幅背景图与首页一致（后台「横幅背景图」设置）
-      const bg = /^https?:\/\//i.test(s.banner_bg_image || "") ? s.banner_bg_image : "";
+      const bg = s.banner_bg_mode === "random" ? "/api/bg" : (/^https?:\/\//i.test(s.banner_bg_image || "") ? s.banner_bg_image : "");
       // 顶部标题卡（与首页横幅风格呼应）
       const header = `
         <div class="banner-card photos-banner">
@@ -4724,13 +4724,33 @@
           </select>
         </div>
         <div class="field">
-          <label>背景图（可选）<br /><small style="color:var(--anzhiyu-secondtext)">直接填图片 URL，或点击"上传"选择本地图片（存入 R2）</small></label>
+          <label>背景图模式</label>
+          <select name="banner_bg_mode" data-bg-mode>
+            <option value="static"${s.banner_bg_mode !== "random" ? " selected" : ""}>固定图片</option>
+            <option value="random"${s.banner_bg_mode === "random" ? " selected" : ""}>随机图片（本站代理缓存，更快更稳）</option>
+          </select>
+        </div>
+        <div class="field" data-bg-panel="static">
+          <label>背景图 URL（可选）<br /><small style="color:var(--anzhiyu-secondtext)">填图片 URL，或点"上传"存到 R2；留空用默认渐变</small></label>
           <div style="display:flex;gap:.5rem;align-items:center">
             <input name="banner_bg_image" maxlength="500" value="${esc(s.banner_bg_image)}" placeholder="https://... 或留空使用默认渐变" style="flex:1" />
             <button type="button" class="btn" data-banner-upload>上传</button>
             <input type="file" accept="image/*" data-banner-file hidden />
           </div>
           <div class="field-hint" data-banner-preview style="margin-top:.4rem">${s.banner_bg_image ? `<img src="${esc(s.banner_bg_image)}" alt="" style="max-width:100%;max-height:120px;border-radius:8px;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
+        </div>
+        <div class="field" data-bg-panel="random">
+          <label>随机图源 URL<br /><small style="color:var(--anzhiyu-secondtext)">需包含 <code>{seed}</code> 占位符；同一时间桶内返回同一张图，命中本站缓存</small></label>
+          <input name="banner_bg_source" maxlength="500" value="${esc(s.banner_bg_source)}" placeholder="https://picsum.photos/seed/{seed}/1350/300" />
+          <label style="margin-top:.6rem">换图频率</label>
+          <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+            <button type="button" class="btn" data-bg-int="1">每小时</button>
+            <button type="button" class="btn" data-bg-int="24">每天</button>
+            <button type="button" class="btn" data-bg-int="168">每周</button>
+            <input type="number" name="banner_bg_interval" min="1" max="720" value="${esc(s.banner_bg_interval)}" style="width:120px" aria-label="自定义小时" />
+            <span style="font-size:.8rem;color:var(--anzhiyu-secondtext)">小时（可自定义 1-720）</span>
+          </div>
+          <div class="field-hint" style="margin-top:.4rem">预览：<a href="/api/bg" target="_blank" rel="noopener" style="color:var(--anzhiyu-main)">/api/bg</a>（新标签打开，图片经本站抓取后缓存到 R2）</div>
         </div>
 
         <div class="admin-panel-head" style="margin-top:1.75rem"><h3>页脚</h3></div>
@@ -4846,6 +4866,25 @@
         }
       });
     }
+
+    // 背景图：模式切换显示对应面板 + 频率预设按钮
+    const bgMode = panel.querySelector("[data-bg-mode]");
+    if (bgMode) {
+      const applyBgPanels = () => {
+        const m = bgMode.value;
+        panel.querySelectorAll("[data-bg-panel]").forEach(p => {
+          p.style.display = p.getAttribute("data-bg-panel") === m ? "" : "none";
+        });
+      };
+      bgMode.addEventListener("change", applyBgPanels);
+      applyBgPanels();
+    }
+    panel.querySelectorAll("[data-bg-int]").forEach(b =>
+      b.addEventListener("click", () => {
+        const inp = panel.querySelector('[name="banner_bg_interval"]');
+        if (inp) inp.value = b.getAttribute("data-bg-int");
+      })
+    );
 
     // 头像类字段上传 + URL 实时预览
     const avatarPreviewHtml = url =>
@@ -7444,7 +7483,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;

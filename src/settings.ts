@@ -45,6 +45,9 @@ export interface SiteSettings {
   banner_button_url: string; // 横幅按钮链接（空=默认 发布/登录 行为）
   banner_button_target: string; // 横幅外链打开方式：_blank=新标签（默认），_self=当前标签
   banner_bg_image: string; // 横幅背景图 URL（后台上传或外链）
+  banner_bg_mode: string; // 横幅背景模式：static=固定图（用 banner_bg_image），random=随机图源（走 /api/bg 缓存）
+  banner_bg_source: string; // 随机图源 URL 模板，需含 {seed} 占位（默认 picsum）
+  banner_bg_interval: string; // 随机图换图频率：多少小时换一张（数字字符串，默认 24=每天）
   // 页脚
   footer_text: string; // 页脚文案（支持 HTML）
   footer_run_since: string; // 网站运行起始时间 ISO 字符串，空=不显示运行时长
@@ -134,6 +137,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   banner_button_url: "",
   banner_button_target: "_blank",
   banner_bg_image: "",
+  banner_bg_mode: "static",
+  banner_bg_source: "https://picsum.photos/seed/{seed}/1350/300",
+  banner_bg_interval: "24",
   footer_text: "",
   footer_run_since: "",
   feed_page_size: "20",
@@ -196,6 +202,9 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   banner_button_url: 500,
   banner_button_target: 10,
   banner_bg_image: 500,
+  banner_bg_mode: 10,
+  banner_bg_source: 500,
+  banner_bg_interval: 4,
   footer_text: 2000,
   footer_run_since: 40,
   feed_page_size: 3,
@@ -283,6 +292,12 @@ export function normalizeSettings(raw: Record<string, unknown> | null | undefine
   out.feed_page_size = Number.isFinite(fps)
     ? String(Math.max(1, Math.min(50, fps)))
     : DEFAULT_SETTINGS.feed_page_size;
+  // 随机背景换图频率（小时）：1-720，非法回退默认
+  const bi = parseInt(out.banner_bg_interval, 10);
+  out.banner_bg_interval = Number.isFinite(bi)
+    ? String(Math.max(1, Math.min(720, bi)))
+    : DEFAULT_SETTINGS.banner_bg_interval;
+  if (out.banner_bg_mode !== "static" && out.banner_bg_mode !== "random") out.banner_bg_mode = DEFAULT_SETTINGS.banner_bg_mode;
   return out;
 }
 

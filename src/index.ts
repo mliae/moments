@@ -23,6 +23,7 @@ import friendRoutes, { adminFriendRoutes } from "./routes/friends";
 import searchRoutes from "./routes/search";
 import indexnowAdminRoutes from "./routes/indexnow";
 import baiduAdminRoutes from "./routes/baidu";
+import bgRoutes from "./routes/bg";
 import { getSettings } from "./settings";
 import { keyToSrc, ensureSchema, type PostRow } from "./db";
 import { isAdmin, hasAdminPassword } from "./auth";
@@ -108,6 +109,7 @@ app.route("/api", miscRoutes);
 app.route("/api/search", searchRoutes);
 app.route("/api/admin/indexnow", indexnowAdminRoutes);
 app.route("/api/admin/baidu", baiduAdminRoutes);
+app.route("/api/bg", bgRoutes);
 
 app.get("/media/*", serveMedia);
 
@@ -300,7 +302,9 @@ app.get("/", async c => {
   const s = await getSettings(c.env.DB);
   const origin = new URL(c.req.url).origin;
   const html = await getIndexHtml(c);
-  const image = /^https?:\/\//i.test(s.banner_bg_image || "")
+  const image = s.banner_bg_mode === "random"
+    ? absoluteUrl(origin, "/api/bg", s.site_domain)
+    : /^https?:\/\//i.test(s.banner_bg_image || "")
     ? s.banner_bg_image
     : s.banner_bg_image
       ? absoluteUrl(origin, s.banner_bg_image, s.site_domain)
