@@ -106,6 +106,15 @@ CREATE TABLE IF NOT EXISTS friends (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_friends_status ON friends (status, sort_order ASC, id DESC);
+CREATE TABLE IF NOT EXISTS indexnow_log (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  url        TEXT NOT NULL DEFAULT '',
+  endpoint   TEXT NOT NULL DEFAULT '',
+  status     TEXT NOT NULL DEFAULT '',  -- ok / fail
+  message    TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_indexnow_log_created ON indexnow_log (created_at DESC);
 `;
 
 let schemaPromise: Promise<void> | null = null;

@@ -74,6 +74,10 @@ export interface SiteSettings {
   qq_ckqq: string; // 系统 QQ 号
   qq_skey: string; // 系统 QQ 的 skey
   qq_pskey: string; // 系统 QQ 的 pskey（p_skey）
+  // IndexNow 搜索推送
+  indexnow_key: string; // IndexNow 密钥（去 Bing 站长平台生成）；空=未启用推送
+  indexnow_endpoints: string; // 推送端点列表，每行一个 URL（默认含 Bing/统一入口/百度）
+  indexnow_auto: boolean; // 发布/更新已发布文章时是否自动推送
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -147,6 +151,12 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   qq_ckqq: "",
   qq_skey: "",
   qq_pskey: "",
+  indexnow_key: "",
+  indexnow_endpoints:
+    "https://api.indexnow.org/indexnow\n" +
+    "https://www.bing.com/indexnow\n" +
+    "https://api.indexnow.baidu.com/indexnow",
+  indexnow_auto: true,
 };
 
 /** 字符串字段约束：最大长度 */
@@ -199,6 +209,8 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   qq_ckqq: 20,
   qq_skey: 200,
   qq_pskey: 256,
+  indexnow_key: 128,
+  indexnow_endpoints: 1500,
 };
 
 /**
@@ -224,6 +236,7 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "about_enabled",
   "links_enabled",
   "photos_enabled",
+  "indexnow_auto",
 ];
 
 export function clampSetting(value: unknown, max: number): string {

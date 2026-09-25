@@ -2059,3 +2059,15 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 .search-more { display: block; padding: .5rem .7rem; font-size: .8rem; color: var(--anzhiyu-main); text-decoration: none; border-radius: 8px; }
 .search-more:hover { background: var(--anzhiyu-secondbg); }
 
+/* IndexNow 推送记录 */
+.indexnow-log details { margin: 0; }
+.indexnow-log summary { list-style: none; }
+.indexnow-log summary::-webkit-details-marker { display: none; }
+.indexnow-log-row { display: flex; align-items: center; gap: .6rem; padding: .4rem .6rem; background: var(--anzhiyu-secondbg); border-radius: 8px; font-size: .78rem; }
+.indexnow-log-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.indexnow-log-row .dot.ok { background: #5cb85c; }
+.indexnow-log-row .dot.fail { background: #e74c3c; }
+.indexnow-log-row .in-url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--anzhiyu-fontcolor); }
+.indexnow-log-row .in-ep { color: var(--anzhiyu-secondtext); font-size: .72rem; flex-shrink: 0; }
+.indexnow-log-row .in-time { color: var(--anzhiyu-secondtext); font-size: .72rem; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+

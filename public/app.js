@@ -5136,6 +5136,9 @@
     const origin = location.origin.replace(/\/$/, "");
     const site = (state.settings.site_domain || origin).replace(/^https?:\/\//, "").replace(/\/.*$/, "");
     const enc = encodeURIComponent(site);
+    let cfg = {};
+    try { cfg = await api("/api/admin/settings"); } catch { /* 未登录则用空对象 */ }
+    const defEndpoints = "https://api.indexnow.org/indexnow\nhttps://www.bing.com/indexnow\nhttps://api.indexnow.baidu.com/indexnow";
     const items = [
       { label: "站点地图 sitemap.xml", url: `${origin}/sitemap.xml`, tip: "提交给搜索引擎，列出所有可收录页面" },
       { label: "爬虫规则 robots.txt", url: `${origin}/robots.txt`, tip: "声明允许/禁止抓取的路径与 sitemap 位置" },
@@ -5165,11 +5168,91 @@
         <a class="btn" href="https://search.google.com/search-console?resource_id=${encodeURIComponent("sc-domain:" + site)}" target="_blank" rel="noopener" style="justify-content:center">Google Search Console</a>
         <a class="btn ghost" href="https://www.bing.com/indexnow" target="_blank" rel="noopener" style="justify-content:center">了解 IndexNow 自动推送</a>
       </div>
-      <p style="color:var(--anzhiyu-secondtext);margin-top:1rem;font-size:.78rem">提示：各平台需先验证站点归属（按平台指引添加 TXT 或上传文件），验证后即可提交 sitemap 并查看收录情况。</p>`;
+      <p style="color:var(--anzhiyu-secondtext);margin-top:1rem;font-size:.78rem">提示：各平台需先验证站点归属（按平台指引添加 TXT 或上传文件），验证后即可提交 sitemap 并查看收录情况。</p>
+
+      <div class="admin-panel-head" style="margin-top:1.8rem"><h3>IndexNow 自动推送</h3></div>
+      <p style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:-.4rem 0 1rem">填写后，发布/更新已发布文章会自动通知搜索引擎重抓。先去 <a href="https://www.bing.com/indexnow" target="_blank" rel="noopener" style="color:var(--anzhiyu-main)">Bing IndexNow</a> 生成一个 key，填到下方保存即可（key 会通过站点的 <code>/indexnow-key.txt</code> 对外暴露，用于归属验证）。</p>
+      <form class="settings-form" data-indexnow-form style="max-width:640px;display:flex;flex-direction:column;gap:.75rem">
+        <div class="field">
+          <label>IndexNow Key</label>
+          <input name="indexnow_key" value="${esc(cfg.indexnow_key || "")}" placeholder="粘贴 Bing 生成的 key" maxlength="128" />
+          <small style="color:var(--anzhiyu-secondtext)">保存后可访问 <a href="${origin}/indexnow-key.txt" target="_blank" rel="noopener" style="color:var(--anzhiyu-main)">${origin}/indexnow-key.txt</a> 验证是否返回该 key。</small>
+        </div>
+        <div class="field">
+          <label>推送端点（每行一个，留空恢复默认）</label>
+          <textarea name="indexnow_endpoints" rows="4" placeholder="${esc(defEndpoints)}">${esc(cfg.indexnow_endpoints || defEndpoints)}</textarea>
+        </div>
+        <label style="display:flex;align-items:center;gap:.5rem;font-size:.88rem;cursor:pointer">
+          <input type="checkbox" name="indexnow_auto" ${cfg.indexnow_auto !== false ? "checked" : ""} />
+          发布/更新已发布文章时自动推送
+        </label>
+        <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+          <button class="btn primary" type="submit">保存配置</button>
+          <span data-indexnow-msg style="font-size:.82rem;color:var(--anzhiyu-secondtext)"></span>
+        </div>
+      </form>
+
+      <div style="margin-top:1.4rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+        <button class="btn" type="button" data-indexnow-push>推送最近 10 篇</button>
+        <input type="number" min="1" max="50" value="10" data-indexnow-n style="width:90px" aria-label="推送篇数" />
+        <span data-indexnow-push-msg style="font-size:.82rem;color:var(--anzhiyu-secondtext)"></span>
+      </div>
+
+      <details class="indexnow-log" style="margin-top:1.6rem">
+        <summary style="cursor:pointer;font-weight:700;font-size:.92rem">最近推送记录（点击展开）</summary>
+        <div data-indexnow-log style="margin-top:.8rem;display:flex;flex-direction:column;gap:.4rem"></div>
+      </details>`;
     panel.querySelectorAll("[data-copy]").forEach(btn => btn.addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(btn.dataset.copy); toast("已复制：" + btn.dataset.copy); }
       catch { toast("复制失败，请手动复制", 1); }
     }));
+
+    // 保存 IndexNow 配置
+    const inForm = panel.querySelector("[data-indexnow-form]");
+    inForm?.addEventListener("submit", async e => {
+      e.preventDefault();
+      const msg = panel.querySelector("[data-indexnow-msg]");
+      const fd = new FormData(inForm);
+      const patch = {
+        indexnow_key: String(fd.get("indexnow_key") || "").trim(),
+        indexnow_endpoints: String(fd.get("indexnow_endpoints") || "").trim(),
+        indexnow_auto: inForm.querySelector("[name=indexnow_auto]").checked,
+      };
+      try {
+        await api("/api/admin/settings", { method: "PUT", body: patch });
+        msg.textContent = "已保存 ✓";
+        setTimeout(() => { msg.textContent = ""; }, 2000);
+      } catch (err) { msg.textContent = err.message || "保存失败"; }
+    });
+
+    // 手动推送最近 N 篇
+    const loadLog = async () => {
+      const box = panel.querySelector("[data-indexnow-log]");
+      if (!box) return;
+      try {
+        const d = await api("/api/admin/indexnow/log");
+        const list = d.list || [];
+        if (!list.length) { box.innerHTML = `<div style="color:var(--anzhiyu-secondtext);font-size:.8rem;padding:.5rem 0">暂无推送记录</div>`; return; }
+        box.innerHTML = list.map(r => `<div class="indexnow-log-row">
+          <span class="dot ${r.status === "ok" ? "ok" : "fail"}"></span>
+          <span class="in-url">${esc(r.url)}</span>
+          <span class="in-ep">${esc(r.endpoint.replace(/^https?:\/\//, "").split("/")[0])}</span>
+          <span class="in-time">${esc((r.created_at || "").replace("T", " ").slice(0, 19))}</span>
+        </div>`).join("");
+      } catch { box.innerHTML = `<div style="color:var(--anzhiyu-secondtext);font-size:.8rem">记录加载失败</div>`; }
+    };
+    const logDetails = panel.querySelector("details.indexnow-log");
+    logDetails?.addEventListener("toggle", () => { if (logDetails.open) loadLog(); });
+    panel.querySelector("[data-indexnow-push]")?.addEventListener("click", async () => {
+      const n = Number(panel.querySelector("[data-indexnow-n]").value) || 10;
+      const msg = panel.querySelector("[data-indexnow-push-msg]");
+      msg.textContent = "推送中…";
+      try {
+        const d = await api("/api/admin/indexnow/push", { method: "POST", body: { n } });
+        msg.textContent = `✓ 推送 ${d.pushed} 篇，${d.ok}/${d.total} 端点成功`;
+        loadLog();
+      } catch (err) { msg.textContent = err.message || "推送失败"; }
+    });
   }
 
   /* ---------- 后台 Tab：安全 ---------- */

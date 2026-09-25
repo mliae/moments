@@ -21,6 +21,7 @@ import miscRoutes from "./routes/misc";
 import photoRoutes, { adminPhotoRoutes } from "./routes/photos";
 import friendRoutes, { adminFriendRoutes } from "./routes/friends";
 import searchRoutes from "./routes/search";
+import indexnowAdminRoutes from "./routes/indexnow";
 import { getSettings } from "./settings";
 import { keyToSrc, ensureSchema, type PostRow } from "./db";
 import { isAdmin, hasAdminPassword } from "./auth";
@@ -83,9 +84,10 @@ app.get("/api/settings", async c => {
   // 私密字段绝不下发：后台入口、apihz 凭证、QQ 登录态
   const {
     admin_path: _h1, apihz_id: _h2, apihz_key: _h3, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
+    indexnow_key: _h7,
     ...publicSettings
   } = s;
-  void [_h1, _h2, _h3, _h4, _h5, _h6];
+  void [_h1, _h2, _h3, _h4, _h5, _h6, _h7];
   const res = ok(c, publicSettings);
   res.headers.set("Cache-Control", "public, max-age=60, s-maxage=300");
   return res;
@@ -103,6 +105,7 @@ app.route("/api/feed", feedRoutes);
 app.route("/api/music", musicRoutes);
 app.route("/api", miscRoutes);
 app.route("/api/search", searchRoutes);
+app.route("/api/admin/indexnow", indexnowAdminRoutes);
 
 app.get("/media/*", serveMedia);
 
@@ -236,6 +239,14 @@ app.get("/feed", async c => {
   return c.text(rssXml(origin, s, posts), 200, {
     "content-type": "application/rss+xml; charset=utf-8",
   });
+});
+
+// IndexNow key 校验文件：搜索引擎抓取此文件验证 key 归属；未配置 key 时返回 404
+app.get("/indexnow-key.txt", async c => {
+  const s = await getSettings(c.env.DB);
+  const key = (s.indexnow_key || "").trim();
+  if (!key) return c.text("Not Found", 404);
+  return c.text(key, 200, { "content-type": "text/plain; charset=utf-8" });
 });
 
 /* ==================== HTML SSR ==================== */
