@@ -753,6 +753,9 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
 }
 /* 圆角改由 iframe 自身承担，容器不 overflow:hidden——避免裁掉 B 站底部控制条 */
 .video-embed-frame { width: 100%; height: 100%; border: 0; display: block; border-radius: 12px; }
+/* YouTube 被墙时的友好提示 */
+.video-embed-notice { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; width: 100%; height: 100%; padding: 1rem; box-sizing: border-box; color: #fff; text-align: center; font-size: .9rem; }
+.video-embed-notice a { color: #9ec5ff; text-decoration: underline; }
 .video-embed-cover { position: absolute; inset: 0; }
 .video-embed-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .video-embed-cover::after {

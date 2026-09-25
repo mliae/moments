@@ -1083,6 +1083,48 @@
     }
   }
 
+  // 向占位容器注入真正的播放器 iframe
+  function injectEmbedIframe(el, provider, vid) {
+    const iframe = document.createElement("iframe");
+    iframe.src = embedIframeUrl({ provider, vid });
+    iframe.className = "video-embed-frame";
+    iframe.loading = "lazy";
+    iframe.frameBorder = "0";
+    iframe.allowFullscreen = true;
+    iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen");
+    // 去掉 allow-popups：拦截播放器内点击（up主/标题等）打开新标签页跳走
+    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation");
+    el.innerHTML = "";
+    el.appendChild(iframe);
+  }
+
+  // YouTube 在国内被墙时的友好提示（替代被墙的 iframe）
+  function youtubeBlockedNotice(vid) {
+    const href = `https://www.youtube.com/watch?v=${encodeURIComponent(vid)}`;
+    return `<div class="video-embed-notice">
+      <span>此视频来自 YouTube，当前网络可能无法访问，请科学上网后观看</span>
+      <a href="${esc(href)}" target="_blank" rel="noreferrer">在 YouTube 打开 ↗</a>
+    </div>`;
+  }
+
+  // 探测 YouTube 是否可访问：加载其 favicon，成功=可达，失败/超时=被墙。
+  // 结果整页缓存（同一会话只探一次，所有视频共用）。
+  let _ytProbe = null;
+  function youtubeReachable() {
+    if (_ytProbe === null) {
+      _ytProbe = new Promise(resolve => {
+        let done = false;
+        const finish = ok => { if (done) return; done = true; resolve(ok); };
+        const img = new Image();
+        img.onload = () => finish(true);
+        img.onerror = () => finish(false);
+        img.src = `https://www.youtube.com/favicon.ico?_=${Date.now()}`;
+        setTimeout(() => finish(false), 3500); // 超时视为不可达
+      });
+    }
+    return _ytProbe;
+  }
+
   function hydrateVideos(root) {
     // 站外嵌入视频：占位容器 → 注入真正的 iframe（用 createElement，避开 sanitizeHtml 过滤）
     root.querySelectorAll(".video-embed[data-embed-provider]:not([data-embed-ready])").forEach(el => {
@@ -1090,17 +1132,15 @@
       const provider = el.dataset.embedProvider;
       const vid = el.dataset.embedVid;
       if (!provider || !vid) return;
-      const iframe = document.createElement("iframe");
-      iframe.src = embedIframeUrl({ provider, vid });
-      iframe.className = "video-embed-frame";
-      iframe.loading = "lazy";
-      iframe.frameBorder = "0";
-      iframe.allowFullscreen = true;
-      iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen");
-      // 去掉 allow-popups：拦截 B 站播放器内点击（up主/标题等）打开新标签页跳走
-      iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation");
-      el.innerHTML = "";
-      el.appendChild(iframe);
+      if (provider === "youtube") {
+        // YouTube 在国内被墙：先探测连通性，通才加载 iframe，不通则显示友好提示
+        youtubeReachable().then(ok => {
+          if (ok) injectEmbedIframe(el, provider, vid);
+          else el.innerHTML = youtubeBlockedNotice(vid);
+        });
+      } else {
+        injectEmbedIframe(el, provider, vid);
+      }
     });
     // 预连接外部视频域名（提前建 TCP 连接，HLS 首请求快几百毫秒）
     const preconnected = new Set();
