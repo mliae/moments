@@ -63,7 +63,8 @@ function validateMomentInput(raw: unknown, r2Domain?: string): MomentInput | str
     const v = body.video as Record<string, unknown>;
     const kind = String(v.kind ?? "");
     const src = String(v.src ?? "").trim();
-    if (!src) return "视频地址不能为空";
+    // embed 视频用 provider+vid 标识，不需要 src；mp4/hls 才要求地址
+    if (kind !== "embed" && !src) return "视频地址不能为空";
     let poster: string | null = null;
     const posterRaw = typeof v.poster === "string" ? v.poster.trim() : "";
     if (posterRaw) {

@@ -3385,7 +3385,7 @@
             <div class="emp-row">
               <input type="url" data-moment-poster placeholder="封面图地址（选填，不填显示纯色占位）" />
             </div>
-            <div class="emp-help">M3U8（HLS 流媒体）和 MP4 均可。封面图可选填任意网络图片地址。</div>
+            <div class="emp-help">支持粘贴 B站 / YouTube 分享链接（自动取封面、点击播放）；也支持 .m3u8 或 .mp4 直链。</div>
           </div>
           <div class="video-preview" data-video-preview hidden></div>
         </div>
@@ -6656,13 +6656,13 @@
       </div>
       <div data-vpanel="url" hidden>
         <div class="emp-row">
-          <input type="url" placeholder="https://example.com/video.m3u8 或 .mp4" />
+          <input type="url" placeholder="粘贴 B站 / YouTube 分享链接，或 .m3u8 / .mp4 直链" />
           <button type="button" class="btn primary" data-evp-ok>插入</button>
         </div>
         <div class="emp-row">
-          <input type="url" data-evp-poster placeholder="封面图地址（选填，不填显示纯色占位）" />
+          <input type="url" data-evp-poster placeholder="封面图地址（选填，仅直链视频需要）" />
         </div>
-        <div class="emp-help">M3U8（HLS 流媒体）和 MP4 均可，前端会自动挂接播放器。封面图可选填任意网络图片地址。</div>
+        <div class="emp-help">支持粘贴 B站 / YouTube 分享链接（自动取封面、点击播放）；也支持 .m3u8 或 .mp4 直链。</div>
       </div>`;
     container.appendChild(panel);
     const progress = panel.querySelector("[data-evp-progress]");
@@ -6727,6 +6727,14 @@
     const posterInput = panel.querySelector("[data-evp-poster]");
     const okUrl = () => {
       const u = urlInput.value.trim();
+      // B站 / YouTube 分享链接：直接插入，由渲染端解析为封面+点击播放
+      const emb = parseEmbedUrl(u);
+      if (emb) {
+        mdInsertBlock(ta, `@[video](${u})`);
+        panel.remove();
+        toast(`${emb.provider === "youtube" ? "YouTube" : "B站"}视频已插入`);
+        return;
+      }
       // 去掉 query/hash 后按路径扩展名判断，兼容带签名参数（?Expires=&Signature=）的直链
       let pathOk = false;
       try {
@@ -6734,7 +6742,7 @@
         pathOk = /\.(m3u8|mp4)$/.test(path);
       } catch {}
       if (!pathOk) {
-        return toast("请输入 .m3u8 或 .mp4 结尾的视频直链");
+        return toast("请输入 B站/YouTube 分享链接，或 .m3u8 / .mp4 结尾的视频直链");
       }
       const p = posterInput.value.trim();
       // 封面接受 http(s) 外链或站内相对路径（/media/...）
