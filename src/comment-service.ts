@@ -178,17 +178,27 @@ export async function deleteCommentAnywhere(db: D1Database, commentId: number): 
   return !!info.meta.changes;
 }
 
-/** 按评论 id 编辑内容（后台管理用）；返回更新后的行或 null */
+/** 按评论 id 编辑内容/图片（后台管理用）；仅更新传入字段；返回更新后的行或 null */
 export async function editCommentAnywhere(
   db: D1Database,
   commentId: number,
-  content: string
+  patch: { content?: string; images?: string }
 ): Promise<CommentRow | null> {
-  const trimmed = content.trim().slice(0, 500);
-  if (!trimmed) return null;
+  const sets: string[] = [];
+  const binds: (string | number)[] = [];
+  if (patch.content !== undefined) {
+    sets.push("content = ?");
+    binds.push(patch.content.trim().slice(0, 500));
+  }
+  if (patch.images !== undefined) {
+    sets.push("images = ?");
+    binds.push(patch.images);
+  }
+  if (!sets.length) return null;
+  binds.push(commentId);
   const row = await db
-    .prepare(`UPDATE comments SET content = ? WHERE id = ? RETURNING *`)
-    .bind(trimmed, commentId)
+    .prepare(`UPDATE comments SET ${sets.join(", ")} WHERE id = ? RETURNING *`)
+    .bind(...binds)
     .first<CommentRow>();
   return row ?? null;
 }

@@ -3195,14 +3195,19 @@
 
   /* ================= 管理：发动态 ================= */
 
-  /** 后台编辑评论内容：小弹窗，PUT /api/admin/comments/:cid */
-  function openCommentEditor(cid, content) {
+  /** 后台编辑评论内容/图片：小弹窗，PUT /api/admin/comments/:cid */
+  function openCommentEditor(cid, content, images) {
+    let imgs = Array.isArray(images) ? [...images] : [];
     const modal = openModal(`
       <div class="modal-head"><h3>编辑评论</h3><button type="button" class="modal-x" data-close aria-label="关闭">×</button></div>
       <form class="comment-edit-form" data-comment-edit-form data-cid="${cid}">
         <div class="field">
           <label>评论内容</label>
-          <textarea name="content" maxlength="500" required style="min-height:90px">${esc(content || "")}</textarea>
+          <textarea name="content" maxlength="500" style="min-height:90px">${esc(content || "")}</textarea>
+        </div>
+        <div class="field">
+          <label>评论图片（点右上角 × 可删除，最多 3 张）</label>
+          <div class="cmt-edit-imgs" data-cmt-edit-imgs>${renderImgs()}</div>
         </div>
         <div class="modal-foot">
           <button type="button" class="btn" data-close>取消</button>
@@ -3211,14 +3216,26 @@
       </form>`);
     modal.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeModal));
     const form = modal.querySelector("[data-comment-edit-form]");
+    const imgBox = modal.querySelector("[data-cmt-edit-imgs]");
+    function renderImgs() {
+      if (!imgs.length) return `<div style="color:var(--anzhiyu-secondtext);font-size:.8rem">（无图片）</div>`;
+      return imgs.map((u, i) => `<span class="cmt-edit-img"><img src="${esc(u)}" alt="" referrerpolicy="no-referrer" /><button type="button" class="cmt-edit-img-x" data-rm="${i}" aria-label="删除图片">×</button></span>`).join("");
+    }
+    imgBox.innerHTML = renderImgs();
+    imgBox.addEventListener("click", e => {
+      const btn = e.target.closest("[data-rm]");
+      if (!btn) return;
+      imgs.splice(Number(btn.dataset.rm), 1);
+      imgBox.innerHTML = renderImgs();
+    });
     form.addEventListener("submit", async e => {
       e.preventDefault();
       const v = form.content.value.trim();
-      if (!v) return toast("评论内容不能为空");
+      if (!v && !imgs.length) return toast("评论内容和图片不能都为空");
       const btn = form.querySelector('button[type="submit"]');
       btn.disabled = true;
       try {
-        await api(`/api/admin/comments/${cid}`, { method: "PUT", body: { content: v } });
+        await api(`/api/admin/comments/${cid}`, { method: "PUT", body: { content: v, images: imgs } });
         closeModal();
         toast("已更新");
         renderAdminComments(document.getElementById("adminPanel"));
@@ -4584,8 +4601,9 @@
           <div class="admin-check-cell"><input type="checkbox" class="admin-check" value="${c.id}" /></div>
           <div class="row-main">
             <div class="row-title">
-              ${c.is_ai ? '<span class="tag-mini tag-ai">AI</span>' : c.is_owner ? '<span class="tag-mini">博主</span>' : ""}<strong>${esc(c.nickname)}</strong>：${esc(c.content)}
+              ${c.is_ai ? '<span class="tag-mini tag-ai">AI</span>' : c.is_owner ? '<span class="tag-mini">博主</span>' : ""}<strong>${esc(c.nickname)}</strong>：${esc(c.content) || (c.images && c.images.length ? '<span style="color:var(--anzhiyu-secondtext)">[图片评论]</span>' : "")}
             </div>
+            ${c.images && c.images.length ? `<div class="comment-images admin-cmt-imgs">${c.images.map(u => `<img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="comment-img" data-lightbox="${esc(u)}" />`).join("")}</div>` : ""}
             <div class="row-sub">
               <span>${timeAgo(c.created_at)}</span>
               <span class="tag-mini">${c.target_type === "post" ? "文章" : "说说"}</span>
@@ -4593,7 +4611,7 @@
             </div>
           </div>
           <div class="row-actions">
-            <button class="btn" data-admin-act="edit-comment" data-cid="${c.id}" data-content="${esc(c.content.replace(/"/g, "&quot;"))}">编辑</button>
+            <button class="btn" data-admin-act="edit-comment" data-cid="${c.id}" data-content="${esc((c.content || "").replace(/"/g, "&quot;"))}" data-images='${esc(JSON.stringify(c.images || []))}'>编辑</button>
             <button class="btn danger" data-admin-act="del-comment" data-cid="${c.id}">删除</button>
           </div>
         </div>`
@@ -7293,7 +7311,10 @@
       if (act === "edit-comment") {
         const cid = Number(adminAct.dataset.cid);
         const content = adminAct.dataset.content || "";
-        openCommentEditor(cid, content);
+        let images = [];
+        try { images = JSON.parse(adminAct.dataset.images || "[]"); } catch { images = []; }
+        if (!Array.isArray(images)) images = [];
+        openCommentEditor(cid, content, images);
         return;
       }
       return;

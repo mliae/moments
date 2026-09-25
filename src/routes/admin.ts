@@ -393,7 +393,7 @@ app.post("/qq/test", requireAdmin, async c => {
 app.get("/comments", requireAdmin, async c => {
   const limit = Math.min(200, Math.max(1, Number(c.req.query("limit")) || 100));
   const rows = await c.env.DB.prepare(
-    `SELECT c.id, c.target_type, c.target_id, c.parent_id, c.nickname, c.content, c.is_owner, c.is_ai, c.created_at,
+    `SELECT c.id, c.target_type, c.target_id, c.parent_id, c.nickname, c.content, c.images, c.is_owner, c.is_ai, c.created_at,
             CASE WHEN c.target_type = 'post' THEN p.title
                  ELSE substr(replace(replace(m.content, char(10), ' '), char(13), ''), 1, 60)
             END AS target_excerpt,
@@ -411,13 +411,23 @@ app.get("/comments", requireAdmin, async c => {
       parent_id: number;
       nickname: string;
       content: string;
+      images: string | null;
       is_owner: number;
       is_ai: number;
       created_at: string;
       target_excerpt: string;
       post_slug: string | null;
     }>();
-  const list = (rows.results ?? []).map(r => ({ ...r, is_owner: r.is_owner === 1 }));
+  const list = (rows.results ?? []).map(r => {
+    let images: string[] = [];
+    try {
+      const p = JSON.parse(r.images || "[]");
+      if (Array.isArray(p)) images = p.filter((x): x is string => typeof x === "string");
+    } catch {
+      images = [];
+    }
+    return { ...r, images, is_owner: r.is_owner === 1 };
+  });
   return ok(c, { list });
 });
 
@@ -441,19 +451,32 @@ app.post("/comments/batch-delete", requireAdmin, async c => {
   return ok(c, { deleted }, `已删除 ${deleted} 条评论`);
 });
 
-/** PUT /api/admin/comments/:cid 编辑评论内容（后台管理用） */
+/** PUT /api/admin/comments/:cid 编辑评论内容/图片（后台管理用） */
 app.put("/comments/:cid", requireAdmin, async c => {
   const commentId = Number(c.req.param("cid"));
   if (!Number.isFinite(commentId)) return fail(c, "无效的 ID", 400);
   let content = "";
+  let images: string[] = [];
   try {
-    const body = await c.req.json<{ content?: unknown }>();
+    const body = await c.req.json<{ content?: unknown; images?: unknown }>();
     content = String(body.content ?? "");
+    if (Array.isArray(body.images)) {
+      images = body.images
+        .map(String)
+        .map(s => s.trim())
+        .filter(s => /^https?:\/\//i.test(s))
+        .slice(0, 3)
+        .map(s => s.slice(0, 500));
+    }
   } catch {
     return fail(c, "请求格式错误", 400);
   }
-  if (!content.trim()) return fail(c, "评论内容不能为空", 400);
-  const updated = await editCommentAnywhere(c.env.DB, commentId, content);
+  // 内容与图片至少要有一个
+  if (!content.trim() && !images.length) return fail(c, "评论内容和图片不能都为空", 400);
+  const updated = await editCommentAnywhere(c.env.DB, commentId, {
+    content,
+    images: images.length ? JSON.stringify(images) : "",
+  });
   if (!updated) return fail(c, "评论不存在", 404);
   return ok(c, updated, "已更新");
 });
