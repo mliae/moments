@@ -173,8 +173,7 @@ publicApp.post("/leave", async c => {
 adminApp.get("/summary", requireAdmin, async c => {
   const db = c.env.DB;
   const days = Math.max(1, Math.min(90, Number(c.req.query("days")) || 7));
-  const since = `now, '-${days} days'`;
-  const where = `created_at >= strftime('%Y-%m-%dT%H:%M:%fZ', ${since})`;
+  const where = `created_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${days} days')`;
 
   const batch = await db.batch([
     db.prepare(`SELECT COUNT(*) AS pv, COUNT(DISTINCT ip) AS uv FROM analytics_pv WHERE ${where}`),
