@@ -1053,9 +1053,6 @@
       ? `https://www.youtube-nocookie.com/embed/${e.vid}`
       : `https://player.bilibili.com/player.html?bvid=${e.vid}&page=1&high_quality=1&danmaku=0&autoplay=0`;
   }
-  function embedCoverUrl(e) {
-    return `/api/embed/cover?provider=${e.provider}&vid=${encodeURIComponent(e.vid)}`;
-  }
   // 站外嵌入视频：输出带 provider/vid 的占位容器，由 hydrateVideos 用 createElement 注入 iframe。
   // 不能直接在 HTML 里写 <iframe>——sanitizeHtml 会过滤掉 iframe，导致只剩空黑盒。
   function embedBoxHtml(e) {
@@ -3450,10 +3447,18 @@
     const vpCard = (v, idx) => {
       const isEmbed = v.kind === "embed";
       const kindLabel = isEmbed ? (v.provider === "youtube" ? "YouTube" : "哔哩哔哩") : v.kind === "hls" ? "M3U8" : "MP4";
-      const posterSrc = isEmbed ? embedCoverUrl({ provider: v.provider, vid: v.vid }) : v.poster;
+      // embed 不请求站外封面，直接文字占位；mp4/hls 用本地 poster（无则「无封面」）
+      let media;
+      if (isEmbed) {
+        media = `<div class="vp-no-poster">${kindLabel}</div>`;
+      } else if (v.poster) {
+        media = `<img class="vp-poster" src="${esc(v.poster)}" alt="封面" referrerpolicy="no-referrer" />`;
+      } else {
+        media = `<div class="vp-no-poster">无封面</div>`;
+      }
       return `
         <div class="vp-card">
-          ${posterSrc ? `<img class="vp-poster" src="${esc(posterSrc)}" alt="封面" referrerpolicy="no-referrer" />` : `<div class="vp-no-poster">无封面</div>`}
+          ${media}
           <div class="vp-info">
             <span class="vp-kind">${kindLabel}</span>
             <span class="vp-src">${esc(isEmbed ? v.vid : (v.src || "").slice(0, 60))}</span>
@@ -3465,13 +3470,12 @@
       if (!draft.videos.length) { videoPreview.hidden = true; videoPreview.innerHTML = ""; return; }
       videoPreview.hidden = false;
       videoPreview.innerHTML = draft.videos.map(vpCard).join("");
-      // 封面图（尤其 B 站 /api/embed/cover）可能加载失败：裂图 → 降级为平台文字占位
+      // 本地 poster 也可能加载失败：裂图 → 降级为「无封面」
       videoPreview.querySelectorAll("img.vp-poster").forEach(img => {
         img.addEventListener("error", () => {
-          const label = img.closest(".vp-card")?.querySelector(".vp-kind")?.textContent || "视频";
           const ph = document.createElement("div");
           ph.className = "vp-no-poster";
-          ph.textContent = label;
+          ph.textContent = "无封面";
           img.replaceWith(ph);
         });
       });

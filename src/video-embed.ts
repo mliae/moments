@@ -29,14 +29,3 @@ export function parseEmbed(raw: unknown): EmbedRef | null {
 
   return null;
 }
-
-/** 官方 iframe 播放器地址 */
-export function embedIframeSrc(e: EmbedRef): string {
-  if (e.provider === "youtube") return `https://www.youtube-nocookie.com/embed/${e.vid}`;
-  return `https://player.bilibili.com/player.html?bvid=${e.vid}&page=1&high_quality=1&danmaku=0&autoplay=0`;
-}
-
-/** YouTube 封面可直接拼接；B站封面需经 /api/embed/cover 解析 */
-export function youtubeCover(vid: string): string {
-  return `https://img.youtube.com/vi/${vid}/hqdefault.jpg`;
-}
