@@ -5138,7 +5138,7 @@
     const enc = encodeURIComponent(site);
     let cfg = {};
     try { cfg = await api("/api/admin/settings"); } catch { /* 未登录则用空对象 */ }
-    const defEndpoints = "https://api.indexnow.org/indexnow\nhttps://www.bing.com/indexnow\nhttps://api.indexnow.baidu.com/indexnow";
+    const defEndpoints = "https://api.indexnow.org/indexnow\nhttps://www.bing.com/indexnow";
     const items = [
       { label: "站点地图 sitemap.xml", url: `${origin}/sitemap.xml`, tip: "提交给搜索引擎，列出所有可收录页面" },
       { label: "爬虫规则 robots.txt", url: `${origin}/robots.txt`, tip: "声明允许/禁止抓取的路径与 sitemap 位置" },

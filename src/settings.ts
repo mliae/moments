@@ -154,8 +154,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   indexnow_key: "",
   indexnow_endpoints:
     "https://api.indexnow.org/indexnow\n" +
-    "https://www.bing.com/indexnow\n" +
-    "https://api.indexnow.baidu.com/indexnow",
+    "https://www.bing.com/indexnow",
   indexnow_auto: true,
 };
 
