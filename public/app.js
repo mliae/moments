@@ -3465,6 +3465,16 @@
       if (!draft.videos.length) { videoPreview.hidden = true; videoPreview.innerHTML = ""; return; }
       videoPreview.hidden = false;
       videoPreview.innerHTML = draft.videos.map(vpCard).join("");
+      // 封面图（尤其 B 站 /api/embed/cover）可能加载失败：裂图 → 降级为平台文字占位
+      videoPreview.querySelectorAll("img.vp-poster").forEach(img => {
+        img.addEventListener("error", () => {
+          const label = img.closest(".vp-card")?.querySelector(".vp-kind")?.textContent || "视频";
+          const ph = document.createElement("div");
+          ph.className = "vp-no-poster";
+          ph.textContent = label;
+          img.replaceWith(ph);
+        });
+      });
     }
     // 事件委托：移除某个视频
     videoPreview.addEventListener("click", e => {
