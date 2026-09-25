@@ -6,7 +6,7 @@
  * 复杂排版（表格等）在客户端由 marked 增强；此处保证内容完整可读即可。
  */
 import { keyToSrc } from "./db";
-import { parseEmbed } from "./video-embed";
+import { parseEmbed, embedIframeSrc } from "./video-embed";
 
 const escapeHtml = (s: string) =>
   s
@@ -55,11 +55,12 @@ function musicBlock(label: string): string {
 /** @[video](url) 或 @[video](url "封面URL") 视频块（m3u8 输出占位 video，前端水合挂 HLS；mp4 直出 src）。
  *  无封面时使用站点统一封面 defaultPoster（后台设置） */
 function videoBlock(url: string, poster: string, defaultPoster = "", r2Domain?: string): string {
-  // 站外嵌入（B站/YouTube）：输出占位容器，由前端水合成「封面→点击加载 iframe」
+  // 站外嵌入（B站/YouTube）：直接输出播放器 iframe（不再用封面占位）
   const rawUrl = url.replace(/&amp;/g, "&");
   const emb = parseEmbed(rawUrl);
   if (emb) {
-    return `<div class="article-video"><div class="video-embed" data-embed-provider="${emb.provider}" data-embed-vid="${emb.vid}" data-embed-url="${escapeHtml(rawUrl)}"></div></div>`;
+    const src = embedIframeSrc(emb);
+    return `<div class="article-video"><div class="video-embed"><iframe class="video-embed-frame" src="${escapeHtml(src)}" frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"></iframe></div></div>`;
   }
   const safe = safeUrl(url) || (r2Domain ? escapeHtml(keyToSrc(url, r2Domain)) : "");
   if (!safe) return "";
