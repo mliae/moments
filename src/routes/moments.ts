@@ -11,6 +11,7 @@ import { ok, fail } from "../respond";
 import type { HonoEnv } from "../types";
 import { requireAdmin } from "../auth";
 import { getSettings } from "../settings";
+import { parseEmbed } from "../video-embed";
 import {
   queryMoments,
   queryMomentById,
@@ -86,6 +87,19 @@ function validateMomentInput(raw: unknown, r2Domain?: string): MomentInput | str
       if (u.protocol !== "http:" && u.protocol !== "https:") return "M3U8 仅支持 http(s) 外链";
       if (!/\.m3u8($|\?)/i.test(u.pathname + u.search)) return "M3U8 地址必须以 .m3u8 结尾";
       video = { kind: "hls", src, poster };
+    } else if (kind === "embed") {
+      // 站外嵌入（B站/YouTube）：前端可直接给 provider+vid，也可只给分享链接由后端解析
+      let provider = String(v.provider ?? "");
+      let vid = String(v.vid ?? "");
+      if ((provider !== "bilibili" && provider !== "youtube") || !vid) {
+        const parsed = parseEmbed(src || v.url || "");
+        if (!parsed) return "不支持的视频平台（仅支持 B站 / YouTube）";
+        provider = parsed.provider;
+        vid = parsed.vid;
+      }
+      if (provider === "youtube" && !/^[\w-]{11}$/.test(vid)) return "YouTube 视频 ID 非法";
+      if (provider === "bilibili" && !/^BV[0-9A-Za-z]{10}$/.test(vid)) return "B站视频 ID 非法（需 BV 号）";
+      video = { kind: "embed", src: "", provider: provider as "bilibili" | "youtube", vid, poster: null };
     } else {
       return "视频类型非法";
     }

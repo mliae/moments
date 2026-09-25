@@ -158,6 +158,8 @@
         },
         renderer(token) {
           const url = String(token.url || "");
+          const emb = parseEmbedUrl(url);
+          if (emb) return `<div class="article-video">${embedPlaceholderHtml(emb)}</div>`;
           const poster = resolveVideoPoster(token.poster);
           const posterAttr = poster ? ` poster="${esc(poster)}"` : "";
           const cls = /\.m3u8(?:[?#]|$)/i.test(url) ? "essay-media-video essay-media-video--hls" : "essay-media-video";
@@ -1020,13 +1022,43 @@
   }
 
   function videoHtml(video) {
-    if (!video || !video.src) return "";
+    if (!video) return "";
+    if (video.kind === "embed" && video.provider && video.vid) {
+      return embedPlaceholderHtml({ provider: video.provider, vid: video.vid });
+    }
+    if (!video.src) return "";
     const poster = resolveVideoPoster(video.poster);
     const posterAttr = poster ? ` poster="${esc(poster)}"` : "";
     if (video.kind === "hls") {
       return `<video class="essay-media-video essay-media-video--hls" data-hls-src="${esc(video.src)}"${posterAttr} controls preload="none" playsinline></video>`;
     }
     return `<video class="essay-media-video" src="${esc(video.src)}"${posterAttr} controls preload="none" playsinline></video>`;
+  }
+
+  // ===== 站外嵌入视频（B站 / YouTube）=====
+  function parseEmbedUrl(s) {
+    s = String(s || "").trim();
+    if (!s) return null;
+    const yt =
+      s.match(/youtube\.com\/watch\?[^#]*?[?&]v=([\w-]{11})/i) ||
+      s.match(/youtu\.be\/([\w-]{11})/i) ||
+      s.match(/youtube(?:-nocookie)?\.com\/(?:embed|shorts|v)\/([\w-]{11})/i);
+    if (yt) return { provider: "youtube", vid: yt[1] };
+    const bv = s.match(/\/video\/(BV[0-9A-Za-z]{10})/i) || s.match(/(BV[0-9A-Za-z]{10})/);
+    if (bv) return { provider: "bilibili", vid: bv[1] };
+    return null;
+  }
+  function embedIframeUrl(e) {
+    return e.provider === "youtube"
+      ? `https://www.youtube-nocookie.com/embed/${e.vid}`
+      : `https://player.bilibili.com/player.html?bvid=${e.vid}&page=1&high_quality=1&danmaku=0&autoplay=0`;
+  }
+  function embedCoverUrl(e) {
+    return `/api/embed/cover?provider=${e.provider}&vid=${encodeURIComponent(e.vid)}`;
+  }
+  function embedPlaceholderHtml(e) {
+    const label = e.provider === "youtube" ? "YouTube" : "哔哩哔哩";
+    return `<div class="video-embed" data-embed-provider="${e.provider}" data-embed-vid="${esc(e.vid)}"><div class="video-embed-cover"><img src="${embedCoverUrl(e)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" /><span class="video-embed-play" aria-hidden="true">▶</span><span class="video-embed-badge">${label}</span></div></div>`;
   }
 
   // 外链媒体（封面图等）统一走自家 Worker 反代：部分图床域名在国内被 TLS 阻断，
@@ -1049,6 +1081,31 @@
   }
 
   function hydrateVideos(root) {
+    // 站外嵌入视频：占位封面 → 点击才加载 iframe（省流量，封面由 /api/embed/cover 解析）
+    root.querySelectorAll(".video-embed:not([data-embed-ready])").forEach(el => {
+      el.dataset.embedReady = "1";
+      const provider = el.dataset.embedProvider;
+      const vid = el.dataset.embedVid;
+      if (!provider || !vid) return;
+      if (!el.querySelector(".video-embed-cover")) {
+        const label = provider === "youtube" ? "YouTube" : "哔哩哔哩";
+        el.innerHTML = `<div class="video-embed-cover"><img src="${embedCoverUrl({ provider, vid })}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" /><span class="video-embed-play" aria-hidden="true">▶</span><span class="video-embed-badge">${label}</span></div>`;
+      }
+      el.style.cursor = "pointer";
+      el.addEventListener("click", () => {
+        if (el.dataset.embedLoaded) return;
+        el.dataset.embedLoaded = "1";
+        const iframe = document.createElement("iframe");
+        iframe.src = embedIframeUrl({ provider, vid });
+        iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen");
+        iframe.setAttribute("allowfullscreen", "");
+        iframe.setAttribute("frameborder", "0");
+        iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups");
+        iframe.className = "video-embed-frame";
+        el.innerHTML = "";
+        el.appendChild(iframe);
+      });
+    });
     // 预连接外部视频域名（提前建 TCP 连接，HLS 首请求快几百毫秒）
     const preconnected = new Set();
     root.querySelectorAll("video.essay-media-video").forEach(v => {
@@ -3323,7 +3380,7 @@
           </div>
           <div data-vpanel="url" hidden>
             <div class="emp-row">
-              <input type="url" name="video-url" placeholder="https://example.com/video.m3u8 或 .mp4" />
+              <input type="url" name="video-url" placeholder="粘贴 B站 / YouTube 分享链接，或 .m3u8 / .mp4 直链" />
             </div>
             <div class="emp-row">
               <input type="url" data-moment-poster placeholder="封面图地址（选填，不填显示纯色占位）" />
@@ -3392,12 +3449,15 @@
       if (!draft.video) { videoPreview.hidden = true; return; }
       videoPreview.hidden = false;
       const p = draft.video.poster;
+      const isEmbed = draft.video.kind === "embed";
+      const kindLabel = isEmbed ? (draft.video.provider === "youtube" ? "YouTube" : "哔哩哔哩") : draft.video.kind === "hls" ? "M3U8" : "MP4";
+      const posterSrc = isEmbed ? embedCoverUrl({ provider: draft.video.provider, vid: draft.video.vid }) : p;
       videoPreview.innerHTML = `
         <div class="vp-card">
-          ${p ? `<img class="vp-poster" src="${esc(p)}" alt="封面" />` : `<div class="vp-no-poster">无封面</div>`}
+          ${posterSrc ? `<img class="vp-poster" src="${esc(posterSrc)}" alt="封面" referrerpolicy="no-referrer" />` : `<div class="vp-no-poster">无封面</div>`}
           <div class="vp-info">
-            <span class="vp-kind">${draft.video.kind === "hls" ? "M3U8" : "MP4"}</span>
-            <span class="vp-src">${esc(draft.video.src.slice(0, 60))}</span>
+            <span class="vp-kind">${kindLabel}</span>
+            <span class="vp-src">${esc(isEmbed ? draft.video.vid : (draft.video.src || "").slice(0, 60))}</span>
           </div>
           <button type="button" class="btn ghost sm" data-rm-video>移除</button>
         </div>`;
@@ -3658,8 +3718,13 @@
         const posterInput = modal.querySelector("[data-moment-poster]");
         const poster = posterInput ? posterInput.value.trim() : "";
         if (url) {
-          const isHls = /\.m3u8($|\?)/i.test(url.split("?")[0] + "?");
-          draft.video = { kind: isHls ? "hls" : "mp4", src: url, poster: poster || null };
+          const emb = parseEmbedUrl(url);
+          if (emb) {
+            draft.video = { kind: "embed", provider: emb.provider, vid: emb.vid, src: "", poster: null };
+          } else {
+            const isHls = /\.m3u8($|\?)/i.test(url.split("?")[0] + "?");
+            draft.video = { kind: isHls ? "hls" : "mp4", src: url, poster: poster || null };
+          }
         } else {
           draft.video = null;
         }

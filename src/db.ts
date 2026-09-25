@@ -184,9 +184,11 @@ export interface PostRow {
 }
 
 export interface VideoRef {
-  kind: "mp4" | "hls";
+  kind: "mp4" | "hls" | "embed";
   src: string;
   poster?: string | null;
+  provider?: "bilibili" | "youtube"; // kind=embed 时：站外平台
+  vid?: string; // kind=embed 时：平台视频 ID
 }
 
 export interface MomentView {
@@ -217,6 +219,12 @@ export function parseVideo(raw: string | null | undefined): VideoRef | null {
   if (!raw) return null;
   try {
     const v = JSON.parse(raw) as Partial<VideoRef>;
+    if (v.kind === "embed") {
+      if ((v.provider === "bilibili" || v.provider === "youtube") && typeof v.vid === "string" && v.vid) {
+        return { kind: "embed", src: "", provider: v.provider, vid: v.vid, poster: null };
+      }
+      return null;
+    }
     if ((v.kind === "mp4" || v.kind === "hls") && typeof v.src === "string" && v.src) {
       return { kind: v.kind, src: v.src, poster: typeof v.poster === "string" && v.poster ? v.poster : null };
     }
@@ -275,6 +283,7 @@ export function serializeMoment(row: MomentRow, withComments?: CommentRow[], r2D
     video: (() => {
       const v = parseVideo(row.video);
       if (!v) return null;
+      if (v.kind === "embed") return { kind: "embed", src: "", provider: v.provider, vid: v.vid, poster: null };
       const poster = v.poster ? (/^https?:\/\//i.test(v.poster) || v.poster.startsWith("/media/") ? v.poster : keyToSrc(v.poster, r2Domain)) : null;
       return /^https?:\/\//i.test(v.src) || v.src.startsWith("/media/") ? { ...v, poster } : { kind: v.kind, src: keyToSrc(v.src, r2Domain), poster };
     })(),

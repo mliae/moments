@@ -744,6 +744,32 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
   color: inherit; padding: 0 2px; border-radius: 2px;
 }
 .md-preview .article-video .essay-media-video { aspect-ratio: 16 / 9; max-height: 70vh; }
+
+/* 站外嵌入视频（B站/YouTube）：封面占位 → 点击加载 iframe */
+.article-video .video-embed,
+.datacont .video-embed {
+  position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px;
+  overflow: hidden; background: #000;
+}
+.video-embed-cover { position: absolute; inset: 0; }
+.video-embed-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.video-embed-cover::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.05) 40%, rgba(0,0,0,.45));
+}
+.video-embed-play {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 64px; height: 64px; border-radius: 50%;
+  background: rgba(0,0,0,.55); color: #fff; font-size: 26px; line-height: 64px; text-align: center;
+  display: flex; align-items: center; justify-content: center; padding-left: 5px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.4); transition: transform .15s ease, background .15s ease;
+}
+.video-embed:hover .video-embed-play { background: var(--anzhiyu-main, #ff7d00); transform: translate(-50%,-50%) scale(1.08); }
+.video-embed-badge {
+  position: absolute; left: 10px; bottom: 10px; z-index: 1;
+  background: rgba(0,0,0,.6); color: #fff; font-size: 12px; padding: 2px 8px; border-radius: 6px;
+}
+.video-embed-frame { width: 100%; height: 100%; border: 0; display: block; }
 /* 居中块（文章正文 / 说说 datacont / 编辑器预览通用） */
 .text-center { text-align: center; }
 .article-body .text-center, .datacont .text-center { margin: .9rem 0; }
