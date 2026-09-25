@@ -1055,7 +1055,7 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
 .seg button.on { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcolor); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); font-weight: 500; }
 /* 上传 MP4 面板：按钮全宽与标签栏对齐，提示文案居中 */
 [data-vpanel="mp4-upload"] { text-align: center; }
-[data-vpanel="mp4-upload"] .btn.block { margin-bottom: 4px; }
+[data-vpanel="mp4-upload"] .btn.block { margin-bottom: 4px; padding: 8px; font-size: .85rem; }
 
 /* 图片 lightbox */
 .lightbox {
