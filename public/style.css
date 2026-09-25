@@ -2131,3 +2131,32 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 .indexnow-log-row .in-ep { color: var(--anzhiyu-secondtext); font-size: .72rem; flex-shrink: 0; }
 .indexnow-log-row .in-time { color: var(--anzhiyu-secondtext); font-size: .72rem; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
+/* ==================== 后台访问统计 ==================== */
+.an-days { display: inline-flex; gap: .3rem; }
+.an-daybtn { border: var(--style-border); background: var(--anzhiyu-secondbg); color: var(--anzhiyu-secondtext); font-size: .78rem; padding: .25rem .7rem; border-radius: 999px; cursor: pointer; transition: all .15s; }
+.an-daybtn.on { background: var(--anzhiyu-main); border-color: var(--anzhiyu-main); color: #fff; }
+.an-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem; }
+.an-block { background: var(--anzhiyu-card-bg); border: var(--style-border); border-radius: 12px; padding: .9rem 1rem; margin-top: 1rem; }
+.an-block h4 { margin: 0 0 .6rem; font-size: .92rem; color: var(--anzhiyu-main); }
+.an-empty { margin: 0; font-size: .8rem; color: var(--anzhiyu-secondtext); padding: .3rem 0; }
+.an-barrow { display: flex; align-items: center; gap: .5rem; font-size: .8rem; margin: .28rem 0; }
+.an-barname { flex: 0 0 38%; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--anzhiyu-fontcolor); }
+.an-bartrack { flex: 1; height: 8px; background: var(--anzhiyu-secondbg); border-radius: 999px; overflow: hidden; }
+.an-barfill { display: block; height: 100%; background: var(--anzhiyu-main); border-radius: 999px; }
+.an-barnum { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--anzhiyu-secondtext); font-size: .76rem; }
+.an-legend { display: flex; gap: 1.2rem; justify-content: center; margin: .4rem 0 0; font-size: .74rem; color: var(--anzhiyu-secondtext); }
+.an-legend span { display: inline-flex; align-items: center; gap: .3rem; }
+.an-legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.an-visitor { border-top: 1px dashed var(--anzhiyu-card-border); padding: .6rem 0; }
+.an-visitor:first-child { border-top: 0; }
+.an-vhead { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: .8rem; }
+.an-vip { font-weight: 700; color: var(--anzhiyu-main); cursor: pointer; font-variant-numeric: tabular-nums; }
+.an-vip:hover { text-decoration: underline; }
+.an-vloc { color: var(--anzhiyu-fontcolor); }
+.an-vdev, .an-vtime, .an-vdur { color: var(--anzhiyu-secondtext); font-size: .74rem; }
+.an-vdur { margin-left: auto; }
+.an-vpages { margin-top: .4rem; display: flex; flex-wrap: wrap; gap: .35rem; }
+.an-page { display: inline-flex; align-items: center; gap: .25rem; background: var(--anzhiyu-secondbg); border-radius: 6px; padding: .18rem .5rem; font-size: .74rem; color: var(--anzhiyu-fontcolor); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-page i { font-style: normal; color: var(--anzhiyu-secondtext); font-size: .68rem; }
+@media (max-width: 720px) { .an-grid { grid-template-columns: 1fr; } .an-vdur { margin-left: 0; } }
+

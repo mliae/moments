@@ -4077,6 +4077,7 @@
 
   const ADMIN_TABS = [
     { key: "overview", label: "概览", icon: "layout-dashboard" },
+    { key: "analytics", label: "访问统计", icon: "bar-chart-3" },
     { key: "moments", label: "说说", icon: "message-circle" },
     { key: "posts", label: "文章", icon: "file-text" },
     { key: "photos", label: "相册", icon: "image" },
@@ -4256,6 +4257,7 @@
     const panel = document.getElementById("adminPanel");
     if (!panel) return;
     if (tab === "overview") return renderAdminOverview(panel);
+    if (tab === "analytics") return renderAdminAnalytics(panel);
     if (tab === "moments") return renderAdminMoments(panel);
     if (tab === "posts") return renderAdminPosts(panel);
     if (tab === "photos") return renderAdminPhotos(panel);
@@ -4317,6 +4319,90 @@
         <div class="ov-chart-axis">${trend.map(t => `<span>${t.date.slice(5)}</span>`).join("")}</div>
       </div>
       <p class="ov-tip">提示：点击上方数字卡片可快速跳转到对应管理页。</p>`;
+  }
+
+  /* ---------- 后台 Tab：访问统计 ---------- */
+  let analyticsDays = 7;
+  async function renderAdminAnalytics(panel) {
+    const head = `
+      <div class="ov-chart-head" style="margin-bottom:1rem">
+        <h3>访问统计</h3>
+        <span class="an-days">
+          ${[7, 30, 90].map(d => `<button type="button" class="an-daybtn ${analyticsDays === d ? "on" : ""}" data-andays="${d}">${d}天</button>`).join("")}
+        </span>
+      </div>`;
+    panel.innerHTML = `${head}<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
+    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); renderAdminAnalytics(panel); }));
+
+    let s, v;
+    try {
+      [s, v] = await Promise.all([
+        api(`/api/admin/analytics/summary?days=${analyticsDays}`),
+        api(`/api/admin/analytics/visitors?limit=50`),
+      ]);
+    } catch (e) { panel.innerHTML = `${head}<p>加载失败：${esc(e.message)}</p>`; return; }
+
+    const fmtDur = sec => { sec = Number(sec) || 0; const m = Math.floor(sec / 60), r = sec % 60; return m ? `${m}分${r}秒` : `${r}秒`; };
+    const cards = [
+      { label: "浏览量 PV", val: s.pv },
+      { label: "独立访客 UV", val: s.uv },
+      { label: "平均停留", val: fmtDur(s.avgDuration) },
+    ];
+    const barList = (title, rows) => {
+      const max = Math.max(1, ...rows.map(r => r.n));
+      return `<div class="an-block"><h4>${title}</h4>${rows.length ? rows.map(r => `
+        <div class="an-barrow"><span class="an-barname" title="${esc(r.name)}">${esc(r.name || "未知")}</span>
+          <span class="an-bartrack"><span class="an-barfill" style="width:${(r.n / max * 100).toFixed(1)}%"></span></span>
+          <span class="an-barnum">${r.n}</span></div>`).join("") : `<p class="an-empty">暂无数据</p>`}</div>`;
+    };
+    // 趋势图（PV/UV 双折线）
+    const trend = s.trend || [];
+    const W = 640, H = 170, pad = 30;
+    const maxV = Math.max(1, ...trend.map(t => Math.max(t.pv, t.uv)));
+    const x = i => pad + (i * (W - pad * 2)) / Math.max(1, trend.length - 1);
+    const y = v => H - pad - (v / maxV) * (H - pad * 2);
+    const line = arr => trend.map((t, i) => `${x(i).toFixed(1)},${y(arr(t)).toFixed(1)}`).join(" ");
+
+    const visitors = (v.list || []).map(sess => {
+      const loc = [sess.country, sess.region, sess.city].filter(Boolean).join(" · ") || "未知";
+      const pages = sess.pages.map(p => `<span class="an-page" title="${esc(p.title || "")}">${esc(p.path || "/")}<i>${fmtDur(p.dur)}</i></span>`).join("");
+      const t = new Date(sess.last);
+      return `<div class="an-visitor">
+        <div class="an-vhead">
+          <span class="an-vip" data-copy="${esc(sess.ip)}" title="点击复制">${esc(sess.ip || "隐藏")}</span>
+          <span class="an-vloc">${esc(loc)}</span>
+          <span class="an-vdev">${esc(sess.device)} · ${esc(sess.os)} · ${esc(sess.browser)}</span>
+          <span class="an-vtime">${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}</span>
+          <span class="an-vdur">停留 ${fmtDur(sess.duration)}</span>
+        </div>
+        <div class="an-vpages">${pages}</div>
+      </div>`;
+    }).join("");
+
+    panel.innerHTML = `
+      ${head}
+      <div class="ov-cards">${cards.map(c => `
+        <div class="ov-card"><div class="ov-card-num">${c.val}</div><div class="ov-card-label">${c.label}</div></div>`).join("")}</div>
+      <div class="ov-chart-card">
+        <div class="ov-chart-head"><h3>浏览趋势</h3><span class="ov-chart-sub">近 ${s.days} 天</span></div>
+        <svg class="ov-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">
+          ${[0.25, 0.5, 0.75].map(f => `<line x1="${pad}" y1="${(pad + (H - pad * 2) * f).toFixed(1)}" x2="${W - pad}" y2="${(pad + (H - pad * 2) * f).toFixed(1)}" stroke="var(--anzhiyu-card-border)" stroke-dasharray="4 5"/>`).join("")}
+          <polyline points="${line(t => t.pv)}" fill="none" stroke="var(--anzhiyu-main)" stroke-width="2.5" stroke-linejoin="round"/>
+          <polyline points="${line(t => t.uv)}" fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/>
+        </svg>
+        <div class="ov-chart-axis">${trend.map(t => `<span>${t.date.slice(5)}</span>`).join("")}</div>
+        <p class="an-legend"><span><i style="background:var(--anzhiyu-main)"></i>PV</span><span><i style="background:#9ca3af"></i>UV</span></p>
+      </div>
+      <div class="an-grid">
+        ${barList("热门页面", s.topPaths)}
+        ${barList("来源网站", s.referrers.map(r => ({ name: (() => { try { return new URL(r.name).host; } catch { return r.name; } })(), n: r.n })))}
+        ${barList("国家/地区", s.countries)}
+        ${barList("设备", s.devices)}
+      </div>
+      <div class="an-block"><h4>最近访客（${(v.list || []).length} 个会话）</h4>
+        ${visitors || `<p class="an-empty">暂无访客记录</p>`}</div>`;
+
+    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); renderAdminAnalytics(panel); }));
   }
 
   // 后台列表分页状态（跨重渲染保留）
@@ -8223,6 +8309,73 @@
       <a class="btn" href="/">返回首页</a></div></div></div>`;
   }
 
+  /* ================= 访问统计埋点（后台/管理员不计，由后端再兜底排除） ================= */
+  const Analytics = (() => {
+    let sid = "";
+    try { sid = sessionStorage.getItem("ma_sid") || ""; } catch (_) {}
+    if (!sid) {
+      sid = "s_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      try { sessionStorage.setItem("ma_sid", sid); } catch (_) {}
+    }
+    // 会话级：首次进入的外部来源 + UTM
+    let ref = "";
+    try { ref = sessionStorage.getItem("ma_ref") || ""; } catch (_) {}
+    if (ref === "" && document.referrer) {
+      try {
+        const rh = new URL(document.referrer).host;
+        if (rh && rh !== location.host) { ref = document.referrer; sessionStorage.setItem("ma_ref", ref); }
+      } catch (_) {}
+    }
+    const q = new URLSearchParams(location.search);
+    const utm = {
+      source: q.get("utm_source") || "",
+      medium: q.get("utm_medium") || "",
+      campaign: q.get("utm_campaign") || "",
+    };
+
+    let cur = null; // { id, enterAt }
+    let visEnter = Date.now();
+    let accum = 0;
+    const elapsed = () => accum + (visEnter ? Date.now() - visEnter : 0);
+
+    function leave() {
+      if (!cur) return;
+      const sec = Math.max(0, Math.round(elapsed() / 1000));
+      const id = cur.id;
+      cur = null;
+      if (!id || sec <= 0) return;
+      const payload = JSON.stringify({ id, seconds: sec });
+      try {
+        const blob = new Blob([payload], { type: "application/json" });
+        if (navigator.sendBeacon) { navigator.sendBeacon("/api/analytics/leave", blob); return; }
+      } catch (_) {}
+      try { fetch("/api/analytics/leave", { method: "POST", body: payload, keepalive: true }); } catch (_) {}
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) { accum += Date.now() - visEnter; visEnter = 0; leave(); }
+      else { visEnter = Date.now(); }
+    });
+    window.addEventListener("pagehide", leave);
+
+    async function track(path) {
+      if (path === state.adminPath || path === "/admin") return; // 后台页不统计
+      if (state.admin) return; // 已登录管理员不统计（后端 cookie 再兜底）
+      leave(); // 结算上一页
+      accum = 0; visEnter = Date.now();
+      try {
+        const res = await fetch("/api/analytics/pv", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ path, title: document.title || "", referrer: ref, sid, ...utm }),
+        });
+        const j = await res.json();
+        if (j && j.data && j.data.id) cur = { id: j.data.id, enterAt: Date.now() };
+      } catch (_) {}
+    }
+    return { track };
+  })();
+
   function route() {
     // 后台手机抽屉若曾锁定滚动，任何路由切换都解除，避免页面卡住
     document.body.style.overflow = "";
@@ -8301,6 +8454,7 @@
       return;
     }
     syncFab();
+    Analytics.track(path);
     window.scrollTo(0, 0);
   }
 

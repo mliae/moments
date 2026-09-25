@@ -24,6 +24,7 @@ import searchRoutes from "./routes/search";
 import indexnowAdminRoutes from "./routes/indexnow";
 import baiduAdminRoutes from "./routes/baidu";
 import bgRoutes from "./routes/bg";
+import { analyticsPublicRoutes, analyticsAdminRoutes } from "./routes/analytics";
 import { getSettings } from "./settings";
 import { keyToSrc, ensureSchema, type PostRow } from "./db";
 import { isAdmin, hasAdminPassword } from "./auth";
@@ -110,6 +111,8 @@ app.route("/api/search", searchRoutes);
 app.route("/api/admin/indexnow", indexnowAdminRoutes);
 app.route("/api/admin/baidu", baiduAdminRoutes);
 app.route("/api/bg", bgRoutes);
+app.route("/api/analytics", analyticsPublicRoutes);
+app.route("/api/admin/analytics", analyticsAdminRoutes);
 
 app.get("/media/*", serveMedia);
 

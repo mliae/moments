@@ -87,6 +87,8 @@ export interface SiteSettings {
   baidu_push_token: string; // 百度推送 token（私密，不公开）
   // 评论表情包
   comment_emoji_owo_url: string; // 评论区 OwO 表情包 JSON 地址；默认站内 /owo.json（willow-god 包）
+  // 访问统计
+  analytics_enabled: boolean; // 是否启用访客访问统计（后台不计入）
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -172,6 +174,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   baidu_push_site: "",
   baidu_push_token: "",
   comment_emoji_owo_url: "/owo.json",
+  analytics_enabled: true,
 };
 
 /** 字符串字段约束：最大长度 */
@@ -259,6 +262,7 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "photos_enabled",
   "indexnow_auto",
   "baidu_push_enabled",
+  "analytics_enabled",
 ];
 
 export function clampSetting(value: unknown, max: number): string {
