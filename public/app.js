@@ -879,39 +879,31 @@
     unlockBodyScroll();
   }
 
-  /* ================= 图片灯箱（lightgallery：缩放/全屏/自动播放/手势） ================= */
+  /* ================= 图片灯箱（Fancybox：缩放/幻灯片/全屏/手势） ================= */
   // 全站图片统一用 data-lightbox 触发（feed / 相册 / 评论 / 正文）。
-  // 为不拖慢首屏，lightgallery 的 CSS+JS 在「首次点图」时才懒加载。
+  // 为不拖慢首屏，Fancybox 的 CSS+JS 在「首次点图」时才懒加载。
 
-  let lgInstance = null;        // 当前打开的 lightgallery 实例
-  let lgOpen = false;           // 灯箱是否处于打开状态
-  let lgAssetsPromise = null;   // 懒加载资源的 Promise（只加载一次）
+  let fbOpen = false;          // 灯箱是否处于打开状态
+  let fbAssetsPromise = null;  // 懒加载资源的 Promise（只加载一次）
 
-  // 懒加载 lightgallery 资源：CSS + 4 个 UMD 脚本（按序）
+  // 懒加载 Fancybox 资源：CSS + UMD 脚本
   function loadLightboxAssets() {
-    if (lgAssetsPromise) return lgAssetsPromise;
-    lgAssetsPromise = (async () => {
-      if (!document.getElementById("lg-css")) {
+    if (fbAssetsPromise) return fbAssetsPromise;
+    fbAssetsPromise = (async () => {
+      if (!document.getElementById("fb-css")) {
         const l = document.createElement("link");
-        l.id = "lg-css"; l.rel = "stylesheet"; l.href = "/vendor/lg/lightgallery-bundle.css";
+        l.id = "fb-css"; l.rel = "stylesheet"; l.href = "/vendor/fancybox/fancybox.css";
         document.head.appendChild(l);
       }
-      const scripts = [
-        "/vendor/lg/lightgallery.umd.js",
-        "/vendor/lg/lg-zoom.umd.js",
-        "/vendor/lg/lg-fullscreen.umd.js",
-        "/vendor/lg/lg-autoplay.umd.js",
-      ];
-      for (const s of scripts) {
-        if (document.querySelector(`script[src="${s}"]`)) continue;
+      if (!document.querySelector('script[src="/vendor/fancybox/fancybox.umd.js"]')) {
         await new Promise((res, rej) => {
           const sc = document.createElement("script");
-          sc.src = s; sc.onload = res; sc.onerror = rej;
+          sc.src = "/vendor/fancybox/fancybox.umd.js"; sc.onload = res; sc.onerror = rej;
           document.body.appendChild(sc);
         });
       }
     })();
-    return lgAssetsPromise;
+    return fbAssetsPromise;
   }
 
   // 用一组图片打开灯箱，index 为起始下标
@@ -924,27 +916,25 @@
     } catch (e) {
       showToast("图片查看器加载失败"); return;
     }
-    if (lgInstance) { try { lgInstance.destroy(); } catch (_) {} lgInstance = null; }
-    // 挂载到一个常驻容器，避免每次新建影响事件委托
-    let host = document.getElementById("lg-host");
-    if (!host) { host = document.createElement("div"); host.id = "lg-host"; document.body.appendChild(host); }
-    lgInstance = lightGallery(host, {
-      dynamic: true,
-      dynamicEl: list.map(s => ({ src: s, thumb: s })),
-      index,
-      download: false,            // 关闭下载按钮（界面零英文）
-      autoplayControls: true,     // 显示播放/暂停，用户可随时自动播放
-      pause: 3000,                // 自动播放每张停留 3s
-      progressBar: true,          // 播放进度条
-      zoom: true, fullscreen: true, controls: true, loop: true,
-      hideBarsDelay: 3000,
-      showMaximizeIcon: false,    // 去掉「放大」按钮（与全屏重复，保持简洁）
-      licenseKey: "0000-0000-000-0000",
-    });
-    lgInstance.openGallery(index);
+    if (typeof Fancybox === "undefined") { showToast("图片查看器加载失败"); return; }
+    Fancybox.show(
+      list.map(s => ({ src: s })),
+      {
+        startIndex: index,
+        infinite: true,              // 循环切换
+        dragToClose: false,          // 避免误触关闭
+        Images: { zoom: true },      // 滚轮/双击缩放
+        // 工具栏与参考站一致：中间 缩放/旋转/翻转，右侧 幻灯片/全屏/关闭（Fancybox 原厂 SVG 图标）
+        Toolbar: { display: { left: [], middle: ["zoomIn", "zoomOut", "actualSize", "rotateCCW", "rotateCW", "flipX", "flipY"], right: ["slideshow", "fullscreen", "close"] } },
+        on: {
+          done: () => { fbOpen = true; lockBodyScroll(); },
+          destroy: () => { fbOpen = false; unlockBodyScroll(); },
+        },
+      }
+    );
   }
 
-  function closeLightbox() { if (lgInstance) { try { lgInstance.close(); } catch (_) {} } }
+  function closeLightbox() { if (typeof Fancybox !== "undefined") { try { Fancybox.close(); } catch (_) {} } }
 
   // 事件委托：点击任意 [data-lightbox] 打开
   document.addEventListener("click", e => {
@@ -957,16 +947,9 @@
     }
   });
 
-  // 灯箱开关时锁定/释放 body 滚动
-  document.addEventListener("lgAfterOpen", () => { lgOpen = true; lockBodyScroll(); });
-  document.addEventListener("lgAfterClose", () => {
-    lgOpen = false; unlockBodyScroll();
-    if (lgInstance) { try { lgInstance.destroy(); } catch (_) {} lgInstance = null; }
-  });
-
   document.addEventListener("keydown", e => {
-    if (!lgOpen) return;
-    // 灯箱打开时独占 ESC：避免连带关闭下层评论弹窗
+    if (!fbOpen) return;
+    // 灯箱打开时独占 ESC：避免连带关闭下层评论弹窗（Fancybox 自身也会关闭）
     if (e.key === "Escape") { e.stopImmediatePropagation(); closeLightbox(); }
   });
 
@@ -3027,6 +3010,12 @@
           <a class="links-apply-btn" href="/links/apply">申请友链 ${svgIcon("arrow-right", 16)}</a>
         </div>
       </div></div>`;
+      // 同步浏览器标签页标题与 SEO
+      setSeo({
+        title: `友链 · ${state.settings.site_title}`,
+        description: state.settings.essay_subtitle || "",
+        path: activeCat === "全部" ? "/links" : `/links?category=${encodeURIComponent(activeCat)}`,
+      });
     } catch (e) {
       app.innerHTML = `<div class="essay"><div class="links-wrap"><div class="essay-empty">${esc(e.message)}</div></div></div>`;
     }
@@ -3094,6 +3083,14 @@
         </form>
       </div>
     </div></div>`;
+
+    // 同步浏览器标签页标题与 SEO
+    setSeo({
+      title: `申请友链 · ${s.site_title}`,
+      description: "提交站点信息，申请加入友链墙。",
+      path: "/links/apply",
+      noindex: true,
+    });
 
     // 自动获取站点信息
     const form = document.getElementById("linksApplyForm");
