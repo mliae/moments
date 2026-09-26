@@ -4343,6 +4343,16 @@
     } catch (e) { panel.innerHTML = `${head}<p>加载失败：${esc(e.message)}</p>`; return; }
 
     const fmtDur = sec => { sec = Number(sec) || 0; const m = Math.floor(sec / 60), r = sec % 60; return m ? `${m}分${r}秒` : `${r}秒`; };
+    // 静态路由 → 中文名；详情页回退用标题；都没有则显示原路径
+    const PAGE_NAMES = { "/": "首页", "/moments": "说说", "/posts": "文章", "/about": "关于", "/links": "友链", "/photos": "相册", "/search": "搜索", "/music": "音乐", "/feed": "订阅" };
+    const pageName = (path, title) => { path = path || "/"; return PAGE_NAMES[path] || (title ? title : path); };
+    // IPv6 太长：缩写显示前 3 段，完整地址仍可点击复制
+    const shortIp = ip => {
+      if (!ip) return "隐藏";
+      if (!ip.includes(":")) return ip;
+      const seg = ip.split(":").filter(Boolean);
+      return seg.length > 3 ? seg.slice(0, 3).join(":") + "…" : ip;
+    };
     const cards = [
       { label: "浏览量 PV", val: s.pv },
       { label: "独立访客 UV", val: s.uv },
@@ -4365,11 +4375,11 @@
 
     const visitors = (v.list || []).map(sess => {
       const loc = [sess.country, sess.region, sess.city].filter(Boolean).join(" · ") || "未知";
-      const pages = sess.pages.map(p => `<span class="an-page" title="${esc(p.title || "")}">${esc(p.path || "/")}<i>${fmtDur(p.dur)}</i></span>`).join("");
+      const pages = sess.pages.map(p => `<span class="an-page" title="${esc(p.path || "/")}">${esc(pageName(p.path, p.title))}<i>${fmtDur(p.dur)}</i></span>`).join("");
       const t = new Date(sess.last);
       return `<div class="an-visitor">
         <div class="an-vhead">
-          <span class="an-vip" data-copy="${esc(sess.ip)}" title="点击复制">${esc(sess.ip || "隐藏")}</span>
+          <span class="an-vip" data-copy="${esc(sess.ip)}" title="点击复制完整 IP">${esc(shortIp(sess.ip))}</span>
           <span class="an-vloc">${esc(loc)}</span>
           <span class="an-vdev">${esc(sess.device)} · ${esc(sess.os)} · ${esc(sess.browser)}</span>
           <span class="an-vtime">${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}</span>
@@ -4394,7 +4404,7 @@
         <p class="an-legend"><span><i style="background:var(--anzhiyu-main)"></i>PV</span><span><i style="background:#9ca3af"></i>UV</span></p>
       </div>
       <div class="an-grid">
-        ${barList("热门页面", s.topPaths)}
+        ${barList("热门页面", s.topPaths.map(r => ({ name: pageName(r.name, r.title), n: r.n })))}
         ${barList("来源网站", s.referrers.map(r => ({ name: (() => { try { return new URL(r.name).host; } catch { return r.name; } })(), n: r.n })))}
         ${barList("国家/地区", s.countries)}
         ${barList("设备", s.devices)}

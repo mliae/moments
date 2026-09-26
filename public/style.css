@@ -2150,7 +2150,10 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 .an-visitor { border-top: 1px dashed var(--anzhiyu-card-border); padding: .6rem 0; }
 .an-visitor:first-child { border-top: 0; }
 .an-vhead { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: .8rem; }
-.an-vip { font-weight: 700; color: var(--anzhiyu-main); cursor: pointer; font-variant-numeric: tabular-nums; }
+.an-vip { font-weight: 700; color: var(--anzhiyu-main); cursor: pointer; font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.an-barrow:hover .an-barfill { filter: brightness(1.15); }
+.an-barname { transition: color .15s; }
+.an-barrow:hover .an-barname { color: var(--anzhiyu-main); }
 .an-vip:hover { text-decoration: underline; }
 .an-vloc { color: var(--anzhiyu-fontcolor); }
 .an-vdev, .an-vtime, .an-vdur { color: var(--anzhiyu-secondtext); font-size: .74rem; }

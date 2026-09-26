@@ -181,7 +181,7 @@ adminApp.get("/summary", requireAdmin, async c => {
       `SELECT date(created_at) AS d, COUNT(*) AS pv, COUNT(DISTINCT ip) AS uv FROM analytics_pv
        WHERE ${where} GROUP BY date(created_at) ORDER BY d ASC`
     ),
-    db.prepare(`SELECT path, COUNT(*) AS n FROM analytics_pv WHERE ${where} GROUP BY path ORDER BY n DESC LIMIT 10`),
+    db.prepare(`SELECT path, MIN(title) AS title, COUNT(*) AS n FROM analytics_pv WHERE ${where} GROUP BY path ORDER BY n DESC LIMIT 10`),
     db.prepare(`SELECT referrer, COUNT(*) AS n FROM analytics_pv WHERE ${where} AND referrer <> '' GROUP BY referrer ORDER BY n DESC LIMIT 10`),
     db.prepare(`SELECT country, COUNT(*) AS n FROM analytics_pv WHERE ${where} GROUP BY country ORDER BY n DESC LIMIT 10`),
     db.prepare(`SELECT device, COUNT(*) AS n FROM analytics_pv WHERE ${where} GROUP BY device ORDER BY n DESC`),
@@ -214,7 +214,11 @@ adminApp.get("/summary", requireAdmin, async c => {
     uv: Number(row?.uv ?? 0),
     avgDuration: Math.round(Number(avgRow?.avg ?? 0)),
     trend,
-    topPaths: top(2),
+    topPaths: (batch[2].results as Array<{ path: string; title: string | null; n: number }>).map(r => ({
+      name: String(r.path),
+      title: String(r.title ?? ""),
+      n: Number(r.n),
+    })),
     referrers: top(3),
     countries: top(4),
     devices: top(5),
