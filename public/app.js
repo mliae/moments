@@ -572,6 +572,17 @@
   }
 
   let _ffmpegPromise = null;
+  let _hlsPromise = null;
+  // HLS 库（hls.min.js 约 600KB）按需加载：仅遇到非 Safari 的 HLS 视频时才下载
+  function ensureHls() {
+    if (window.Hls) return Promise.resolve(window.Hls);
+    if (!_hlsPromise) {
+      _hlsPromise = loadScript("/vendor/hls.min.js")
+        .then(() => window.Hls || null)
+        .catch(() => null);
+    }
+    return _hlsPromise;
+  }
   function loadFfmpeg() {
     if (_ffmpegPromise) return _ffmpegPromise;
     _ffmpegPromise = (async () => {
@@ -1225,19 +1236,21 @@
       videoEl.addEventListener("error", () => delete videoEl.dataset.loading);
       if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
         videoEl.src = url; // Safari 原生 HLS
-      } else if (window.Hls && Hls.isSupported()) {
-        // 起播/抗卡顿调优：默认配置过于保守（初始带宽估计仅 500kbps、
-        // 清单加载完才拉首片、前向缓冲只有 30s），外链源站慢时起播卡顿明显
-        const hls = new Hls({
-          enableWorker: true,
-          startFragPrefetch: true, // 清单解析时并行预取首片，起播快几百毫秒
-          abrEwmaDefaultEstimate: 2e6, // 初始带宽估计 2Mbps，多码率源直接高档起播
-          maxBufferLength: 60, // 前向缓冲目标 60s（默认 30s），抗源站抖动
-          backBufferLength: 30, // 已播仅保留 30s，控制内存
+      } else {
+        // 非 Safari：按需加载 hls.js 后再挂接（首屏不下载 600KB 库）
+        ensureHls().then(HlsCtor => {
+          if (!HlsCtor || !HlsCtor.isSupported()) { videoEl.src = url; return; }
+          const hls = new HlsCtor({
+            enableWorker: true,
+            startFragPrefetch: true, // 清单解析时并行预取首片，起播快几百毫秒
+            abrEwmaDefaultEstimate: 2e6, // 初始带宽估计 2Mbps，多码率源直接高档起播
+            maxBufferLength: 60, // 前向缓冲目标 60s（默认 30s），抗源站抖动
+            backBufferLength: 30, // 已播仅保留 30s，控制内存
+          });
+          hls.loadSource(url);
+          hls.attachMedia(videoEl);
+          videoEl._hls = hls; // 元素被移除时可供 destroy
         });
-        hls.loadSource(url);
-        hls.attachMedia(videoEl);
-        videoEl._hls = hls; // 元素被移除时可供 destroy
       }
     });
 

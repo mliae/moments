@@ -27,7 +27,7 @@ import bgRoutes from "./routes/bg";
 import { analyticsPublicRoutes, analyticsAdminRoutes } from "./routes/analytics";
 import { getSettings } from "./settings";
 import { keyToSrc, ensureSchema, type PostRow } from "./db";
-import { isAdmin, hasAdminPassword } from "./auth";
+import { isAdmin, hasAdminPassword, ADMIN_COOKIE } from "./auth";
 import {
   buildSeoHead,
   websiteJsonLd,
@@ -76,6 +76,29 @@ app.use("*", async (c, next) => {
   const dest = `https://${targetHost}${url.pathname}${url.search}`;
   const status = c.req.method === "GET" || c.req.method === "HEAD" ? 301 : 308;
   return c.redirect(dest, status);
+});
+
+/* ==================== SSR 页面边缘缓存 ====================
+ * 匿名访客的 HTML 走边缘缓存：命中即不跑 Worker / 不查 D1，TTFB 从秒级降到毫秒级。
+ * - 仅 GET、HTML、且未带管理员 cookie 时缓存（管理员永远取最新，避免后台改动被缓存）。
+ * - 发布/改动后最长 ~2 分钟生效；浏览器 1 分钟、边缘 2 分钟、并允许 stale-while-revalidate。
+ */
+const SSR_CACHE_EXACT = new Set(["/", "/posts", "/photos", "/links", "/links/apply"]);
+const isSsrCachePath = (pathname: string) => SSR_CACHE_EXACT.has(pathname) || /^\/post\/[^/]+$/.test(pathname);
+app.use("*", async (c, next) => {
+  if (c.req.method !== "GET" && c.req.method !== "HEAD") return next();
+  if (!isSsrCachePath(new URL(c.req.url).pathname)) return next();
+  const cookie = c.req.header("cookie") || "";
+  if (cookie.includes(`${ADMIN_COOKIE}=`)) return next(); // 管理员不缓存
+  const cache = (caches as unknown as { default: Cache }).default;
+  const key = new Request(c.req.url);
+  const hit = await cache.match(key);
+  if (hit) return hit; // 边缘命中，直接返回
+  await next();
+  if (c.res.status === 200 && (c.res.headers.get("content-type") || "").includes("text/html")) {
+    c.res.headers.set("cache-control", "public, max-age=60, s-maxage=120, stale-while-revalidate=600");
+    c.executionCtx.waitUntil(cache.put(key, c.res.clone()));
+  }
 });
 
 app.get("/api/health", c => ok(c, { site: c.env.SITE_NAME ?? "moments", time: new Date().toISOString() }));
