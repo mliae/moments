@@ -879,50 +879,74 @@
     unlockBodyScroll();
   }
 
-  /* ================= 图片灯箱（幻影灯） ================= */
+  /* ================= 图片灯箱（lightgallery：缩放/全屏/自动播放/手势） ================= */
+  // 全站图片统一用 data-lightbox 触发（feed / 相册 / 评论 / 正文）。
+  // 为不拖慢首屏，lightgallery 的 CSS+JS 在「首次点图」时才懒加载。
 
-  let lightboxState = null;
+  let lgInstance = null;        // 当前打开的 lightgallery 实例
+  let lgOpen = false;           // 灯箱是否处于打开状态
+  let lgAssetsPromise = null;   // 懒加载资源的 Promise（只加载一次）
 
-  function renderLightbox() {
-    if (!lightboxState) return;
-    const { group, index } = lightboxState;
-    const src = group[index];
-    const multi = group.length > 1;
-    lightboxRoot.innerHTML = `
-      <div class="lightbox-mask" data-lb-close>
-        <button type="button" class="lightbox-close" data-lb-close aria-label="关闭">×</button>
-        ${
-          multi
-            ? `<button type="button" class="lightbox-nav lightbox-prev" data-lb-prev aria-label="上一张">‹</button>
-               <button type="button" class="lightbox-nav lightbox-next" data-lb-next aria-label="下一张">›</button>
-               <div class="lightbox-index">${index + 1} / ${group.length}</div>`
-            : ""
-        }
-        <img class="lightbox-img" src="${esc(src)}" alt="" />
-        <span class="lightbox-orig-tip">原图 · 右键可保存</span>
-      </div>`;
+  // 懒加载 lightgallery 资源：CSS + 4 个 UMD 脚本（按序）
+  function loadLightboxAssets() {
+    if (lgAssetsPromise) return lgAssetsPromise;
+    lgAssetsPromise = (async () => {
+      if (!document.getElementById("lg-css")) {
+        const l = document.createElement("link");
+        l.id = "lg-css"; l.rel = "stylesheet"; l.href = "/vendor/lg/lightgallery-bundle.css";
+        document.head.appendChild(l);
+      }
+      const scripts = [
+        "/vendor/lg/lightgallery.umd.js",
+        "/vendor/lg/lg-zoom.umd.js",
+        "/vendor/lg/lg-fullscreen.umd.js",
+        "/vendor/lg/lg-autoplay.umd.js",
+      ];
+      for (const s of scripts) {
+        if (document.querySelector(`script[src="${s}"]`)) continue;
+        await new Promise((res, rej) => {
+          const sc = document.createElement("script");
+          sc.src = s; sc.onload = res; sc.onerror = rej;
+          document.body.appendChild(sc);
+        });
+      }
+    })();
+    return lgAssetsPromise;
   }
 
-  function openLightbox(src, group) {
-    lightboxState = { group: group.filter(Boolean), index: Math.max(0, group.indexOf(src)) };
-    lockBodyScroll();
-    renderLightbox();
+  // 用一组图片打开灯箱，index 为起始下标
+  async function openLightbox(src, group) {
+    const list = group.filter(Boolean);
+    if (!list.length) return;
+    const index = Math.max(0, list.indexOf(src));
+    try {
+      await loadLightboxAssets();
+    } catch (e) {
+      showToast("图片查看器加载失败"); return;
+    }
+    if (lgInstance) { try { lgInstance.destroy(); } catch (_) {} lgInstance = null; }
+    // 挂载到一个常驻容器，避免每次新建影响事件委托
+    let host = document.getElementById("lg-host");
+    if (!host) { host = document.createElement("div"); host.id = "lg-host"; document.body.appendChild(host); }
+    lgInstance = lightGallery(host, {
+      dynamic: true,
+      dynamicEl: list.map(s => ({ src: s, thumb: s })),
+      index,
+      download: false,            // 关闭下载按钮（界面零英文）
+      autoplayControls: true,     // 显示播放/暂停，用户可随时自动播放
+      pause: 3000,                // 自动播放每张停留 3s
+      progressBar: true,          // 播放进度条
+      zoom: true, fullscreen: true, controls: true, loop: true,
+      hideBarsDelay: 3000,
+      showMaximizeIcon: false,    // 去掉「放大」按钮（与全屏重复，保持简洁）
+      licenseKey: "0000-0000-000-0000",
+    });
+    lgInstance.openGallery(index);
   }
 
-  function closeLightbox() {
-    lightboxState = null;
-    lightboxRoot.innerHTML = "";
-    unlockBodyScroll();
-  }
+  function closeLightbox() { if (lgInstance) { try { lgInstance.close(); } catch (_) {} } }
 
-  function moveLightbox(delta) {
-    if (!lightboxState) return;
-    const n = lightboxState.group.length;
-    lightboxState.index = (lightboxState.index + delta + n) % n;
-    renderLightbox();
-  }
-
-  // 事件委托：点击任意 [data-lightbox] 打开；灯箱内按钮/遮罩处理
+  // 事件委托：点击任意 [data-lightbox] 打开
   document.addEventListener("click", e => {
     const trigger = e.target.closest?.("[data-lightbox]");
     if (trigger) {
@@ -930,22 +954,20 @@
       const wrap = trigger.closest(".bber-container-img") || trigger.parentElement;
       const group = [...wrap.querySelectorAll("[data-lightbox]")].map(a => a.getAttribute("data-lightbox"));
       openLightbox(trigger.getAttribute("data-lightbox"), group);
-      return;
     }
-    if (!lightboxState) return;
-    const t = e.target;
-    if (t.closest("[data-lb-prev]")) moveLightbox(-1);
-    else if (t.closest("[data-lb-next]")) moveLightbox(1);
-    else if (t.closest("[data-lb-close]") && !t.closest(".lightbox-img")) closeLightbox();
+  });
+
+  // 灯箱开关时锁定/释放 body 滚动
+  document.addEventListener("lgAfterOpen", () => { lgOpen = true; lockBodyScroll(); });
+  document.addEventListener("lgAfterClose", () => {
+    lgOpen = false; unlockBodyScroll();
+    if (lgInstance) { try { lgInstance.destroy(); } catch (_) {} lgInstance = null; }
   });
 
   document.addEventListener("keydown", e => {
-    if (!lightboxState) return;
-    // 灯箱打开时独占键盘：阻止模态的 ESC 处理器连带关闭评论弹窗
-    e.stopImmediatePropagation();
-    if (e.key === "Escape") closeLightbox();
-    else if (e.key === "ArrowLeft") moveLightbox(-1);
-    else if (e.key === "ArrowRight") moveLightbox(1);
+    if (!lgOpen) return;
+    // 灯箱打开时独占 ESC：避免连带关闭下层评论弹窗
+    if (e.key === "Escape") { e.stopImmediatePropagation(); closeLightbox(); }
   });
 
   // 缩略图加载失败 → 自动回退原图（老图片没有 _w1200 缩略图时触发）
