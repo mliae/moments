@@ -1843,8 +1843,8 @@
     panel.id = "emojiPanel";
     panel.className = "emoji-panel";
     panel.dataset.targetId = textarea.id || "";
-    // 分类：默认（lucide）+ 后台 OwO 各包
-    const tabs = [{ t: "lucide", name: "默认" }].concat(packs.map((p, i) => ({ t: "owo", name: p.name, idx: i })));
+    // 分类：只保留后台 OwO 图片包（去掉 lucide 默认 Tab）
+    const tabs = packs.map((p, i) => ({ t: "owo", name: p.name, idx: i }));
     panel.innerHTML = `
       <div class="emoji-tabs">
         ${tabs.map((tb, i) => `<button type="button" class="emoji-tab${i === 0 ? " is-active" : ""}" data-etab="${i}">${esc(tb.name)}</button>`).join("")}

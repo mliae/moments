@@ -33,7 +33,7 @@ function resolveKey(pathname: string): string | null {
     return null;
   }
   if (!key || key.startsWith("/") || key.includes("..") || key.includes("\\")) return null;
-  if (!key.startsWith("uploads/")) return null; // 只允许访问上传目录
+  if (!key.startsWith("uploads/") && !key.startsWith("emoji/")) return null; // 只允许访问上传/表情目录
   return key;
 }
 
