@@ -107,13 +107,13 @@ app.get("/api/health", c => ok(c, { site: c.env.SITE_NAME ?? "moments", time: ne
 // 设置变更频率低：浏览器缓存 60s + Cloudflare 边缘缓存 5min（边缘命中不消耗 Worker 请求额度）
 app.get("/api/settings", async c => {
   const s = await getSettings(c.env.DB);
-  // 私密字段绝不下发：后台入口、apihz 凭证、QQ 登录态
+  // 私密字段绝不下发：后台入口、QQ 登录态
   const {
-    admin_path: _h1, apihz_id: _h2, apihz_key: _h3, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
+    admin_path: _h1, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
     indexnow_key: _h7, baidu_push_token: _h8,
     ...publicSettings
   } = s;
-  void [_h1, _h2, _h3, _h4, _h5, _h6, _h7, _h8];
+  void [_h1, _h4, _h5, _h6, _h7, _h8];
   const res = ok(c, publicSettings);
   res.headers.set("Cache-Control", "public, max-age=60, s-maxage=300");
   return res;
@@ -523,4 +523,46 @@ app.onError((err, c) => {
   return fail(c, "服务器开小差了", 500);
 });
 
-export default app;
+/* ==================== Cron 定时任务 ====================
+ * QQ Cookie 保活：腾讯根据活跃度判定 skey/pskey 有效期，
+ * 定时调用 qzone 接口让 Cookie 保持活跃，延长可用时间。
+ * 保活间隔在后台「设置 - QQ 昵称资料」中配置（小时）。
+ */
+async function handleScheduled(env: HonoEnv["Bindings"]): Promise<void> {
+  try {
+    const s = await getSettings(env.DB);
+    if (!s.qq_ckqq || !s.qq_pskey) return; // 未配置 QQ 凭证，跳过
+
+    // 检查上次保活时间，避免过于频繁调用
+    const lastKey = "qq_keepalive_last";
+    const lastRow = await env.DB.prepare(
+      `SELECT value FROM kv_store WHERE key = ?`
+    ).bind(lastKey).first<{ value: string }>();
+    const lastTime = lastRow?.value ? new Date(lastRow.value).getTime() : 0;
+    const intervalHours = Math.max(1, Math.min(72, parseInt(s.qq_keepalive_interval, 10) || 6));
+    const intervalMs = intervalHours * 60 * 60 * 1000;
+    if (Date.now() - lastTime < intervalMs) return; // 未到间隔时间
+
+    // 调用腾讯接口保活（用 ckqq 自测）
+    const { fetchQqNickDirect } = await import("./routes/misc");
+    const r = await fetchQqNickDirect(s, s.qq_ckqq);
+    const status = r?.nickname ? "ok" : "empty";
+
+    // 记录本次保活时间
+    await env.DB.prepare(
+      `INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+    ).bind(lastKey, new Date().toISOString()).run();
+
+    console.log(`[qq-keepalive] ${status} interval=${intervalHours}h`);
+  } catch (e) {
+    console.error("[qq-keepalive] error:", e);
+  }
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled: async (_event: ScheduledEvent, env: HonoEnv["Bindings"], _ctx: ExecutionContext) => {
+    await handleScheduled(env);
+  },
+};

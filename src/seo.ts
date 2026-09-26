@@ -130,6 +130,9 @@ const fmtDate = (iso: string) => {
 };
 
 /** 与前端 .article-card 结构一致，data-ssr-post 供前端水合时识别（避免重绘闪烁） */
+const PIN_BADGE =
+  '<span class="top-badge"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg><span>置顶</span></span>';
+
 export function renderPostSsr(row: PostRow, commentCount: number, defaultPoster = "", r2Domain?: string): string {
   const p = serializePost(row, true, r2Domain);
   const body = renderMarkdownSafe(row.content_md || "", defaultPoster, r2Domain);
@@ -140,7 +143,7 @@ export function renderPostSsr(row: PostRow, commentCount: number, defaultPoster 
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
             返回首页
           </a>
-          <h1>${esc(p.title)}${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h1>
+          <h1>${p.pinned ? PIN_BADGE : ""}${esc(p.title)}${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h1>
           <div class="article-meta"><time datetime="${escAttr(p.created_at)}">${esc(fmtDate(p.created_at))}</time></div>
           <div class="article-body">${body}</div>
           <div class="article-actions"><a class="btn" href="/posts">返回列表</a></div>

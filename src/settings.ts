@@ -71,12 +71,11 @@ export interface SiteSettings {
   // 评论头像
   random_avatar_api: string; // 随机头像 API 列表，每行一条，支持 {imgtype} 占位；留空=内置 apihz 默认
   random_avatar_imgtype: string; // 随机头像类型 imgtype（apihz 0-16），默认 9=古风
-  // QQ 资料（apihz 接口）——私密，不通过公开 API 下发
-  apihz_id: string; // apihz 开发者 ID
-  apihz_key: string; // apihz 开发者 KEY
+  // QQ 昵称资料（自建接口，skey/pskey 直接调腾讯，不经过第三方）
   qq_ckqq: string; // 系统 QQ 号
   qq_skey: string; // 系统 QQ 的 skey
   qq_pskey: string; // 系统 QQ 的 pskey（p_skey）
+  qq_keepalive_interval: string; // 保活间隔（小时），1-72，默认 6；Cron 定时用 skey 调腾讯接口维持活跃
   // IndexNow 搜索推送
   indexnow_key: string; // IndexNow 密钥（去 Bing 站长平台生成）；空=未启用推送
   indexnow_endpoints: string; // 推送端点列表，每行一个 URL（默认含 Bing/统一入口/百度）
@@ -160,11 +159,10 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   random_avatar_api:
     "https://cn.apihz.cn/api/img/apihzimgtx.php?id=88888888&key=88888888&type=1&imgtype={imgtype}",
   random_avatar_imgtype: "9",
-  apihz_id: "",
-  apihz_key: "",
   qq_ckqq: "",
   qq_skey: "",
   qq_pskey: "",
+  qq_keepalive_interval: "6",
   indexnow_key: "",
   indexnow_endpoints:
     "https://api.indexnow.org/indexnow\n" +
@@ -225,11 +223,10 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   site_icon: 300,
   random_avatar_api: 2000,
   random_avatar_imgtype: 2,
-  apihz_id: 20,
-  apihz_key: 64,
   qq_ckqq: 20,
   qq_skey: 200,
   qq_pskey: 256,
+  qq_keepalive_interval: 3,
   indexnow_key: 128,
   indexnow_endpoints: 1500,
   baidu_push_site: 100,
@@ -305,6 +302,11 @@ export function normalizeSettings(raw: Record<string, unknown> | null | undefine
   out.banner_bg_interval = Number.isFinite(bi)
     ? String(Math.max(1, Math.min(720, bi)))
     : DEFAULT_SETTINGS.banner_bg_interval;
+  // QQ Cookie 保活间隔（小时）：1-72，非法回退默认
+  const ka = parseInt(out.qq_keepalive_interval, 10);
+  out.qq_keepalive_interval = Number.isFinite(ka)
+    ? String(Math.max(1, Math.min(72, ka)))
+    : DEFAULT_SETTINGS.qq_keepalive_interval;
   if (out.banner_bg_mode !== "static" && out.banner_bg_mode !== "random") out.banner_bg_mode = DEFAULT_SETTINGS.banner_bg_mode;
   return out;
 }

@@ -1,4 +1,4 @@
-/* global marked, Hls */
+/* global marked, Hls, Artplayer */
 /* eslint-disable */
 /* build 20260921f */
 /**
@@ -265,6 +265,7 @@
     info: { stroke: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>' },
     check: { stroke: '<path d="M20 6 9 17l-5-5"/>' },
     "circle-user": { stroke: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/>' },
+    pin: { stroke: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>' },
   };
 
   function svgIcon(name, size) {
@@ -574,6 +575,7 @@
 
   let _ffmpegPromise = null;
   let _hlsPromise = null;
+  let _artPromise = null;
   // HLS 库（hls.min.js 约 600KB）按需加载：仅遇到非 Safari 的 HLS 视频时才下载
   function ensureHls() {
     if (window.Hls) return Promise.resolve(window.Hls);
@@ -583,6 +585,16 @@
         .catch(() => null);
     }
     return _hlsPromise;
+  }
+  // Artplayer（约 158KB）按需加载：仅桌面端存在视频时才下载（移动端用原生控件）
+  function ensureArtplayer() {
+    if (window.Artplayer) return Promise.resolve(window.Artplayer);
+    if (!_artPromise) {
+      _artPromise = loadScript("/vendor/artplayer.js")
+        .then(() => window.Artplayer || null)
+        .catch(() => null);
+    }
+    return _artPromise;
   }
   function loadFfmpeg() {
     if (_ffmpegPromise) return _ffmpegPromise;
@@ -1114,7 +1126,9 @@
     iframe.frameBorder = "0";
     iframe.allowFullscreen = true;
     iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen");
-    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups");
+    // sandbox 拦截站外跳转：无 allow-popups 时播放器内 logo/标题/推荐的 window.open 全被拦死；
+    // 无 allow-top-navigation 时无法跳转顶层页面。播放/全屏等内部功能不受影响。
+    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation");
     el.innerHTML = "";
     el.appendChild(iframe);
   }
@@ -1228,58 +1242,129 @@
       if (v.readyState >= 1) applyRatio();
       v.addEventListener("loadedmetadata", applyRatio);
     });
+    // 桌面端增强：原生 <video> → Artplayer（倍速/画面比例/PIP/网页全屏/统一皮肤）。
+    // 仅桌面（宽 ≥769px 且非触屏）：移动端保留原生控件（系统级手势/锁屏控制更优）。
+    // 库加载失败自动回退原生挂接。先同步占位 data-video-attached，防止下方原生逻辑重复处理。
+    // 全端启用 Artplayer（含移动端，用户想体验手机端效果）。
+    // 快速回退：把 MOBILE_ARTPLAYER 改回 false 即恢复移动端原生控件。
+    const MOBILE_ARTPLAYER = true;
+    if (MOBILE_ARTPLAYER || (!isTouchDevice && window.matchMedia("(min-width: 769px)").matches)) {
+      root.querySelectorAll("video.essay-media-video:not([data-video-attached])").forEach(videoEl => {
+        videoEl.dataset.videoAttached = "1";
+        ensureArtplayer().then(Art => {
+          if (Art) buildArtplayer(videoEl, Art);
+          else { delete videoEl.dataset.videoAttached; attachVideoNative(videoEl); }
+        });
+      });
+    }
     // 仅水合"未挂接"的视频：loadFeed 每次翻页都对整个列表容器调用，
     // 不加标记会让旧 HLS 视频被反复 new Hls()，旧实例（含 worker/持续分片下载）
     // 从不销毁，翻几页后 CPU/网络/内存暴涨，整站越来越卡。
-    root.querySelectorAll("video.essay-media-video--hls[data-hls-src]:not([data-video-attached])").forEach(videoEl => {
-      const url = videoEl.dataset.hlsSrc;
-      if (!url) return;
-      videoEl.dataset.videoAttached = "1";
-      // 加载提示：只在用户主动播放且确实缓冲中时显示。
-      // 不能用 loadstart——preload="none" 的视频解析到 src 就会触发 loadstart
-      // 但不下载数据、canplay 永不触发，会导致"加载中…"遮罩永久残留盖住封面。
-      videoEl.addEventListener("play", () => { if (videoEl.readyState < 3) videoEl.dataset.loading = "1"; });
-      videoEl.addEventListener("waiting", () => videoEl.dataset.loading = "1");
-      videoEl.addEventListener("canplay", () => delete videoEl.dataset.loading);
-      videoEl.addEventListener("playing", () => delete videoEl.dataset.loading);
-      videoEl.addEventListener("pause", () => delete videoEl.dataset.loading);
-      videoEl.addEventListener("error", () => delete videoEl.dataset.loading);
-      if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
-        videoEl.src = url; // Safari 原生 HLS
-      } else {
-        // 非 Safari：按需加载 hls.js 后再挂接（首屏不下载 600KB 库）
-        ensureHls().then(HlsCtor => {
-          if (!HlsCtor || !HlsCtor.isSupported()) { videoEl.src = url; return; }
-          const hls = new HlsCtor({
-            enableWorker: true,
-            startFragPrefetch: true, // 清单解析时并行预取首片，起播快几百毫秒
-            abrEwmaDefaultEstimate: 2e6, // 初始带宽估计 2Mbps，多码率源直接高档起播
-            maxBufferLength: 60, // 前向缓冲目标 60s（默认 30s），抗源站抖动
-            backBufferLength: 30, // 已播仅保留 30s，控制内存
-          });
-          hls.loadSource(url);
-          hls.attachMedia(videoEl);
-          videoEl._hls = hls; // 元素被移除时可供 destroy
-        });
-      }
-    });
-
+    root.querySelectorAll("video.essay-media-video--hls[data-hls-src]:not([data-video-attached])").forEach(attachVideoNative);
     // 非 HLS（直 src）视频：加载提示
-    root.querySelectorAll("video.essay-media-video[src]:not(.essay-media-video--hls):not([data-video-attached])").forEach(v => {
-      v.dataset.videoAttached = "1";
-      // 同上：不用 loadstart（preload="none" 下会误触发且永久不清除）
-      v.addEventListener("play", () => { if (v.readyState < 3) v.dataset.loading = "1"; });
-      v.addEventListener("waiting", () => v.dataset.loading = "1");
-      v.addEventListener("canplay", () => delete v.dataset.loading);
-      v.addEventListener("playing", () => delete v.dataset.loading);
-      v.addEventListener("pause", () => delete v.dataset.loading);
-      v.addEventListener("error", () => delete v.dataset.loading);
+    root.querySelectorAll("video.essay-media-video[src]:not(.essay-media-video--hls):not([data-video-attached])").forEach(attachVideoNative);
+  }
+
+  /** 给 video 元素挂 HLS 源：Safari 走原生 HLS，其余按需加载 hls.js（约 600KB，首屏不下载） */
+  function attachHlsSource(videoEl, url) {
+    if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
+      videoEl.src = url; // Safari 原生 HLS
+      return;
+    }
+    ensureHls().then(HlsCtor => {
+      if (!HlsCtor || !HlsCtor.isSupported()) { videoEl.src = url; return; }
+      const hls = new HlsCtor({
+        enableWorker: true,
+        startFragPrefetch: true, // 清单解析时并行预取首片，起播快几百毫秒
+        abrEwmaDefaultEstimate: 2e6, // 初始带宽估计 2Mbps，多码率源直接高档起播
+        maxBufferLength: 60, // 前向缓冲目标 60s（默认 30s），抗源站抖动
+        backBufferLength: 30, // 已播仅保留 30s，控制内存
+      });
+      hls.loadSource(url);
+      hls.attachMedia(videoEl);
+      videoEl._hls = hls; // 元素被移除时可供 destroy
     });
+  }
+
+  /** 原生挂接（移动端 / Artplayer 加载失败回退）：加载提示 + HLS/直链处理 */
+  function attachVideoNative(videoEl) {
+    videoEl.dataset.videoAttached = "1";
+    const url = videoEl.dataset.hlsSrc;
+    if (videoEl.classList.contains("essay-media-video--hls") && !url) return;
+    // 加载提示：只在用户主动播放且确实缓冲中时显示。
+    // 不能用 loadstart——preload="none" 的视频解析到 src 就会触发 loadstart
+    // 但不下载数据、canplay 永不触发，会导致"加载中…"遮罩永久残留盖住封面。
+    videoEl.addEventListener("play", () => { if (videoEl.readyState < 3) videoEl.dataset.loading = "1"; });
+    videoEl.addEventListener("waiting", () => videoEl.dataset.loading = "1");
+    videoEl.addEventListener("canplay", () => delete videoEl.dataset.loading);
+    videoEl.addEventListener("playing", () => delete videoEl.dataset.loading);
+    videoEl.addEventListener("pause", () => delete videoEl.dataset.loading);
+    videoEl.addEventListener("error", () => delete videoEl.dataset.loading);
+    if (url) attachHlsSource(videoEl, url);
+  }
+
+  /** 桌面端：把 .video-stage 里的原生 video 替换为 Artplayer 容器。
+   *  竖屏比例在 metadata 后写入容器（与原生 applyRatio 行为一致），构造失败回退原生。 */
+  function buildArtplayer(videoEl, Art) {
+    if (!videoEl.isConnected) return;
+    const stage = videoEl.parentElement; // .video-stage（hydrateVideos 已包好）
+    const url = videoEl.dataset.hlsSrc || videoEl.getAttribute("src") || "";
+    if (!stage || !url) { delete videoEl.dataset.videoAttached; attachVideoNative(videoEl); return; }
+    const poster = videoEl.getAttribute("poster") || "";
+    const isHls = /\.m3u8(?:[?#]|$)/i.test(url);
+    const box = document.createElement("div");
+    box.className = "essay-media-video--art";
+    stage.querySelectorAll(".video-play-btn").forEach(b => b.remove()); // Artplayer 自带按钮，防重叠
+    videoEl.replaceWith(box);
+    let art = null;
+    try {
+      art = new Art({
+        container: box,
+        url,
+        poster,
+        type: isHls ? "m3u8" : "",
+        lang: "zh-cn",
+        theme: (getComputedStyle(document.documentElement).getPropertyValue("--anzhiyu-main") || "#6b8e6f").trim(),
+        volume: 1,
+        autoplay: false,
+        mutex: true, // 多实例互斥：播一个停另一个
+        hotkey: true, // 空格/方向键（聚焦时）
+        setting: true, // 设置菜单（画面比例等）。注意：布尔开关是 setting；settings 是自定义菜单数组，传布尔会触发 v5 校验抛错回退原生
+        playbackRate: true, // 倍速按钮
+        aspectRatio: true,
+        pip: true,
+        fullscreen: true,
+        fullscreenWeb: false, // 网页全屏全端关闭（用户需求）
+        moreVideoAttr: { playsInline: true },
+        customType: isHls ? { m3u8: (video, src) => attachHlsSource(video, src) } : {},
+      });
+    } catch (e) {
+      console.warn("Artplayer 初始化失败，回退原生播放器:", e);
+      box.remove();
+      stage.appendChild(videoEl);
+      delete videoEl.dataset.videoAttached;
+      attachVideoNative(videoEl);
+      return;
+    }
+    box._art = art;
+    const applyRatio = () => {
+      const v = art.video, W = v.videoWidth, H = v.videoHeight;
+      if (!W || !H) return;
+      box.style.aspectRatio = (W / H).toFixed(4);
+      box.classList.toggle("video-portrait", H > W);
+      art.resize();
+    };
+    art.on("video:loadedmetadata", applyRatio);
   }
 
   /** 停止容器内所有视频：HLS 销毁实例（停止后台拉分片），普通 MP4 暂停。
    *  删除卡片/关弹窗/视图切换/路由切换前调用，防止声音继续、流量空耗 */
   function disposeVideos(root) {
+    // Artplayer 实例销毁（内部 video/事件/解码器），防止切页后后台续播耗流量
+    root.querySelectorAll(".essay-media-video--art").forEach(box => {
+      try { if (box._art) { box._art.destroy(true); box._art = null; } } catch { /* 忽略 */ }
+      box.remove();
+    });
     root.querySelectorAll("video.essay-media-video--hls").forEach(videoEl => {
       try {
         if (videoEl._hls) {
@@ -1707,14 +1792,16 @@
   /** 时间线中的文章卡片：只显示封面 + 标题 + 摘要，点击进入文章详情 */
   function postFeedCardHtml(p) {
     return `
-    <li class="bber-item bber-item--post">
+    <li class="bber-item bber-item--post${p.pinned ? " bber-item--pinned" : ""}">
       <a class="bber-post-link" href="/post/${encodeURIComponent(p.slug)}">
         <div class="bber-author-row">
           <span class="bber-author">
             ${avatarSpanHtml(state.settings.post_avatar, "", "bber-author-avatar--post", "file-text")}
             <span class="bber-author-nickname">文章</span>
           </span>
-          <span class="bber-post-tag">文章</span>
+          ${p.pinned
+            ? `<span class="bber-post-tag bber-post-tag--pinned">${svgIcon("pin", 12)}<span>置顶</span></span>`
+            : `<span class="bber-post-tag">文章</span>`}
         </div>
         ${p.cover ? `<div class="bber-post-cover"><img src="${esc(thumbSrc(p.cover))}" alt="" loading="lazy" referrerpolicy="no-referrer" data-orig="${esc(p.cover)}" /></div>` : ""}
         <div class="bber-post-title">${esc(p.title)}</div>
@@ -1739,9 +1826,20 @@
   }
 
   /** 评论内容 @ 提及高亮：转义后包裹 @username */
+  /** 解析时间戳字符串 → 秒数（支持 分:秒 和 时:分:秒） */
+  function parseTimestamp(ts) {
+    const p = ts.split(":").map(Number);
+    return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p[0] * 60 + p[1];
+  }
   function formatCommentContent(text) {
     return owoTokenToImg(reactionTokenToSvg(esc(text)))
-      .replace(/@([^\s@<>，。！？、（）]+)/g, '<span class="comment-mention">@$1</span>');
+      .replace(/@([^\s@<>，。！？、（）]+)/g, '<span class="comment-mention">@$1</span>')
+      // 评论时间戳锚点：0:00 / 12:34 / 1:23:45 → 可点击跳转视频
+      .replace(/(^|[^0-9:])(\d{1,2}):(\d{2})(?::(\d{2}))?($|[^0-9:])/g,
+        (_, pre, a, b, c, post) => {
+          const ts = c ? `${a}:${b}:${c}` : `${a}:${b}`;
+          return `${pre}<a href="#" class="comment-timestamp" data-ts="${ts}">${a}:${b}${c ? ":" + c : ""}</a>${post}`;
+        });
   }
 
   /* ================= 评论增强：表情 / 图片 / 随机评论 ================= */
@@ -2637,10 +2735,10 @@
                 ? list
                     .map(
                       p => `
-            <a class="post-item" href="/post/${encodeURIComponent(p.slug)}">
+            <a class="post-item${p.pinned ? " post-item--pinned" : ""}" href="/post/${encodeURIComponent(p.slug)}">
               ${p.cover ? `<img class="cover" src="${esc(thumbSrc(p.cover))}" loading="lazy" alt="" data-orig="${esc(p.cover)}" />` : ""}
               <div class="info">
-                <h3>${esc(p.title)}${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h3>
+                <h3>${p.pinned ? `<span class="top-badge">${svgIcon("pin", 12)}<span>置顶</span></span>` : ""}${esc(p.title)}${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h3>
                 <p class="excerpt">${esc(p.excerpt || "")}</p>
                 <div class="date">${timeAgo(p.created_at)}</div>
               </div>
@@ -3252,7 +3350,7 @@
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
             返回首页
           </a>
-          <h1>${esc(p.title)}${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h1>
+          <h1>${p.pinned ? `<span class="top-badge">${svgIcon("pin", 13)}<span>置顶</span></span>` : ""}${esc(p.title)}${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h1>
           <div class="article-meta">${timeAgo(p.created_at)}</div>
           <div class="article-body">${sanitizeHtml(marked.parse(p.content_md || ""))}</div>
           ${
@@ -4594,14 +4692,15 @@
           ? list
               .map(
                 p => `
-        <div class="admin-row">
+        <div class="admin-row${p.pinned ? " is-pinned" : ""}">
           <label class="admin-check-cell"><input type="checkbox" class="admin-check" value="${p.id}" /></label>
           <div class="row-main">
-            <div class="row-title">${esc(p.title)}${p.status === "draft" ? '<span class="tag-mini draft" style="margin-left:6px">草稿</span>' : ""}</div>
+            <div class="row-title">${esc(p.title)}${p.pinned ? '<span class="tag-mini pinned" style="margin-left:6px">置顶</span>' : ""}${p.status === "draft" ? '<span class="tag-mini draft" style="margin-left:6px">草稿</span>' : ""}</div>
             <div class="row-sub"><span>${timeAgo(p.created_at)}</span><span>/${esc(p.slug)}</span></div>
           </div>
           <div class="row-actions">
             <a class="btn" href="/post/${encodeURIComponent(p.slug)}${p.status === "draft" ? "?preview=1" : ""}">查看</a>
+            <button class="btn${p.pinned ? " primary" : ""}" data-admin-act="pin-post" data-id="${p.id}" data-pinned="${p.pinned ? 1 : 0}">${p.pinned ? "取消置顶" : "置顶"}</button>
             <button class="btn" data-admin-act="edit-post" data-slug="${esc(p.slug)}">编辑</button>
             <button class="btn danger" data-admin-act="del-post" data-id="${p.id}">删除</button>
           </div>
@@ -5217,17 +5316,16 @@
         </details>
 
         <details class="admin-fold">
-          <summary class="admin-fold-summary">QQ 昵称资料（apihz）</summary>
+          <summary class="admin-fold-summary">QQ 昵称资料（自建）</summary>
           <div class="admin-fold-body">
         <div class="field" style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc)">
-          <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，用这组凭证查昵称。凭证仅存服务端，绝不下发前台。</div>
+          <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，用这组凭证查昵称。Worker 直连腾讯，凭证不出本站点，无泄露风险。</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
-            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">apihz 开发者 ID</label><input name="apihz_id" value="${esc(s.apihz_id)}" placeholder="个人资料里的数字 ID" /></div>
-            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">apihz 开发者 KEY</label><input name="apihz_key" value="${esc(s.apihz_key)}" placeholder="通讯秘钥" /></div>
             <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">系统 QQ（ckqq）</label><input name="qq_ckqq" value="${esc(s.qq_ckqq)}" placeholder="你的 QQ 号" /></div>
             <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">skey</label><input name="qq_skey" value="${esc(s.qq_skey)}" placeholder="cookie 里的 skey" /></div>
           </div>
           <div style="margin-top:.4rem"><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">pskey（p_skey）</label><input name="qq_pskey" value="${esc(s.qq_pskey)}" placeholder="cookie 里的 p_skey" style="width:100%" /></div>
+          <div style="margin-top:.4rem"><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">Cookie 保活间隔（小时）</label><input name="qq_keepalive_interval" type="number" min="1" max="72" value="${esc(s.qq_keepalive_interval)}" placeholder="6" style="width:100%" /></div>
           <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.6rem">
             <a data-qq-bookmarklet class="btn" href="#" style="text-decoration:none">拖拽到书签栏：一键抓取</a>
             <button type="button" class="btn" data-qq-test>测试连接</button>
@@ -5387,11 +5485,10 @@
       bmLink.addEventListener("click", e => e.preventDefault());
     }
     const qqFormVals = () => ({
-      apihz_id: panel.querySelector('[name="apihz_id"]')?.value || "",
-      apihz_key: panel.querySelector('[name="apihz_key"]')?.value || "",
       qq_ckqq: panel.querySelector('[name="qq_ckqq"]')?.value || "",
       qq_skey: panel.querySelector('[name="qq_skey"]')?.value || "",
       qq_pskey: panel.querySelector('[name="qq_pskey"]')?.value || "",
+      qq_keepalive_interval: panel.querySelector('[name="qq_keepalive_interval"]')?.value || "6",
     });
     const parseBtn = panel.querySelector("[data-qq-parse]");
     if (parseBtn) {
@@ -7797,6 +7894,20 @@
         }
         return;
       }
+      if (act === "pin-post") {
+        const id = Number(adminAct.dataset.id);
+        const nextPinned = adminAct.dataset.pinned === "1" ? 0 : 1;
+        adminAct.disabled = true;
+        try {
+          const res = await api(`/api/posts/${id}/pin`, { method: "POST", body: { pinned: nextPinned } });
+          toast(res.message || (nextPinned ? "已置顶" : "已取消置顶"));
+          renderAdminPosts(document.getElementById("adminPanel"));
+        } catch (err) {
+          adminAct.disabled = false;
+          toast(err.message);
+        }
+        return;
+      }
       if (act === "del-post") {
         const id = Number(adminAct.dataset.id);
         if (!confirm("确定删除这篇文章？")) return;
@@ -7966,7 +8077,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
@@ -8137,6 +8248,27 @@
 
   /* ---------- 评论区点击委托：一键回复 / 楼中楼折叠 / 顶级评论折叠 / 取消回复 ---------- */
   document.addEventListener("click", e => {
+    // 评论时间戳锚点：跳转到视频对应时间点
+    const tsLink = e.target.closest?.("a.comment-timestamp[data-ts]");
+    if (tsLink) {
+      e.preventDefault();
+      const sec = parseTimestamp(tsLink.dataset.ts);
+      // 在当前文章页找第一个视频（Artplayer 或原生 video）
+      const artBox = document.querySelector(".essay-media-video--art");
+      const nativeVideo = document.querySelector("video.essay-media-video");
+      if (artBox && artBox._art) {
+        artBox._art.video.currentTime = sec;
+        artBox._art.play();
+        artBox.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (nativeVideo) {
+        nativeVideo.currentTime = sec;
+        nativeVideo.play().catch(() => {});
+        nativeVideo.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        toast("当前页面没有视频");
+      }
+      return;
+    }
     const btn = e.target.closest?.("button");
     if (!btn) return;
     if (btn.hasAttribute("data-replies-toggle")) {

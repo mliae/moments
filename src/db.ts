@@ -26,10 +26,12 @@ CREATE TABLE IF NOT EXISTS posts (
   content_md  TEXT NOT NULL DEFAULT '',
   cover       TEXT NOT NULL DEFAULT '',
   status      TEXT NOT NULL DEFAULT 'published',
+  pinned      INTEGER NOT NULL DEFAULT 0, -- 1=置顶：列表与首页混合流最前
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_posts_status_created ON posts (status, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_pinned ON posts (status, pinned, id DESC);
 
 CREATE TABLE IF NOT EXISTS comments (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -212,6 +214,7 @@ export interface PostRow {
   content_md: string;
   cover: string;
   status: string;
+  pinned?: number; // 1=置顶
   created_at: string;
   updated_at: string;
 }
@@ -365,6 +368,7 @@ export function serializePost(row: PostRow, withContent = false, r2Domain?: stri
     excerpt: row.excerpt,
     cover: row.cover ? keyToSrc(row.cover, r2Domain) : "",
     status: row.status,
+    pinned: row.pinned ? 1 : 0,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -430,6 +434,7 @@ export interface PostFeedView {
   title: string;
   excerpt: string;
   cover: string;
+  pinned: number; // 1=置顶（仅首页第一页可能出现）
   created_at: string;
 }
 
@@ -440,6 +445,8 @@ export interface FeedCursor {
   ts: string;
   kind: "moment" | "post";
   id: number;
+  /** head=true：普通流第一页的特殊游标（前一页被置顶占满时使用），不加时间水位，也不再注入置顶 */
+  head?: true;
 }
 
 /** 游标仅含 ASCII（ISO 时间 + kind + id），可直接 btoa */
@@ -450,7 +457,7 @@ export function decodeFeedCursor(raw: string): FeedCursor | null {
   try {
     const c = JSON.parse(atob(raw)) as Partial<FeedCursor>;
     if (c && typeof c.ts === "string" && typeof c.id === "number" && (c.kind === "moment" || c.kind === "post")) {
-      return { ts: c.ts, kind: c.kind, id: c.id };
+      return { ts: c.ts, kind: c.kind, id: c.id, ...(c.head ? { head: true as const } : {}) };
     }
     return null;
   } catch {
@@ -461,6 +468,7 @@ export function decodeFeedCursor(raw: string): FeedCursor | null {
 /**
  * 混合时间线：说说 + 已发布文章，按 created_at 倒序混排（同表内同毫秒以 id 兜底）。
  * 游标分页：每张表各取 limit+1，在 JS 中归并后截取一页。
+ * 置顶文章：pinned=1 的文章始终从普通流排除（所有分页），仅第一页单独注入到最前面。
  */
 export async function queryFeed(
   db: D1Database,
@@ -470,6 +478,7 @@ export async function queryFeed(
   const voter = safeVoter(opts.voterId);
   const r2 = opts.r2Domain;
   const cur = opts.cursor ?? null;
+  const useWatermark = !!cur && !cur.head; // head 游标表示普通流起点，不加时间条件
   // 关键词过滤：有 q 时只检索匹配的说说（内容/位置），不混入文章
   const q = (opts.q || "").trim();
   const like = q ? `%${q}%` : "";
@@ -480,59 +489,81 @@ export async function queryFeed(
   if (voter) mBinds.push(voter);
   const mConds: string[] = [];
   if (like) { mConds.push("(m.content LIKE ? OR m.location LIKE ?)"); mBinds.push(like, like); }
-  if (cur) { mConds.push("(m.created_at < ? OR (m.created_at = ? AND m.id < ?))"); mBinds.push(cur.ts, cur.ts, cur.id); }
+  if (useWatermark) { mConds.push("(m.created_at < ? OR (m.created_at = ? AND m.id < ?))"); mBinds.push(cur!.ts, cur!.ts, cur!.id); }
   const mWhere = mConds.length ? "WHERE " + mConds.join(" AND ") : "";
   mBinds.push(fetchN);
   const mSql = `${momentSelectColumns(voter)} ${mWhere} ORDER BY m.created_at DESC, m.id DESC LIMIT ?`;
   const mRows = (await db.prepare(mSql).bind(...mBinds).all<MomentRow>()).results;
 
-  // 已发布文章（关键词过滤模式下不返回文章）
+  const POST_COLS = `SELECT id, slug, title, excerpt, cover, status, pinned, created_at, updated_at FROM posts`;
+  const toPostFeed = (row: PostRow): PostFeedView => ({
+    kind: "post",
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    excerpt: row.excerpt,
+    cover: row.cover ? keyToSrc(row.cover, r2) : "",
+    pinned: row.pinned ? 1 : 0,
+    created_at: row.created_at,
+  });
+
+  // 置顶文章：仅第一页（无游标、无搜索词）查询并注入，上限 10 篇，按文章新旧排序
+  let pinnedFeed: PostFeedView[] = [];
+  if (!like && !cur) {
+    const pinnedRows = (
+      await db
+        .prepare(`${POST_COLS} WHERE status = 'published' AND pinned = 1 ORDER BY id DESC LIMIT 10`)
+        .all<PostRow>()
+    ).results;
+    pinnedFeed = pinnedRows.map(toPostFeed);
+  }
+
+  // 普通文章（pinned=0 永不进入普通流，避免翻页后在旧时间位置重复出现）
   let pRows: PostRow[] = [];
   if (!like) {
     const pBinds: (string | number)[] = [];
-    let pWhere = `WHERE status = 'published'`;
-    if (cur) {
+    let pWhere = `WHERE status = 'published' AND pinned = 0`;
+    if (useWatermark) {
       pWhere += ` AND (created_at < ? OR (created_at = ? AND id < ?))`;
-      pBinds.push(cur.ts, cur.ts, cur.id);
+      pBinds.push(cur!.ts, cur!.ts, cur!.id);
     }
     pBinds.push(fetchN);
     pRows = (
       await db
-        .prepare(
-          `SELECT id, slug, title, excerpt, cover, status, created_at, updated_at
-         FROM posts ${pWhere} ORDER BY created_at DESC, id DESC LIMIT ?`
-        )
+        .prepare(`${POST_COLS} ${pWhere} ORDER BY created_at DESC, id DESC LIMIT ?`)
         .bind(...pBinds)
         .all<PostRow>()
     ).results;
   }
 
-  const items: FeedItem[] = [
+  const normalItems: FeedItem[] = [
     ...mRows.map<MomentFeedView>(r => ({ kind: "moment", ...serializeMoment(r, undefined, r2) })),
-    ...pRows.map<PostFeedView>(r => ({
-      kind: "post",
-      id: r.id,
-      slug: r.slug,
-      title: r.title,
-      excerpt: r.excerpt,
-      cover: r.cover ? keyToSrc(r.cover, r2) : "",
-      created_at: r.created_at,
-    })),
+    ...pRows.map(toPostFeed),
   ];
 
-  items.sort((a, b) => {
+  normalItems.sort((a, b) => {
     const t = b.created_at.localeCompare(a.created_at);
     if (t !== 0) return t;
     if (a.kind !== b.kind) return a.kind === "post" ? -1 : 1;
     return b.id - a.id;
   });
 
-  const page = items.slice(0, limit);
-  const last = page[page.length - 1];
-  const nextCursor =
-    items.length > limit && last
-      ? encodeFeedCursor({ ts: last.created_at, kind: last.kind, id: last.id })
-      : null;
+  // 置顶固定占前位，其余名额留给普通流
+  const normalNeed = Math.max(0, limit - pinnedFeed.length);
+  const normalPage = normalItems.slice(0, normalNeed);
+  const page: FeedItem[] = [...pinnedFeed, ...normalPage];
+
+  let nextCursor: string | null = null;
+  if (normalItems.length > normalPage.length) {
+    // 还有更多普通内容
+    if (normalPage.length) {
+      const last = normalPage[normalPage.length - 1];
+      nextCursor = encodeFeedCursor({ ts: last.created_at, kind: last.kind, id: last.id });
+    } else {
+      // 整页被置顶占满：下发普通流起点游标，下一页取最新普通内容且不再注入置顶
+      nextCursor = encodeFeedCursor({ ts: "", kind: "post", id: 0, head: true });
+    }
+  }
   return { list: page, nextCursor };
 }
 

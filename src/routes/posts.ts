@@ -4,6 +4,7 @@
  *       GET /:slug     文章详情（?preview=1 管理态可看草稿）
  * 管理：POST /          新建（published/draft）
  *       PUT /:id        编辑
+ *       POST /:id/pin   置顶/取消置顶 { pinned: 0|1 }
  *       DELETE /:id     删除
  */
 import { Hono } from "hono";
@@ -125,8 +126,8 @@ app.get("/", async c => {
     (await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM posts ${where}`).first<{ n: number }>())?.n ?? 0;
   const rows = (
     await c.env.DB.prepare(
-      `SELECT id, slug, title, excerpt, cover, status, created_at, updated_at
-       FROM posts ${where} ORDER BY id DESC LIMIT ? OFFSET ?`
+      `SELECT id, slug, title, excerpt, cover, status, pinned, created_at, updated_at
+       FROM posts ${where} ORDER BY pinned DESC, id DESC LIMIT ? OFFSET ?`
     )
       .bind(perPage, (page - 1) * perPage)
       .all<PostRow>()
@@ -216,6 +217,34 @@ app.put("/:id", requireAdmin, async c => {
     if (s.baidu_push_enabled && s.baidu_push_site?.trim() && s.baidu_push_token?.trim()) baiduPush(c.env.DB, s, [url], origin).catch(() => {});
   }
   return ok(c, serializePost(row, true, s.r2_domain), "文章已更新");
+});
+
+/** POST /:id/pin 置顶/取消置顶，body: { pinned: 0|1 }（独立接口，编辑文章不会误改置顶态） */
+app.post("/:id/pin", requireAdmin, async c => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isFinite(id)) return fail(c, "无效的 ID", 400);
+  let pinned = 0;
+  try {
+    const body = (await c.req.json()) as { pinned?: unknown };
+    pinned = body.pinned === true || body.pinned === 1 ? 1 : 0;
+  } catch {
+    return fail(c, "请求格式错误", 400);
+  }
+  // 置顶上限 10 篇，防止首页被置顶占满
+  if (pinned) {
+    const n = (await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM posts WHERE pinned = 1`).first<{ n: number }>())?.n ?? 0;
+    const me = await c.env.DB.prepare(`SELECT pinned FROM posts WHERE id = ?`).bind(id).first<{ pinned: number }>();
+    if (!me) return fail(c, "文章不存在", 404);
+    if (!me.pinned && n >= 10) return fail(c, "置顶文章最多 10 篇，请先取消其他文章", 400);
+  }
+  const row = await c.env.DB.prepare(
+    `UPDATE posts SET pinned = ?, updated_at = ? WHERE id = ? RETURNING *`
+  )
+    .bind(pinned, new Date().toISOString(), id)
+    .first<PostRow>();
+  if (!row) return fail(c, "文章不存在", 404);
+  const s = await getSettings(c.env.DB);
+  return ok(c, serializePost(row, false, s.r2_domain), pinned ? "已置顶" : "已取消置顶");
 });
 
 app.delete("/:id", requireAdmin, async c => {

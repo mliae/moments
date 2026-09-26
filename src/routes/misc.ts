@@ -118,33 +118,33 @@ async function fetchNickFromApi(api: ApiEntry, qq: string): Promise<string> {
 }
 
 /**
- * 通过 apihz「查询QQ基础资料」接口取昵称（需后台配置 id/ckqq/pskey）。
- * 仅供服务端调用，凭证私密不下发前端。返回 null 表示未配置/失败。
+ * 自建接口：Worker 直接用 skey/pskey 调腾讯 qzone 接口取昵称（不经过 apihz 等第三方）。
+ * Cookie 不出本 Worker，无泄露风险。返回 null 表示未配置/失败。
  */
-export async function fetchApihzNick(
+export async function fetchQqNickDirect(
   s: SiteSettings,
   qq: string
 ): Promise<{ nickname: string } | null> {
-  if (!s.apihz_id || !s.qq_ckqq || !s.qq_pskey) return null;
-  const params = new URLSearchParams({
-    id: s.apihz_id,
-    key: s.apihz_key || "",
-    qq,
-    ckqq: s.qq_ckqq,
-    pskey: s.qq_pskey,
-  });
-  if (s.qq_skey) params.set("skey", s.qq_skey);
-  const url = `https://cn.apihz.cn/api/other/qq.php?${params.toString()}`;
+  if (!s.qq_ckqq || !s.qq_pskey) return null;
+  const url = `https://users.qzone.qq.com/fcg-bin/cgi_get_portrait.fcg?uins=${encodeURIComponent(qq)}`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const resp = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": UA } });
+    const resp = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        "User-Agent": UA,
+        Referer: "https://h5.qzone.qq.com",
+        Cookie: `p_uin=o${s.qq_ckqq}; skey=${s.qq_skey}; p_skey=${s.qq_pskey}`,
+      },
+    });
     if (!resp.ok) throw new Error("http " + resp.status);
-    const d = (await resp.json()) as Record<string, unknown>;
-    if (d.code === 200 && d.Name) {
-      return { nickname: String(d.Name).trim().slice(0, 50) };
-    }
-    throw new Error(String(d.msg || d.text || "apihz 未返回昵称"));
+    const buf = await resp.arrayBuffer();
+    const text = decodeBuf(buf);
+    // qzone 返回 JSONP 或 JSON，尝试提取昵称
+    const nick = extractNick(text, "auto", qq).trim();
+    if (!nick || nick === "null") throw new Error("empty nick");
+    return { nickname: nick.slice(0, 50) };
   } finally {
     clearTimeout(timer);
   }
@@ -161,9 +161,9 @@ app.get("/qq-info", async c => {
   // 从后台读取 API 列表（留空=内置默认），逐个尝试直到拿到昵称
   const s = await getSettings(c.env.DB);
 
-  // 优先 apihz（需配置 id/ckqq/pskey），失败再回退多源列表，最后兜底 QQ 号
+  // 优先自建接口（Worker 直连腾讯，需配置 ckqq/pskey），失败再回退公开多源列表，最后兜底 QQ 号
   try {
-    const a = await fetchApihzNick(s, qq);
+    const a = await fetchQqNickDirect(s, qq);
     if (a?.nickname) nickname = a.nickname;
   } catch { /* 继续回退 */ }
 
