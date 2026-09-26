@@ -917,6 +917,11 @@
       showToast("图片查看器加载失败"); return;
     }
     if (typeof Fancybox === "undefined") { showToast("图片查看器加载失败"); return; }
+    // 窄屏（手机）精简按钮避免换行；桌面端保留与参考站一致的全按钮
+    const isMobile = window.innerWidth < 640;
+    const toolbar = isMobile
+      ? { left: [], middle: ["zoomIn", "zoomOut"], right: ["slideshow", "fullscreen", "close"] }
+      : { left: [], middle: ["zoomIn", "zoomOut", "actualSize", "rotateCCW", "rotateCW", "flipX", "flipY"], right: ["slideshow", "fullscreen", "close"] };
     Fancybox.show(
       list.map(s => ({ src: s })),
       {
@@ -924,8 +929,7 @@
         infinite: true,              // 循环切换
         dragToClose: false,          // 避免误触关闭
         Images: { zoom: true },      // 滚轮/双击缩放
-        // 工具栏与参考站一致：中间 缩放/旋转/翻转，右侧 幻灯片/全屏/关闭（Fancybox 原厂 SVG 图标）
-        Toolbar: { display: { left: [], middle: ["zoomIn", "zoomOut", "actualSize", "rotateCCW", "rotateCW", "flipX", "flipY"], right: ["slideshow", "fullscreen", "close"] } },
+        Toolbar: { display: toolbar },
         on: {
           done: () => { fbOpen = true; lockBodyScroll(); },
           destroy: () => { fbOpen = false; unlockBodyScroll(); },
