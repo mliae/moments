@@ -7795,20 +7795,31 @@
           return;
         }
         card.innerHTML = `
-          ${meta.cover ? `<img class="mcc-cover" src="${proxyCover(meta.cover)}" alt="" referrerpolicy="no-referrer" />` : `<div class="mcc-cover mcc-cover--ph">${svgIcon("music", 32)}</div>`}
+          <div class="mcc-cover-wrap">
+            ${meta.cover ? `<img class="mcc-cover" src="${proxyCover(meta.cover)}" alt="" referrerpolicy="no-referrer" />` : `<div class="mcc-cover mcc-cover--ph">${svgIcon("music", 20)}</div>`}
+            <span class="mcc-cover-ring"></span>
+            <span class="mcc-cover-hint">
+              <svg class="h-play" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              <svg class="h-pause" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+            </span>
+          </div>
           <div class="mcc-info">
             <div class="mcc-name">${esc(meta.title)}</div>
-            <div class="mcc-artist" data-mcc-artist>${esc(meta.artist)}</div>
-            <div class="mcc-now-lyric is-empty" data-mcc-now-lyric></div>
-            <div class="mcc-bar"><i></i></div>
+            <div class="mcc-sub">
+              <span class="mcc-artist" data-mcc-artist>${esc(meta.artist)}</span>
+              <span class="mcc-now-lyric is-empty" data-mcc-now-lyric></span>
+            </div>
           </div>
-          <button type="button" class="mcc-lyric-btn" data-mcc-lyric aria-label="歌词">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M14 3v2h3.59l-9.3 9.29 1.42 1.42L19 6.41V10h2V3h-7zM5 5v14h14v-7h-2v5H7V7h5V5H5z"/></svg>
-          </button>
-          <button type="button" class="mcc-btn" aria-label="播放/暂停">
-            <svg class="i-play" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            <svg class="i-pause" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" hidden><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
-          </button>
+          <div class="mcc-seg">
+            <button type="button" class="mcc-lyric-btn" data-mcc-lyric aria-label="歌词" title="歌词">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M14 3v2h3.59l-9.3 9.29 1.42 1.42L19 6.41V10h2V3h-7zM5 5v14h14v-7h-2v5H7V7h5V5H5z"/></svg>
+            </button>
+            <button type="button" class="mcc-btn" aria-label="播放/暂停" title="播放/暂停">
+              <svg class="i-play" viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              <svg class="i-pause" viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+            </button>
+          </div>
+          <div class="mcc-bar"><i></i></div>
           <div class="mcc-lyric" data-mcc-lyric-panel><div class="mcc-lyric-empty">暂无歌词</div></div>`;
         card.querySelector(".mcc-btn").addEventListener("click", () => toggleMusicCard(card, id, meta));
         // 点击封面也可播放/暂停
