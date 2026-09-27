@@ -1520,7 +1520,7 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
 }
 .music-capsule:hover { box-shadow: var(--anzhiyu-shadow-border), 0 12px 32px -8px rgb(0 0 0 / 35%); }
 
-.music-seg { display: flex; align-items: center; flex-shrink: 0; }
+.music-seg { display: flex; align-items: center; flex-shrink: 0; position: relative; z-index: 1; }
 /* basis auto 让信息列按歌名实际长度撑开（长标题不再被压成固定 184px），
    宽度上限见 .music-info 的 max-width */
 .music-seg-info { flex: 1 1 auto; min-width: 0; gap: 10px; }
@@ -1553,8 +1553,9 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
 }
 /* 必须 display:none 彻底退出 flex 排版：仅 opacity:0 仍占据内容宽度，
    配合 justify-content:center 会把封面 wrap 挤出圆球（白球形 bug 根因）。
-   进度条在 .music-info 内，随信息列一起退出，无需单独隐藏 */
+   进度轨现在是胶囊的直接子元素（绝对定位），不再随信息列一起退出，得单独隐藏 */
 .music-capsule.collapsed .music-info,
+.music-capsule.collapsed .music-progress,
 .music-capsule.collapsed .music-seg-transport,
 .music-capsule.collapsed .music-seg-aux {
   display: none;
@@ -1593,8 +1594,7 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
 }
 @keyframes music-spin { to { transform: rotate(360deg); } }
 
-/* 歌曲信息 + 进度条同属一列：进度条跟着歌名左端对齐，读作"这首歌的进度"
-   而不是钉在胶囊底边的一条游离线（旧样式 left:50px 的观感问题） */
+/* 歌名 + 歌手名两行。flex-basis auto 让整列按歌名长度撑开，上限 340px */
 .music-info {
   flex: 1; min-width: 0; max-width: 340px;
   display: flex; flex-direction: column;
@@ -1656,10 +1656,13 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
   background: var(--anzhiyu-main); cursor: pointer;
 }
 
-/* 进度条：12px 命中区 + 4px 轨道，hover 长出拖拽头 */
+/* 进度轨：贴在胶囊底边横穿整个播放器（左右各内缩 10px 让圆角收得住），
+   12px 透明命中区 + 4px 轨道，hover/拖动长出拖拽头。
+   宽度不再跟着歌名长短浮动——旧写法放在 .music-info 里，短歌名会缩成一条小线段。
+   命中区会盖到控制键下缘几个像素，靠 .music-seg 的 z-index:1 让按键优先吃掉那段点击 */
 .music-progress {
-  position: relative; height: 12px; flex-shrink: 0;
-  display: flex; align-items: center; cursor: pointer;
+  position: absolute; left: 10px; right: 10px; bottom: 5px; height: 12px;
+  display: flex; align-items: center; cursor: pointer; touch-action: pan-y;
 }
 .music-progress::before {
   content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 4px;
@@ -1676,8 +1679,9 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
   box-shadow: 0 0 0 2px var(--anzhiyu-card-bg);
   opacity: 0; transform: scale(.5); transition: opacity .15s, transform .15s;
 }
-.music-progress:hover::before { height: 6px; margin-top: -3px; }
-.music-progress:hover .music-progress-bar::after { opacity: 1; transform: none; }
+.music-progress:hover::before, .music-progress.dragging::before { height: 6px; margin-top: -3px; }
+.music-progress:hover .music-progress-bar::after,
+.music-progress.dragging .music-progress-bar::after { opacity: 1; transform: none; }
 
 /* 歌词面板 */
 .music-lyric {
@@ -1865,7 +1869,7 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
    歌词键降为次要色，进度条贴卡片底边成轨 */
 .music-block-card {
   display: flex; align-items: center; gap: 10px;
-  margin: 10px auto; padding: 9px 10px;
+  margin: 10px auto; padding: 10px 10px 17px;
   background: var(--anzhiyu-card-bg); border: var(--style-border-always);
   border-radius: 16px; max-width: 460px; width: 100%;
   box-shadow: var(--anzhiyu-shadow-border);
@@ -1939,20 +1943,20 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
 .music-block-card.playing .mcc-cover-hint .h-pause { display: block; }
 .music-block-card.playing:hover .mcc-cover-hint { opacity: 1; background: rgb(0 0 0 / 42%); }
 
+/* 信息列整列居中。三行各自占满列宽再行内居中，所以歌词长短变化只重排本行，
+   不会像以前歌手名和歌词叠在同一行那样把整行推得左右晃 */
 .music-block-card .mcc-info {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px;
+  align-items: stretch; text-align: center;
 }
 .music-block-card .mcc-name { font-size: .86rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
-/* 歌手名与滚动歌词叠在同一行：卡片恒定两行文字，播放时不再长高 */
-.music-block-card .mcc-sub { position: relative; height: 1.3em; font-size: .72rem; }
-.music-block-card .mcc-artist { color: var(--anzhiyu-secondtext); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 1.3; }
+.music-block-card .mcc-artist { font-size: .72rem; color: var(--anzhiyu-secondtext); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
 .music-block-card .mcc-now-lyric {
-  position: absolute; inset: 0; background: var(--anzhiyu-card-bg);
-  color: var(--anzhiyu-main); font-weight: 500; line-height: 1.3;
+  min-height: 1.3em; font-size: .72rem; color: var(--anzhiyu-main); font-weight: 500; line-height: 1.3;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: opacity .2s;
 }
-/* 暂停或歌词为空时透明退回歌手名，位置始终占位不抖 */
+/* 暂停或没有歌词时透明退回，位置始终占位不抖 */
 .music-block-card .mcc-now-lyric.is-empty, .music-block-card .mcc-now-lyric:empty {
   opacity: 0;
 }
@@ -1968,23 +1972,33 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
 .music-block-card .mcc-lyric-btn:active { transform: scale(.88); }
 .music-block-card .mcc-lyric-btn.active { color: var(--anzhiyu-main); background: var(--anzhiyu-main-op); }
 
-/* 进度轨：收在歌曲信息列里，跟歌名/歌词同宽——读作"这首歌的进度"，
-   而不是横跨卡片底边的一条花边；悬停加粗 */
+/* 进度轨：与胶囊同款——贴容器底边、左右内缩、12px 透明命中区 + 3px 轨道。
+   卡片因此多留出一截下内边距，轨道就落在那条带子里，不压文字 */
 .music-block-card .mcc-bar {
-  height: 3px; margin-top: 3px; flex-shrink: 0; overflow: hidden;
-  border-radius: 2px; background: var(--anzhiyu-card-border);
-  transition: height .15s, background .2s;
+  position: absolute; left: 10px; right: 10px; bottom: 5px; height: 12px;
+  display: flex; align-items: center; cursor: pointer; touch-action: pan-y;
 }
-.music-block-card.playing .mcc-bar { background: var(--anzhiyu-main-op); }
-.music-block-card:hover .mcc-bar { height: 5px; }
-.music-block-card .mcc-bar i { display: block; height: 100%; width: 0; background: var(--anzhiyu-main); transition: width .2s linear; }
+.music-block-card .mcc-bar::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; margin-top: -1.5px;
+  background: var(--anzhiyu-card-border); border-radius: 2px;
+  transition: height .15s, margin-top .15s, background .2s;
+}
+.music-block-card.playing .mcc-bar::before { background: var(--anzhiyu-main-op); }
+.music-block-card .mcc-bar i {
+  position: relative; flex: none; display: block; height: 3px; width: 0;
+  background: var(--anzhiyu-main); border-radius: 2px; transition: width .2s linear;
+}
+.music-block-card .mcc-bar:hover::before, .music-block-card .mcc-bar.dragging::before {
+  height: 5px; margin-top: -2.5px;
+}
 
 /* 编辑器内嵌态与窄屏 */
 @media (max-width: 640px) {
-  .music-block-card { gap: 8px; padding: 8px; border-radius: 14px; }
+  .music-block-card { gap: 8px; padding: 8px 8px 16px; border-radius: 14px; }
   .music-block-card .mcc-cover-wrap { width: 46px; height: 46px; }
   .music-block-card .mcc-name { font-size: .8rem; }
   .music-block-card .mcc-lyric-btn { width: 24px; height: 24px; }
+  .music-block-card .mcc-bar { left: 8px; right: 8px; bottom: 4px; }
   .music-block-card .mcc-lyric { max-height: 170px; font-size: .74rem; }
 }
 

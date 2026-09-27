@@ -7354,7 +7354,7 @@
 
   // 音频事件
   audio.addEventListener("timeupdate", () => {
-    if (audio.duration) {
+    if (audio.duration && !audio._seeking) {
       musicProgressBar.style.width = (audio.currentTime / audio.duration) * 100 + "%";
     }
     updateLyricIndex();
@@ -7397,13 +7397,8 @@
     }
   });
 
-  // 进度条点击跳转
-  musicProgress.addEventListener("click", e => {
-    if (!audio.duration) return;
-    const rect = musicProgress.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    audio.currentTime = pct * audio.duration;
-  });
+  // 进度条：点击跳转 + 按住拖动
+  bindSeek(musicProgress, musicProgressBar, () => audio);
 
   // 音量滑块
   musicVolume.addEventListener("input", e => {
@@ -7579,6 +7574,44 @@
 
   /* ================= 正文音乐卡片（[music=id] 渲染） ================= */
 
+  /**
+   * 给进度轨接上"点击定位 + 按住拖动"。胶囊播放器和正文卡片共用一套。
+   * track 是加高的透明命中区，fill 是表示已播比例的子元素；
+   * getAudio() 返回 null 表示当前不可跳（比如这张卡没在播）。
+   * 拖动期间把 a._seeking 立起来，timeupdate 据此让位，避免回填写把把手打回去。
+   */
+  function bindSeek(track, fill, getAudio) {
+    if (!track || track._seekBound) return;
+    track._seekBound = true;
+    const pctAt = ev => {
+      const r = track.getBoundingClientRect();
+      return r.width ? Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)) : 0;
+    };
+    track.addEventListener("pointerdown", ev => {
+      const a = getAudio();
+      if (!a || !a.duration) return;
+      ev.preventDefault();
+      a._seeking = true;
+      track.classList.add("dragging");
+      try { track.setPointerCapture(ev.pointerId); } catch { /* 不支持也要能点跳 */ }
+      const show = p => { if (fill) fill.style.width = (p * 100).toFixed(2) + "%"; };
+      const move = e2 => show(pctAt(e2));
+      const done = e2 => {
+        track.removeEventListener("pointermove", move);
+        track.removeEventListener("pointerup", done);
+        track.removeEventListener("pointercancel", done);
+        track.classList.remove("dragging");
+        a._seeking = false;
+        a.currentTime = pctAt(e2) * a.duration;
+        show(pctAt(e2));
+      };
+      show(pctAt(ev));
+      track.addEventListener("pointermove", move);
+      track.addEventListener("pointerup", done);
+      track.addEventListener("pointercancel", done);
+    });
+  }
+
   const musicMetaCache = new Map();
   let musicCardAudio = null;
 
@@ -7642,7 +7675,7 @@
           a._cardBound = true;
           a.addEventListener("timeupdate", () => {
             const bar = document.querySelector(".music-block-card.playing .mcc-bar i");
-            if (bar && a.duration) bar.style.width = (a.currentTime / a.duration) * 100 + "%";
+            if (bar && a.duration && !a._seeking) bar.style.width = (a.currentTime / a.duration) * 100 + "%";
             updateCardLyric(a.currentTime);
           });
           a.addEventListener("ended", () => {
@@ -7795,21 +7828,22 @@
           </button>
           <div class="mcc-info">
             <div class="mcc-name">${esc(meta.title)}</div>
-            <div class="mcc-sub">
-              <span class="mcc-artist" data-mcc-artist>${esc(meta.artist)}</span>
-              <span class="mcc-now-lyric is-empty" data-mcc-now-lyric></span>
-            </div>
-            <div class="mcc-bar"><i></i></div>
+            <div class="mcc-artist" data-mcc-artist>${esc(meta.artist)}</div>
+            <div class="mcc-now-lyric is-empty" data-mcc-now-lyric></div>
           </div>
           <button type="button" class="mcc-lyric-btn" data-mcc-lyric aria-label="歌词" title="歌词">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zm14-10v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
           </button>
+          <div class="mcc-bar" aria-hidden="true"><i></i></div>
           <div class="mcc-lyric" data-mcc-lyric-panel><div class="mcc-lyric-empty">暂无歌词</div></div>`;
         // 封面即播放键：常驻的播放角标是可点提示，转起来的黑胶本身就是播放状态
         card.querySelector(".mcc-cover-wrap").addEventListener("click", () => toggleMusicCard(card, id, meta));
         // 歌词按钮（展开完整歌词面板，可选）
         const lyricBtn = card.querySelector("[data-mcc-lyric]");
         lyricBtn.addEventListener("click", () => toggleCardLyric(card, id, meta, lyricBtn));
+        // 进度轨：只有正在播这张卡的音频才可拖，别的卡片点了不发声也别乱跳
+        bindSeek(card.querySelector(".mcc-bar"), card.querySelector(".mcc-bar i"),
+          () => (card.classList.contains("playing") ? musicCardAudio : null));
       })
     );
   }

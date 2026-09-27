@@ -175,9 +175,6 @@
         <div class="music-info">
           <div class="music-title" id="musicTitle">未播放</div>
           <div class="music-artist" id="musicArtist">点击播放</div>
-          <div class="music-progress" id="musicProgress">
-            <div class="music-progress-bar" id="musicProgressBar"></div>
-          </div>
         </div>
       </div>
       <div class="music-seg music-seg-transport">
@@ -215,6 +212,10 @@
         <button class="music-ctrl music-close-btn" data-music-close title="收起" aria-label="收起">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
+      </div>
+      <!-- 进度轨贴在胶囊底边横穿：宽度不随歌名长短浮动，拖拽行程就是播放器宽度 -->
+      <div class="music-progress" id="musicProgress">
+        <div class="music-progress-bar" id="musicProgressBar"></div>
       </div>
     </div>
   </div>
