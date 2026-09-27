@@ -421,7 +421,33 @@ async function searchQQPrimary(kw: string, limit: number): Promise<SearchHit[]> 
   }
 }
 
-/** smartbox 联想搜索（仅 mid/歌名/歌手，无封面与 VIP 信息） */
+/** QQ 单曲详情（公开接口）：补 albummid→封面、VIP、时长（smartbox 回退结果用） */
+async function getQQSongDetail(mid: string): Promise<{ albummid: string; vip: boolean; duration: number } | null> {
+  try {
+    const res = await fetch(
+      `https://c.y.qq.com/v8/fcg-bin/fcg_play_single_song.fcg?songmid=${encodeURIComponent(mid)}&format=json`,
+      { headers: { "User-Agent": UA, Referer: "https://y.qq.com/" } }
+    );
+    const data = (await res.json()) as {
+      data?: Array<{ album?: { mid?: string }; pay?: { payplay?: number }; interval?: number }>;
+    };
+    const s = data.data?.[0];
+    if (!s) return null;
+    return {
+      albummid: s.album?.mid || "",
+      vip: s.pay?.payplay === 1,
+      duration: Number(s.interval ?? 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function qqCoverUrl(albummid: string): string {
+  return albummid ? `https://y.gtimg.cn/music/photo_new/T002R500x500M000${albummid}.jpg` : "";
+}
+
+/** smartbox 联想搜索（仅 mid/歌名/歌手）→ 逐个补详情拿封面/VIP/时长 */
 async function searchQQFallback(kw: string, limit: number): Promise<SearchHit[]> {
   try {
     const res = await fetch(
@@ -431,19 +457,21 @@ async function searchQQFallback(kw: string, limit: number): Promise<SearchHit[]>
     const data = (await res.json()) as {
       data?: { song?: { itemlist?: Array<{ mid?: string; name?: string; singer?: string }> } };
     };
-    return (data.data?.song?.itemlist || [])
-      .slice(0, limit)
-      .map((s): SearchHit | null => {
-        if (!s.mid || !s.name) return null;
+    const list = (data.data?.song?.itemlist || []).filter(s => s.mid && s.name).slice(0, limit);
+    if (!list.length) return [];
+    const details = await Promise.all(list.map(s => getQQSongDetail(s.mid as string)));
+    return list
+      .map((s, i): SearchHit | null => {
+        const d = details[i];
         return {
           source: "qq",
-          songId: s.mid,
-          title: s.name,
+          songId: String(s.mid),
+          title: String(s.name),
           artist: s.singer || "未知歌手",
           album: "",
-          cover: "",
-          vip: false,
-          duration: 0,
+          cover: qqCoverUrl(d?.albummid || ""),
+          vip: d?.vip ?? false,
+          duration: d?.duration ?? 0,
         };
       })
       .filter((s): s is SearchHit => s !== null);
@@ -536,7 +564,7 @@ app.get("/search", requireAdmin, async c => {
 
 /** 试听地址解析（管理端）：GET /api/music/preview?source=netease|qq|kugou|kuwo&id=xxx&title=&artist=
  *  返回可直接给 <audio> 播放的 URL；VIP 歌自然只会播出试听片段。
- *  酷狗/酷我没有直连解析通道，按「歌名 歌手」到网易云找同名音源 */
+ *  QQ→injahow meting；酷狗→qijieya；酷我没有解析通道，按「歌名 歌手」到网易云找同名音源 */
 app.get("/preview", requireAdmin, async c => {
   const source = (c.req.query("source") || "netease") as MusicSource;
   const id = (c.req.query("id") || "").trim();
@@ -547,6 +575,8 @@ app.get("/preview", requireAdmin, async c => {
     if (!url) url = `https://api.injahow.cn/meting/?server=netease&type=url&id=${encodeURIComponent(id)}`;
   } else if (source === "qq") {
     url = `https://api.injahow.cn/meting/?server=tencent&type=url&id=${encodeURIComponent(id)}`;
+  } else if (source === "kugou") {
+    url = `https://api.qijieya.cn/meting/?server=kugou&type=url&id=${encodeURIComponent(id)}`;
   } else {
     const title = (c.req.query("title") || "").trim();
     const artist = (c.req.query("artist") || "").trim();
@@ -616,6 +646,17 @@ async function resolveAudio(
 
   type Cand = { label: string; make: () => Promise<Response | null> };
   const cands: Cand[] = [];
+  /** 跨平台：按「歌名 歌手」到网易云、QQ 找同名音源 */
+  const addCrossCandidates = async () => {
+    const neHits = await searchNetease(`${title} ${artist}`, 1);
+    if (neHits[0]) {
+      const outer = await getOuterUrl(neHits[0].songId);
+      if (outer) cands.push({ label: "cross-netease-outer", make: directFetch(outer, "https://music.163.com/") });
+      cands.push({ label: "cross-netease-meting", make: meting("netease", neHits[0].songId) });
+    }
+    const qqHits = await searchQQ(`${title} ${artist}`, 1);
+    if (qqHits[0]) cands.push({ label: "cross-qq", make: meting("tencent", qqHits[0].songId) });
+  };
   if (source === "netease") {
     const outer = await getOuterUrl(songId);
     if (outer) cands.push({ label: "netease-outer", make: directFetch(outer, "https://music.163.com/") });
@@ -626,22 +667,17 @@ async function resolveAudio(
     if (qqHits[0]) cands.push({ label: "cross-qq", make: meting("tencent", qqHits[0].songId) });
   } else if (source === "qq") {
     cands.push({ label: "meting-tencent", make: meting("tencent", songId) });
-    const neHits = await searchNetease(`${title} ${artist}`, 1);
-    if (neHits[0]) {
-      const outer = await getOuterUrl(neHits[0].songId);
-      if (outer) cands.push({ label: "cross-netease-outer", make: directFetch(outer, "https://music.163.com/") });
-      cands.push({ label: "cross-netease-meting", make: meting("netease", neHits[0].songId) });
-    }
+    await addCrossCandidates();
+  } else if (source === "kugou") {
+    // 酷狗：第三方 meting（qijieya）支持酷狗全曲直链
+    cands.push({
+      label: "kugou-qijieya",
+      make: directFetch(`https://api.qijieya.cn/meting/?server=kugou&type=url&id=${encodeURIComponent(songId)}`),
+    });
+    await addCrossCandidates();
   } else {
-    // 酷狗/酷我：跨平台到网易云、QQ 同名搜索
-    const neHits = await searchNetease(`${title} ${artist}`, 1);
-    if (neHits[0]) {
-      const outer = await getOuterUrl(neHits[0].songId);
-      if (outer) cands.push({ label: "cross-netease-outer", make: directFetch(outer, "https://music.163.com/") });
-      cands.push({ label: "cross-netease-meting", make: meting("netease", neHits[0].songId) });
-    }
-    const qqHits = await searchQQ(`${title} ${artist}`, 1);
-    if (qqHits[0]) cands.push({ label: "cross-qq", make: meting("tencent", qqHits[0].songId) });
+    // 酷我：无公开解析通道，跨平台到网易云、QQ 同名搜索
+    await addCrossCandidates();
   }
 
   for (const cand of cands) {
@@ -679,7 +715,8 @@ async function fetchImage(url: string): Promise<{ buf: ArrayBuffer; ext: string 
   }
 }
 
-/** 封面下载：优先给定 URL；失败或为空时网易云可走 meting pic 兜底 */
+/** 封面下载：优先给定 URL；失败或为空时按来源兜底——
+ *  网易→meting pic；QQ→单曲详情拿 albummid 拼 gtimg；酷狗→qijieya pic */
 async function downloadCover(
   coverUrl: string,
   source?: string,
@@ -692,6 +729,13 @@ async function downloadCover(
   if (source === "netease" && songId) {
     return fetchImage(`https://api.injahow.cn/meting/?server=netease&type=pic&id=${encodeURIComponent(songId)}`);
   }
+  if (source === "qq" && songId) {
+    const d = await getQQSongDetail(songId);
+    return d?.albummid ? fetchImage(qqCoverUrl(d.albummid)) : null;
+  }
+  if (source === "kugou" && songId) {
+    return fetchImage(`https://api.qijieya.cn/meting/?server=kugou&type=pic&id=${encodeURIComponent(songId)}`);
+  }
   return null;
 }
 
@@ -703,10 +747,11 @@ async function getLyricSafe(id: string): Promise<string> {
   }
 }
 
-/** meting 取 LRC 原文（QQ 曲目歌词来源） */
+/** meting 取 LRC 原文：QQ→injahow(tencent)；酷狗→qijieya(kugou) */
 async function metingLrc(server: string, id: string): Promise<string> {
   try {
-    const res = await fetch(`https://api.injahow.cn/meting/?server=${server}&type=lrc&id=${id}`, {
+    const base = server === "kugou" ? "https://api.qijieya.cn/meting/" : "https://api.injahow.cn/meting/";
+    const res = await fetch(`${base}?server=${server}&type=lrc&id=${encodeURIComponent(id)}`, {
       headers: { "User-Agent": UA },
     });
     if (!res.ok) return "";
@@ -740,10 +785,16 @@ app.post("/import", requireAdmin, async c => {
   const resolved = await resolveAudio(songId, source, title, artist);
   if (!resolved) return fail(c, "解析失败：所有音源均不可用（VIP 付费或已下架），未入库", 502);
 
-  const [coverRes, lyric] = await Promise.all([
-    downloadCover(coverUrl, source, songId),
-    source === "netease" ? getLyricSafe(songId) : metingLrc("tencent", songId),
-  ]);
+  // 歌词：网易直接取；QQ→meting；酷狗→qijieya；酷我→跨平台网易同名歌词
+  const lyricPromise = (async (): Promise<string> => {
+    if (source === "netease") return getLyricSafe(songId);
+    if (source === "qq") return metingLrc("tencent", songId);
+    if (source === "kugou") return metingLrc("kugou", songId);
+    const neHits = await searchNetease(`${title} ${artist}`, 1);
+    return neHits[0] ? getLyricSafe(neHits[0].songId) : "";
+  })();
+
+  const [coverRes, lyric] = await Promise.all([downloadCover(coverUrl, source, songId), lyricPromise]);
 
   const ext = audioExt(resolved.buf);
   const audioKey = newKey("audio", ext);
