@@ -162,35 +162,39 @@
       <div class="music-playlist-list" id="musicPlaylistList"></div>
     </div>
 
-    <!-- 胶囊主体 -->
+    <!-- 胶囊主体：三段式（信息 | 传输键 | 次要键），播放键为唯一实心重心 -->
     <div class="music-capsule collapsed" id="musicCapsule">
-      <div class="music-cover-wrap">
-        <img class="music-cover" id="musicCover" alt="封面" referrerpolicy="no-referrer" />
-        <div class="music-cover-ring"></div>
-        <div class="music-cover-overlay" id="musicCoverOverlay">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      <div class="music-seg music-seg-info">
+        <div class="music-cover-wrap">
+          <img class="music-cover" id="musicCover" alt="封面" referrerpolicy="no-referrer" />
+          <div class="music-cover-ring"></div>
+          <div class="music-cover-overlay" id="musicCoverOverlay">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        </div>
+        <div class="music-info">
+          <div class="music-title" id="musicTitle">未播放</div>
+          <div class="music-artist" id="musicArtist">点击播放</div>
         </div>
       </div>
-      <div class="music-info">
-        <div class="music-title" id="musicTitle">未播放</div>
-        <div class="music-artist" id="musicArtist">点击播放</div>
-      </div>
-      <div class="music-controls">
-        <button class="music-ctrl music-mode-btn mode-list" data-music-mode title="播放模式：列表循环（点击切换 随机播放/单曲循环）" aria-label="播放模式">
-          <svg class="icon-list" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
-          <svg class="icon-random" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
-          <svg class="icon-one" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/></svg>
-        </button>
+      <div class="music-seg music-seg-transport">
         <button class="music-ctrl" data-music-prev title="上一首" aria-label="上一首">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
         </button>
         <button class="music-ctrl music-play-btn" data-music-play id="musicPlayBtn" title="播放/暂停" aria-label="播放/暂停">
-          <svg class="icon-play" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          <svg class="icon-pause" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
-          <svg class="icon-loading" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="9" opacity=".3"/><path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/></svg>
+          <svg class="icon-play" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg class="icon-pause" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+          <svg class="icon-loading" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="9" opacity=".3"/><path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/></svg>
         </button>
         <button class="music-ctrl" data-music-next title="下一首" aria-label="下一首">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z"/></svg>
+        </button>
+      </div>
+      <div class="music-seg music-seg-aux">
+        <button class="music-ctrl music-mode-btn mode-list" data-music-mode title="播放模式：列表循环（点击切换 随机播放/单曲循环）" aria-label="播放模式">
+          <svg class="icon-list" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+          <svg class="icon-random" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+          <svg class="icon-one" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/></svg>
         </button>
         <button class="music-ctrl music-list-btn" data-music-list title="播放列表" aria-label="播放列表">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 6h13v2H3zm0 5h13v2H3zm0 5h9v2H3zm15-5l5 3-5 3V11z"/></svg>
