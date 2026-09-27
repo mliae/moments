@@ -3448,6 +3448,28 @@
     }
   }
 
+  /* ==================== 文章页返回顶部 ==================== */
+  const backTop = document.getElementById("backTop");
+  let backTopShown = false;
+
+  function syncBackTop() {
+    if (!backTop) return;
+    // 只服务长文：非文章页一律收起，避免与首页 FAB / 各视图抢右下角
+    const show =
+      location.pathname.startsWith("/post/") &&
+      (window.scrollY || document.documentElement.scrollTop || 0) > 480;
+    if (show === backTopShown) return;
+    backTopShown = show;
+    backTop.hidden = !show; // 淡入交给 CSS animation，无需等下一帧
+  }
+
+  window.addEventListener("scroll", syncBackTop, { passive: true });
+
+  backTop?.addEventListener("click", () => {
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+  });
+
   async function hydrateSsrPost(slug) {
     try {
       const p = await api("/api/posts/" + encodeURIComponent(slug));
@@ -9543,6 +9565,7 @@
     disposeVideos(app);
     // 清理文章悬浮目录（侧栏/FAB/抽屉），避免切页残留
     document.querySelectorAll("[data-toc-sidebar], [data-toc-fab], [data-toc-mask], [data-toc-drawer]").forEach(el => el.remove());
+    syncBackTop();
     if (path === "/") {
       renderFeed();
     } else if (path === "/about") {

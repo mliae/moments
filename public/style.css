@@ -2505,6 +2505,48 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   .toc-fab { right: 12px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); width: 42px; height: 42px; }
 }
 
+/* ==================== 文章页返回顶部 ====================
+   与 .fab-publish 共用视觉规范（正圆 / 主色底 / 上浮反馈）。
+   位置分三档，均避开同时可见的悬浮物：
+   ≥1025px 右下角（音乐胶囊可见时上抬一档）；
+   ≤1024px 与 .toc-fab 组成纵向栈（占底格，目录钮上移一格）；
+   ≤640px 音乐播放器变全宽底条，整栈再抬过条高。 */
+.back-top {
+  position: fixed; right: 2rem; bottom: 2rem; z-index: 60;
+  width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; color: #fff; cursor: pointer; padding: 0;
+  background: var(--anzhiyu-main);
+  box-shadow: 0 8px 24px -6px var(--anzhiyu-main-op), 0 6px 20px -6px rgb(0 0 0 / 35%);
+  transition: transform .25s ease, box-shadow .25s ease;
+  animation: back-top-in .25s ease;
+}
+@keyframes back-top-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.back-top:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 12px 28px -6px var(--anzhiyu-main-op); }
+.back-top:active { transform: translateY(-1px) scale(.98); }
+.back-top[hidden] { display: none; }
+
+@media (min-width: 1025px) {
+  body.music-visible .back-top { bottom: 6rem; }
+}
+@media (min-width: 641px) and (max-width: 1024px) {
+  .back-top { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 46px; height: 46px; }
+  /* 音乐胶囊占底部 24~76px，留出入场位移的余量后再叠目录钮 */
+  body.music-visible .back-top { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+  body.music-visible .toc-fab { bottom: calc(146px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 640px) {
+  .back-top { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: 42px; height: 42px; }
+  /* 全宽播放条占底部 8~58px */
+  body.music-visible .back-top { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+  body.music-visible .toc-fab { bottom: calc(128px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .back-top { transition: none; animation: none; transform: none; }
+}
+
 /* ==================== 打赏卡片 ==================== */
 .reward-card {
   margin: 1.2rem 0;
