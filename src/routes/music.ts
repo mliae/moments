@@ -326,9 +326,16 @@ interface SearchHit {
   duration: number; // 秒
 }
 
-/** 网易云搜索：fee 0/8=免费，1/4/16=VIP。
- *  search/get 响应不含封面，需再调 song/detail 批量补 picUrl */
+/** 网易云搜索：官方接口失败（被拦/风控）时自动切 netstart 镜像（Cloudflare 托管，稳定可达） */
 async function searchNetease(kw: string, limit = 10): Promise<SearchHit[]> {
+  const official = await searchNeteaseOfficial(kw, limit);
+  if (official.length) return official;
+  return searchNeteaseMirror(kw, limit);
+}
+
+/** 官方接口：fee 0/8=免费，1/4/16=VIP。
+ *  search/get 响应不含封面，需再调 song/detail 批量补 picUrl */
+async function searchNeteaseOfficial(kw: string, limit = 10): Promise<SearchHit[]> {
   try {
     const res = await fetch(
       `https://music.163.com/api/search/get?s=${encodeURIComponent(kw)}&type=1&limit=${limit}`,
@@ -369,6 +376,40 @@ async function searchNetease(kw: string, limit = 10): Promise<SearchHit[]> {
           artist: artists.map(a => a.name).filter(Boolean).join(" / ") || "未知歌手",
           album: album.name || "",
           cover: coverMap.get(id) || "",
+          vip: [1, 4, 16].includes(Number(s.fee ?? 0)),
+          duration: Math.round(Number(s.duration ?? 0) / 1000),
+        };
+      })
+      .filter((s): s is SearchHit => s !== null);
+  } catch {
+    return [];
+  }
+}
+
+/** netstart 镜像（NeteaseCloudMusicApi 部署）：官方接口被拦时的备用搜索 */
+async function searchNeteaseMirror(kw: string, limit = 10): Promise<SearchHit[]> {
+  try {
+    const res = await fetch(
+      `https://apis.netstart.cn/music/search?keywords=${encodeURIComponent(kw)}&limit=${limit}`,
+      { headers: { "User-Agent": UA, Referer: "https://music.163.com/" } }
+    );
+    const data = (await res.json()) as {
+      result?: { songs?: Array<Record<string, unknown>> };
+    };
+    return (data.result?.songs || [])
+      .map((s): SearchHit | null => {
+        const id = Number(s.id);
+        const name = String(s.name ?? "");
+        if (!id || !name) return null;
+        const artists = Array.isArray(s.artists) ? (s.artists as Array<{ name?: string }>) : [];
+        const album = (s.album as { name?: string } | undefined) || {};
+        return {
+          source: "netease" as const,
+          songId: String(id),
+          title: name,
+          artist: artists.map(a => a.name).filter(Boolean).join(" / ") || "未知歌手",
+          album: album.name || "",
+          cover: "",
           vip: [1, 4, 16].includes(Number(s.fee ?? 0)),
           duration: Math.round(Number(s.duration ?? 0) / 1000),
         };
