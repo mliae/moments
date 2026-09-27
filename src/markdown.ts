@@ -35,8 +35,8 @@ function inline(text: string, r2Domain?: string): string {
     const external = /^https?:\/\//i.test(safe);
     return `<a href="${safe}"${external ? ' target="_blank" rel="noopener noreferrer nofollow"' : ""}>${label}</a>`;
   });
-  // 音乐块 [music=123]
-  out = out.replace(/\[music=(\d+)\]/g, (_m, id) => musicBlock(`music=${id}`));
+  // 音乐块 [music=123]（旧网易云）/ [music=t12]（站内曲库）
+  out = out.replace(/\[music=(t?\d+)\]/g, (_m, id) => musicBlock(`music=${id}`));
   // 粗体/斜体/删除线
   out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   out = out.replace(/__([^_]+)__/g, "<strong>$1</strong>");
@@ -48,6 +48,10 @@ function inline(text: string, r2Domain?: string): string {
 
 function musicBlock(label: string): string {
   const id = label.replace(/^music=/, "").trim();
+  if (/^t\d+$/.test(id)) {
+    // 站内曲库曲目：SSR 输出纯展示占位，前端水合为可播放卡片
+    return `<span class="ssr-music-link">站内音乐（${id}）</span>`;
+  }
   if (!/^\d+$/.test(id)) return "";
   return `<a class="ssr-music-link" data-music-id="${id}" href="https://music.163.com/song?id=${id}" target="_blank" rel="noopener noreferrer nofollow">网易云音乐（ID: ${id}）</a>`;
 }

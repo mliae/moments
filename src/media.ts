@@ -16,6 +16,13 @@ const EXT_MIME: Record<string, string> = {
   mp4: "video/mp4",
   mov: "video/quicktime",
   webm: "video/webm",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  flac: "audio/flac",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  lrc: "text/plain; charset=utf-8",
 };
 
 function extMime(key: string): string {
@@ -33,7 +40,7 @@ function resolveKey(pathname: string): string | null {
     return null;
   }
   if (!key || key.startsWith("/") || key.includes("..") || key.includes("\\")) return null;
-  if (!key.startsWith("uploads/") && !key.startsWith("emoji/")) return null; // 只允许访问上传/表情目录
+  if (!key.startsWith("uploads/") && !key.startsWith("emoji/") && !key.startsWith("music/")) return null; // 只允许访问上传/表情/音乐目录
   return key;
 }
 

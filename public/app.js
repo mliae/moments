@@ -132,15 +132,15 @@
         name: "musicIdBlock",
         level: "block",
         start(src) {
-          return src.match(/^\[music=\d+\]/im)?.index;
+          return src.match(/^\[music=t?\d+\]/im)?.index;
         },
         tokenizer(src) {
-          const m = src.match(/^\[music=(\d+)\][^\n\r]*(?:\r?\n|$)/i);
+          const m = src.match(/^\[music=(t?\d+)\][^\n\r]*(?:\r?\n|$)/i);
           if (!m) return undefined;
           return { type: "musicIdBlock", raw: m[0], songId: m[1] };
         },
         renderer(token) {
-          const id = String(token.songId || "").replace(/[^\d]/g, "");
+          const id = String(token.songId || "").replace(/[^t\d]/g, "");
           return `<div class="music-block-card" data-song-id="${id}"><div class="mcc-skeleton"><span class="spinner"></span>加载音乐…</div></div>`;
         },
       },
@@ -5988,10 +5988,14 @@
         <div class="field">
           <label>自定义歌单 JSON 链接（可选，优先级高于网易云歌单）</label>
           <input name="music_custom_playlist" maxlength="500" value="${esc(s.music_custom_playlist)}" placeholder="https://.../playlist.json" />
-          <div class="field-hint">JSON 格式：<code>[{"name":"歌名","artist":"歌手","url":"音频直链","cover":"封面URL"}]</code></div>
+          <div class="field-hint">JSON 格式：<code>[{"name":"歌名","artist":"歌手","url":"音频直链","cover":"封面URL"}]</code><br />填入 <code>/api/music/playlist.json</code> 可让胶囊播放器播放下方站内音乐库的歌。</div>
         </div>
         <button class="btn primary" type="submit">保存音乐设置</button>
-      </form>`;
+      </form>
+
+      <div class="admin-panel-head" style="margin-top:1.75rem"><h3>站内音乐库</h3></div>
+      <p style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:-.4rem 0 1rem">文章中插入的音乐（<code>[music=tN]</code>）存在站内存储，不依赖第三方接口。停用后前台显示「音乐不可用」，删除会同时移除音频和封面文件。</p>
+      <div data-music-library><div class="emp-help"><span class="spinner"></span> 加载中…</div></div>`;
 
     // 视频默认封面上传
     const vpUploadBtn = panel.querySelector("[data-video-poster-upload]");
@@ -6033,6 +6037,65 @@
       range.addEventListener("input", () => {
         out.textContent = Math.round(Number(range.value) * 100) + "%";
       });
+    }
+
+    // 站内音乐库列表
+    const libBox = panel.querySelector("[data-music-library]");
+    if (libBox) {
+      const SRC_LABEL = { netease: "网易云", qq: "QQ", upload: "上传", url: "外链" };
+      const loadLibrary = async () => {
+        try {
+          const data = await api("/api/music/library");
+          const list = data.list || [];
+          if (!list.length) {
+            libBox.innerHTML = `<div class="emp-help">曲库还是空的。在文章/说说编辑器点「插入音乐」即可搜歌入库、上传本地音乐或转存网络音频。</div>`;
+            return;
+          }
+          libBox.innerHTML = `<div class="mlib-list">${list
+            .map(
+              t => `
+          <div class="mlib-item${t.enabled ? "" : " is-off"}">
+            ${t.cover_url ? `<img class="mlib-cover" src="${esc(t.cover_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="mlib-cover">${svgIcon("music", 18)}</span>`}
+            <div class="mlib-info">
+              <div class="mlib-name">${esc(t.title)}${t.vip ? '<span class="emp-vip">VIP</span>' : ""}<span class="emp-src">${SRC_LABEL[t.source] || esc(t.source)}</span></div>
+              <div class="mlib-artist">${esc(t.artist)}${t.album ? " · " + esc(t.album) : ""} · ${esc(t.id)}</div>
+            </div>
+            <label class="toggle" title="${t.enabled ? "停用" : "启用"}"><input type="checkbox" data-mlib-toggle="${esc(t.id)}" ${t.enabled ? "checked" : ""} /><span></span></label>
+            <button type="button" class="btn sm ghost" data-mlib-del="${esc(t.id)}">删除</button>
+          </div>`
+            )
+            .join("")}</div>`;
+        } catch (e) {
+          libBox.innerHTML = `<div class="emp-help">${esc(e.message || "加载失败")}</div>`;
+        }
+      };
+      libBox.addEventListener("change", async e => {
+        const cb = e.target.closest("[data-mlib-toggle]");
+        if (!cb) return;
+        try {
+          await api("/api/music/library/toggle", { body: { id: cb.dataset.mlibToggle, enabled: cb.checked } });
+          toast(cb.checked ? "已启用" : "已停用");
+          cb.closest(".mlib-item").classList.toggle("is-off", !cb.checked);
+        } catch (err) {
+          toast(err.message || "操作失败");
+          cb.checked = !cb.checked;
+        }
+      });
+      libBox.addEventListener("click", async e => {
+        const del = e.target.closest("[data-mlib-del]");
+        if (!del) return;
+        if (!confirm("删除后音频和封面文件会一并移除，确定删除？")) return;
+        del.disabled = true;
+        try {
+          await api("/api/music/library/delete", { body: { id: del.dataset.mlibDel } });
+          toast("已删除");
+          loadLibrary();
+        } catch (err) {
+          del.disabled = false;
+          toast(err.message || "删除失败");
+        }
+      });
+      loadLibrary();
     }
   }
 
@@ -7678,7 +7741,7 @@
           nowLyric.classList.remove("is-empty");
         }
         // 后台加载歌词（不强制弹出完整面板）
-        autoLoadCardLyric(card, id);
+        autoLoadCardLyric(card, id, meta);
         if (!a._cardBound) {
           a._cardBound = true;
           a.addEventListener("timeupdate", () => {
@@ -7694,8 +7757,9 @@
       .catch(() => toast("播放失败"));
   }
 
-  /** 播放时后台加载歌词到内存，内联显示当前行（不自动弹出完整面板） */
-  async function autoLoadCardLyric(card, id) {
+  /** 播放时后台加载歌词到内存，内联显示当前行（不自动弹出完整面板）
+   *  站内曲目（t 前缀）直接用元数据自带歌词；网易云 ID 走后端代理 */
+  async function autoLoadCardLyric(card, id, meta) {
     const panel = card.querySelector("[data-mcc-lyric-panel]");
     if (!panel) return;
     // 仅加载到内存，不自动弹出完整面板（用户可用歌词按钮手动展开）
@@ -7704,15 +7768,20 @@
       cardLyricState.songId = id;
       return;
     }
-    try {
-      const res = await api(`/api/music/163/lyric?id=${encodeURIComponent(id)}`);
-      const lrc = res.lyric || "";
-      cardLyricState.lines = parseLrc(lrc);
-      cardLyricState.songId = id;
-      cardLyricCache.set(id, cardLyricState.lines);
-    } catch {
-      cardLyricState.lines = [];
+    let lrc = "";
+    if (/^t\d+$/.test(id)) {
+      lrc = (meta && meta.lyric) || "";
+    } else {
+      try {
+        const res = await api(`/api/music/163/lyric?id=${encodeURIComponent(id)}`);
+        lrc = res.lyric || "";
+      } catch {
+        /* 歌词获取失败不影响播放 */
+      }
     }
+    cardLyricState.lines = parseLrc(lrc);
+    cardLyricState.songId = id;
+    if (lrc) cardLyricCache.set(id, cardLyricState.lines);
   }
 
   /** 解析 LRC（复用底部播放器的 parseLrc） */
@@ -7747,11 +7816,16 @@
     }
     panel.innerHTML = `<div class="mcc-lyric-empty">加载歌词中…</div>`;
     try {
-      const res = await api(`/api/music/163/lyric?id=${encodeURIComponent(id)}`);
-      const lrc = res.lyric || "";
+      let lrc = "";
+      if (/^t\d+$/.test(id)) {
+        lrc = (meta && meta.lyric) || "";
+      } else {
+        const res = await api(`/api/music/163/lyric?id=${encodeURIComponent(id)}`);
+        lrc = res.lyric || "";
+      }
       cardLyricState.lines = parseCardLrc(lrc);
       cardLyricState.songId = id;
-      cardLyricCache.set(id, cardLyricState.lines);
+      if (lrc) cardLyricCache.set(id, cardLyricState.lines);
       renderCardLyric(panel);
     } catch {
       panel.innerHTML = `<div class="mcc-lyric-empty">歌词加载失败</div>`;
@@ -7811,7 +7885,10 @@
         let meta = musicMetaCache.get(id);
         if (!meta) {
           try {
-            meta = await api(`/api/music/163?id=${id}`);
+            // t 前缀 = 站内曲库曲目；纯数字 = 旧网易云 ID
+            meta = await api(
+              /^t\d+$/.test(id) ? `/api/music/track?id=${encodeURIComponent(id)}` : `/api/music/163?id=${id}`
+            );
             musicMetaCache.set(id, meta);
           } catch {
             meta = null;
@@ -8284,7 +8361,7 @@
     });
   }
 
-  /** 音乐插入面板（内嵌在表单里，含 ID 获取帮助） */
+  /** 音乐插入面板（3 Tab：搜歌入库 / 本地上传 / 网络地址，入库成功自动插入 [music=tN]） */
   function toggleMusicInsertPanel(container, ta) {
     const exist = container.querySelector("[data-music-panel]");
     if (exist) {
@@ -8295,30 +8372,187 @@
     panel.className = "editor-music-panel";
     panel.dataset.musicPanel = "";
     panel.innerHTML = `
-      <div class="emp-row">
-        <input type="text" placeholder="网易云歌曲 ID（纯数字）或歌曲页链接" />
-        <button type="button" class="btn primary" data-emp-ok>插入</button>
-        <button type="button" class="btn" data-emp-close aria-label="关闭">×</button>
+      <div class="emp-tabs">
+        <button type="button" class="on" data-emp-tab="search">搜歌入库</button>
+        <button type="button" data-emp-tab="upload">本地上传</button>
+        <button type="button" data-emp-tab="url">网络地址</button>
+        <span class="emp-flex"></span>
+        <button type="button" class="emp-close" data-emp-close aria-label="关闭">×</button>
       </div>
-      <div class="emp-help">获取 ID：打开 <a href="https://music.163.com" target="_blank" rel="noreferrer">music.163.com</a> 歌曲页，地址栏 <code>music.163.com/song?id=554241732</code> 中的数字就是 ID。</div>`;
+      <div class="emp-body" data-emp-pane="search">
+        <div class="emp-row">
+          <input type="text" placeholder="搜索歌曲 / 歌手（网易云 + QQ 聚合）" />
+          <button type="button" class="btn primary" data-emp-search>搜索</button>
+        </div>
+        <div class="emp-results" data-emp-results>
+          <div class="emp-help">输入关键词搜索，点「入库」自动下载全曲音频/封面/歌词到站内并插入。</div>
+        </div>
+      </div>
+      <div class="emp-body" data-emp-pane="upload" hidden>
+        <div class="emp-row"><input type="file" accept=".mp3,.m4a,.flac,.wav,.ogg,audio/*" data-emp-file /></div>
+        <div class="emp-row">
+          <input type="text" data-emp-title placeholder="歌曲名（默认取文件名）" />
+          <input type="text" data-emp-artist placeholder="歌手" />
+        </div>
+        <div class="emp-row"><button type="button" class="btn primary" data-emp-upload>上传并插入</button></div>
+        <div class="emp-help">支持 mp3 / m4a / flac / wav / ogg，≤60MB。汽水音乐可先下载到本地再上传。</div>
+      </div>
+      <div class="emp-body" data-emp-pane="url" hidden>
+        <div class="emp-row"><input type="url" data-emp-url placeholder="音频直链 https://…" /></div>
+        <div class="emp-row">
+          <input type="text" data-emp-urltitle placeholder="歌曲名" />
+          <input type="text" data-emp-urlartist placeholder="歌手" />
+        </div>
+        <div class="emp-row"><button type="button" class="btn primary" data-emp-saveurl>转存并插入</button></div>
+        <div class="emp-help">服务端转存到站内存储；支持任何可直接访问的音频地址。</div>
+      </div>`;
     container.appendChild(panel);
-    const input = panel.querySelector("input");
-    input.focus();
-    const ok = () => {
-      const m = input.value.trim().match(/(\d{5,})/);
-      if (!m) return toast("请输入歌曲 ID 或歌曲页链接");
-      mdInsertBlock(ta, `[music=${m[1]}]`);
+
+    const resultsBox = panel.querySelector("[data-emp-results]");
+    const searchInput = panel.querySelector('[data-emp-pane="search"] input');
+
+    // Tab 切换
+    panel.querySelector(".emp-tabs").addEventListener("click", e => {
+      const tab = e.target.closest("[data-emp-tab]");
+      if (tab) {
+        panel.querySelectorAll("[data-emp-tab]").forEach(b => b.classList.toggle("on", b === tab));
+        panel.querySelectorAll("[data-emp-pane]").forEach(p => (p.hidden = p.dataset.empPane !== tab.dataset.empTab));
+        return;
+      }
+      if (e.target.closest("[data-emp-close]")) panel.remove();
+    });
+
+    const insertAndClose = id => {
+      mdInsertBlock(ta, `[music=${id}]`);
       panel.remove();
     };
-    panel.querySelector("[data-emp-ok]").addEventListener("click", ok);
-    panel.querySelector("[data-emp-close]").addEventListener("click", () => panel.remove());
-    input.addEventListener("keydown", e => {
+
+    /* ---- Tab1：搜歌入库 ---- */
+    let searchBusy = false;
+    const doSearch = async () => {
+      const kw = searchInput.value.trim();
+      if (!kw || searchBusy) return;
+      searchBusy = true;
+      resultsBox.innerHTML = `<div class="emp-help"><span class="spinner"></span> 搜索中…</div>`;
+      try {
+        const data = await api(`/api/music/search?kw=${encodeURIComponent(kw)}`);
+        const hits = [
+          ...(data.netease || []).map(h => ({ ...h, sourceLabel: "网易云" })),
+          ...(data.qq || []).map(h => ({ ...h, sourceLabel: "QQ" })),
+        ];
+        if (!hits.length) {
+          resultsBox.innerHTML = `<div class="emp-help">没有找到相关歌曲，换个关键词试试。</div>`;
+          return;
+        }
+        resultsBox.innerHTML = hits
+          .map(
+            (h, i) => `
+        <div class="emp-item">
+          ${h.cover ? `<img class="emp-cover" src="${esc(proxyCover(h.cover))}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="emp-cover emp-cover--ph">${svgIcon("music", 18)}</span>`}
+          <div class="emp-info">
+            <div class="emp-name">${esc(h.title)}${h.vip ? '<span class="emp-vip">VIP</span>' : ""}<span class="emp-src">${h.sourceLabel}</span></div>
+            <div class="emp-artist">${esc(h.artist)}${h.album ? " · " + esc(h.album) : ""}</div>
+          </div>
+          <button type="button" class="btn" data-emp-import="${i}">入库</button>
+        </div>`
+          )
+          .join("");
+        resultsBox._hits = hits;
+      } catch (e) {
+        resultsBox.innerHTML = `<div class="emp-help">${esc(e.message || "搜索失败")}</div>`;
+      } finally {
+        searchBusy = false;
+      }
+    };
+    panel.querySelector("[data-emp-search]").addEventListener("click", doSearch);
+    searchInput.addEventListener("keydown", e => {
       if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
-        ok();
+        doSearch();
       }
     });
+    resultsBox.addEventListener("click", async e => {
+      const btn = e.target.closest("[data-emp-import]");
+      if (!btn || btn.disabled) return;
+      const hit = (resultsBox._hits || [])[Number(btn.dataset.empImport)];
+      if (!hit) return;
+      btn.disabled = true;
+      btn.textContent = "解析中…";
+      try {
+        const data = await api("/api/music/import", {
+          body: { source: hit.source, songId: hit.songId, title: hit.title, artist: hit.artist, album: hit.album, cover: hit.cover, vip: hit.vip },
+        });
+        insertAndClose(data.id);
+        toast(data.duplicate ? "已在音乐库，已插入" : "入库成功，已插入");
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = "入库";
+        toast(err.message || "入库失败");
+      }
+    });
+
+    /* ---- Tab2：本地上传 ---- */
+    const uploadBtn = panel.querySelector("[data-emp-upload]");
+    uploadBtn.addEventListener("click", async () => {
+      const fileInput = panel.querySelector("[data-emp-file]");
+      const file = fileInput && fileInput.files && fileInput.files[0];
+      if (!file) return toast("请选择音频文件");
+      if (file.size > 60 * 1024 * 1024) return toast("文件超过 60MB 限制");
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = "上传中…";
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        const title = panel.querySelector("[data-emp-title]").value.trim();
+        const artist = panel.querySelector("[data-emp-artist]").value.trim();
+        if (title) form.append("title", title);
+        if (artist) form.append("artist", artist);
+        const data = await api("/api/music/upload", { form });
+        insertAndClose(data.id);
+        toast("上传成功，已插入");
+      } catch (e) {
+        toast(e.message || "上传失败");
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = "上传并插入";
+      }
+    });
+
+    /* ---- Tab3：网络地址转存 ---- */
+    const saveUrlBtn = panel.querySelector("[data-emp-saveurl]");
+    const saveUrl = async () => {
+      const url = panel.querySelector("[data-emp-url]").value.trim();
+      if (!url) return toast("请输入音频地址");
+      saveUrlBtn.disabled = true;
+      saveUrlBtn.textContent = "转存中…";
+      try {
+        const data = await api("/api/music/url", {
+          body: {
+            url,
+            title: panel.querySelector("[data-emp-urltitle]").value.trim(),
+            artist: panel.querySelector("[data-emp-urlartist]").value.trim(),
+          },
+        });
+        insertAndClose(data.id);
+        toast("转存成功，已插入");
+      } catch (e) {
+        toast(e.message || "转存失败");
+      } finally {
+        saveUrlBtn.disabled = false;
+        saveUrlBtn.textContent = "转存并插入";
+      }
+    };
+    saveUrlBtn.addEventListener("click", saveUrl);
+    panel.querySelector("[data-emp-url]").addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        saveUrl();
+      }
+    });
+
+    searchInput.focus();
   }
 
   /**
@@ -8334,7 +8568,7 @@
     (afterEl || ta).after(dock);
     let lastKey = null;
     function sync() {
-      const ids = [...ta.value.matchAll(/\[music=(\d+)\]/gi)].map(m => m[1]);
+      const ids = [...ta.value.matchAll(/\[music=(t?\d+)\]/gi)].map(m => m[1]);
       const key = ids.join(",");
       if (key === lastKey) return;
       lastKey = key;
@@ -8466,7 +8700,7 @@
         ])
       );
     }
-    addBtn("music", "插入网易云音乐", () => toggleMusicInsertPanel(field, ta), "music");
+    addBtn("music", "插入音乐（搜索入库 / 本地上传 / 网络地址）", () => toggleMusicInsertPanel(field, ta), "music");
     addSep();
     addBtn("list", "无序列表", () => mdLinePrefix(ta, "- "));
     addBtn("listOrdered", "有序列表", () => mdLinePrefix(ta, "1. "));
@@ -8486,7 +8720,7 @@
       const words = (v.trim().match(/[A-Za-z0-9]+/g) || []).length;
       const imgs = (v.match(/!\[[^\]]*\]\(/g) || []).length;
       const vids = (v.match(/@\[video\]\(/g) || []).length;
-      const musics = (v.match(/\[music=\d+\]/g) || []).length;
+      const musics = (v.match(/\[music=t?\d+\]/g) || []).length;
       const media = [imgs && `图 ${imgs}`, vids && `视频 ${vids}`, musics && `音乐 ${musics}`].filter(Boolean).join(" · ");
       status.textContent = `字数 ${cjk + words}${media ? "　" + media : ""}`;
     };

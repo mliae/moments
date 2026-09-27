@@ -223,6 +223,23 @@ CREATE TABLE IF NOT EXISTS ops_notify_log (
   message    TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_ops_notify_type_time ON ops_notify_log (type, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS music_tracks (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  title      TEXT NOT NULL DEFAULT '',
+  artist     TEXT NOT NULL DEFAULT '',
+  album      TEXT NOT NULL DEFAULT '',
+  source     TEXT NOT NULL DEFAULT 'netease', -- netease / qq
+  source_id  TEXT NOT NULL DEFAULT '',
+  vip        INTEGER NOT NULL DEFAULT 0,
+  audio_key  TEXT NOT NULL DEFAULT '',
+  cover_key  TEXT NOT NULL DEFAULT '',
+  lyric      TEXT NOT NULL DEFAULT '',
+  duration   INTEGER NOT NULL DEFAULT 0,
+  enabled    INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_music_tracks_enabled ON music_tracks (enabled, id);
 `;
 
 let schemaPromise: Promise<void> | null = null;

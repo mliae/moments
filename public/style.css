@@ -2783,3 +2783,80 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   .ops-table th, .ops-table td { padding: .36rem .4rem; }
 }
 
+/* ---------- 音乐插入面板：3 Tab（搜歌入库/本地上传/网络地址） ---------- */
+.editor-music-panel { padding: 0; overflow: hidden; }
+.emp-tabs {
+  display: flex; align-items: center; gap: 2px; padding: 6px 8px;
+  background: var(--anzhiyu-secondbg); border-bottom: var(--style-border);
+}
+.emp-tabs [data-emp-tab] {
+  padding: 5px 12px; border: none; border-radius: 7px; cursor: pointer;
+  background: transparent; color: var(--anzhiyu-secondtext);
+  font-size: .78rem; line-height: 1.4; transition: .15s;
+}
+.emp-tabs [data-emp-tab]:hover { color: var(--anzhiyu-fontcolor); }
+.emp-tabs [data-emp-tab].on {
+  background: var(--anzhiyu-card-bg); color: var(--anzhiyu-main); font-weight: 600;
+  box-shadow: var(--anzhiyu-shadow-border);
+}
+.emp-flex { flex: 1; }
+.emp-close {
+  width: 26px; height: 26px; border: none; border-radius: 7px; cursor: pointer;
+  background: transparent; color: var(--anzhiyu-secondtext); font-size: 1rem; line-height: 1;
+}
+.emp-close:hover { background: var(--anzhiyu-main-op); color: var(--anzhiyu-main); }
+.emp-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.emp-body[hidden] { display: none; }
+.emp-results {
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 260px; overflow-y: auto; overscroll-behavior: contain;
+}
+.emp-item {
+  display: flex; align-items: center; gap: 9px; padding: 6px 8px;
+  border-radius: 8px; transition: .15s;
+}
+.emp-item:hover { background: var(--anzhiyu-main-op); }
+.emp-cover {
+  width: 38px; height: 38px; border-radius: 7px; object-fit: cover; flex-shrink: 0;
+  background: var(--anzhiyu-secondbg); display: inline-flex; align-items: center; justify-content: center;
+  color: var(--anzhiyu-secondtext);
+}
+.emp-info { flex: 1; min-width: 0; }
+.emp-name {
+  font-size: .82rem; font-weight: 600; color: var(--anzhiyu-fontcolor);
+  display: flex; align-items: center; gap: 6px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.emp-artist { font-size: .72rem; color: var(--anzhiyu-secondtext); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emp-vip {
+  flex-shrink: 0; padding: 0 5px; border-radius: 4px; font-size: .62rem; font-weight: 700;
+  background: rgba(255, 170, 0, .16); color: #d98a00; line-height: 1.5;
+}
+.emp-src {
+  flex-shrink: 0; padding: 0 5px; border-radius: 4px; font-size: .62rem;
+  background: var(--anzhiyu-main-op); color: var(--anzhiyu-main); line-height: 1.5;
+}
+.emp-item .btn { flex-shrink: 0; padding: 4px 11px; font-size: .74rem; }
+
+/* ---------- 后台：站内音乐库列表 ---------- */
+.mlib-list { display: flex; flex-direction: column; gap: 8px; max-width: 680px; }
+.mlib-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: .65rem .85rem; border-radius: 12px;
+  background: var(--anzhiyu-card-bg); border: var(--style-border); transition: .2s;
+}
+.mlib-item.is-off { opacity: .5; }
+.mlib-item.is-off .mlib-name { text-decoration: line-through; text-decoration-thickness: 1px; }
+.mlib-cover {
+  width: 42px; height: 42px; border-radius: 9px; object-fit: cover; flex-shrink: 0;
+  background: var(--anzhiyu-secondbg); display: inline-flex; align-items: center; justify-content: center;
+  color: var(--anzhiyu-secondtext);
+}
+.mlib-info { flex: 1; min-width: 0; }
+.mlib-name { font-size: .88rem; font-weight: 600; color: var(--anzhiyu-fontcolor); display: flex; align-items: center; gap: 6px; }
+.mlib-artist { font-size: .74rem; color: var(--anzhiyu-secondtext); margin-top: 2px; }
+@media (max-width: 600px) {
+  .mlib-item { flex-wrap: wrap; }
+  .mlib-info { flex: 1 1 calc(100% - 96px); }
+}
+
