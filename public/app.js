@@ -7582,17 +7582,9 @@
   const musicMetaCache = new Map();
   let musicCardAudio = null;
 
-  function setCardIcon(card, playing) {
-    const play = card.querySelector(".mcc-btn .i-play");
-    const pause = card.querySelector(".mcc-btn .i-pause");
-    if (play) play.hidden = playing;
-    if (pause) pause.hidden = !playing;
-  }
-
   function stopAllMusicCards() {
     document.querySelectorAll(".music-block-card.playing").forEach(c => {
       c.classList.remove("playing");
-      setCardIcon(c, false);
       // 歌词行占位但透明，保持卡片高度不抖动
       const nowLyric = c.querySelector("[data-mcc-now-lyric]");
       if (nowLyric) nowLyric.classList.add("is-empty");
@@ -7621,7 +7613,6 @@
     if (card.classList.contains("playing")) {
       a.pause();
       card.classList.remove("playing");
-      setCardIcon(card, false);
       // 暂停时歌词行占位但透明，保持卡片高度不抖动
       if (nowLyric) nowLyric.classList.add("is-empty");
       return;
@@ -7640,7 +7631,6 @@
     a.play()
       .then(() => {
         card.classList.add("playing");
-        setCardIcon(card, true);
         // 播放时显示内联歌词行（位于歌手名下方，不隐藏歌手名）
         if (nowLyric) {
           nowLyric.textContent = "♪";
@@ -7795,17 +7785,13 @@
           return;
         }
         card.innerHTML = `
-          <div class="mcc-cover-wrap">
-            ${meta.cover ? `<img class="mcc-cover" src="${proxyCover(meta.cover)}" alt="" referrerpolicy="no-referrer" />` : `<div class="mcc-cover mcc-cover--ph">${svgIcon("music", 20)}</div>`}
+          <button type="button" class="mcc-cover-wrap" aria-label="播放/暂停" title="播放/暂停">
+            ${meta.cover ? `<img class="mcc-cover" src="${proxyCover(meta.cover)}" alt="" referrerpolicy="no-referrer" />` : `<span class="mcc-cover mcc-cover--ph">${svgIcon("music", 20)}</span>`}
             <span class="mcc-cover-ring"></span>
             <span class="mcc-cover-hint">
               <svg class="h-play" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
               <svg class="h-pause" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
             </span>
-          </div>
-          <button type="button" class="mcc-btn" aria-label="播放/暂停" title="播放/暂停">
-            <svg class="i-play" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            <svg class="i-pause" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
           </button>
           <div class="mcc-info">
             <div class="mcc-name">${esc(meta.title)}</div>
@@ -7813,19 +7799,14 @@
               <span class="mcc-artist" data-mcc-artist>${esc(meta.artist)}</span>
               <span class="mcc-now-lyric is-empty" data-mcc-now-lyric></span>
             </div>
+            <div class="mcc-bar"><i></i></div>
           </div>
           <button type="button" class="mcc-lyric-btn" data-mcc-lyric aria-label="歌词" title="歌词">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zm14-10v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
           </button>
-          <div class="mcc-bar"><i></i></div>
           <div class="mcc-lyric" data-mcc-lyric-panel><div class="mcc-lyric-empty">暂无歌词</div></div>`;
-        card.querySelector(".mcc-btn").addEventListener("click", () => toggleMusicCard(card, id, meta));
-        // 点击封面也可播放/暂停
-        const cover = card.querySelector(".mcc-cover");
-        if (cover) {
-          cover.style.cursor = "pointer";
-          cover.addEventListener("click", () => toggleMusicCard(card, id, meta));
-        }
+        // 封面即播放键：常驻的播放角标是可点提示，转起来的黑胶本身就是播放状态
+        card.querySelector(".mcc-cover-wrap").addEventListener("click", () => toggleMusicCard(card, id, meta));
         // 歌词按钮（展开完整歌词面板，可选）
         const lyricBtn = card.querySelector("[data-mcc-lyric]");
         lyricBtn.addEventListener("click", () => toggleCardLyric(card, id, meta, lyricBtn));

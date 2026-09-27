@@ -1865,7 +1865,7 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
    歌词键降为次要色，进度条贴卡片底边成轨 */
 .music-block-card {
   display: flex; align-items: center; gap: 10px;
-  margin: 10px auto; padding: 8px 10px 10px 8px;
+  margin: 10px auto; padding: 9px 10px;
   background: var(--anzhiyu-card-bg); border: var(--style-border-always);
   border-radius: 16px; max-width: 460px; width: 100%;
   box-shadow: var(--anzhiyu-shadow-border);
@@ -1893,11 +1893,12 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
   font-size: .8rem; color: var(--anzhiyu-secondtext); min-height: 52px;
 }
 
-/* 封面：52px 黑胶，中心孔让旋转可被感知；整块可点按播放 */
+/* 封面即播放键：52px 黑胶，整块是个 button（键盘可达，Enter/Space 免费拿到） */
 .music-block-card .mcc-cover-wrap {
   position: relative; width: 52px; height: 52px; flex-shrink: 0;
-  border-radius: 50%; overflow: hidden; cursor: pointer;
+  display: block; padding: 0; line-height: 0; color: inherit;
   border: 2px solid var(--anzhiyu-card-border);
+  border-radius: 50%; overflow: hidden; cursor: pointer;
   background: linear-gradient(135deg, var(--anzhiyu-main-op), var(--anzhiyu-secondbg));
 }
 .music-block-card .mcc-cover { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -1912,26 +1913,31 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
   position: absolute; inset: 0; border-radius: 50%;
   box-shadow: inset 0 0 0 2px rgb(0 0 0 / 15%); pointer-events: none;
 }
+/* 中心孔：黑胶旋转的感知锚点，只在播放时出现（待机时让位给播放角标，否则白点会压在三角上） */
 .music-block-card .mcc-cover-wrap::after {
   content: ""; position: absolute; left: 50%; top: 50%;
   width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
   background: var(--anzhiyu-card-bg); box-shadow: 0 0 0 2px rgb(0 0 0 / 12%);
-  pointer-events: none;
+  opacity: 0; transition: opacity .2s; pointer-events: none;
 }
+.music-block-card.playing .mcc-cover-wrap::after { opacity: 1; }
+.music-block-card.playing:hover .mcc-cover-wrap::after { opacity: 0; }
 .music-block-card.playing .mcc-cover { animation: music-spin 8s linear infinite; }
 /* 占位图没有封面内容，旋转只会让图标打转，故不转 */
 .music-block-card.playing .mcc-cover--ph { animation: none; }
 
-/* 悬停封面时的可点提示：随播放状态切换播放/暂停字形（纯 CSS，不碰状态机） */
+/* 播放角标常驻：没有 hover 的触屏也需要"这块能点"的信号。
+   播放中反过来——收起角标、露出封面和转动的中心孔（黑胶本身就是状态），悬停时才给暂停字形。 */
 .music-block-card .mcc-cover-hint {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  color: #fff; background: rgb(0 0 0 / 34%); opacity: 0;
+  color: #fff; background: rgb(0 0 0 / 32%); opacity: 1;
   transition: opacity .2s; pointer-events: none;
 }
 .music-block-card .mcc-cover-hint .h-pause { display: none; }
+.music-block-card.playing .mcc-cover-hint { opacity: 0; }
 .music-block-card.playing .mcc-cover-hint .h-play { display: none; }
 .music-block-card.playing .mcc-cover-hint .h-pause { display: block; }
-.music-block-card:hover .mcc-cover-hint { opacity: 1; }
+.music-block-card.playing:hover .mcc-cover-hint { opacity: 1; background: rgb(0 0 0 / 42%); }
 
 .music-block-card .mcc-info {
   flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
@@ -1951,7 +1957,7 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
   opacity: 0;
 }
 
-/* 控件：播放键紧跟封面（阅读起点即主操作），歌词键降到最右、只用次级色区分 */
+/* 次要控件：只剩歌词键，降到最右、用次级色区分层级 */
 .music-block-card .mcc-lyric-btn {
   width: 26px; height: 26px; flex-shrink: 0; border: none; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; padding: 0;
@@ -1961,29 +1967,12 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
 .music-block-card .mcc-lyric-btn:hover { background: var(--anzhiyu-main-op); color: var(--anzhiyu-main); }
 .music-block-card .mcc-lyric-btn:active { transform: scale(.88); }
 .music-block-card .mcc-lyric-btn.active { color: var(--anzhiyu-main); background: var(--anzhiyu-main-op); }
-.music-block-card .mcc-btn {
-  width: 40px; height: 40px; flex-shrink: 0; border: none; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; padding: 0;
-  background: var(--anzhiyu-main); color: #fff; cursor: pointer;
-  box-shadow: 0 4px 12px -4px var(--anzhiyu-main-op);
-  transition: opacity .15s, transform .15s;
-}
-.music-block-card .mcc-btn:hover { background: var(--anzhiyu-main); opacity: .92; transform: scale(1.06); }
-.music-block-card .mcc-btn:active { transform: scale(.95); }
-/* 播放/暂停图标改由卡片的 .playing 驱动：setCardIcon 写的是 svg 元素的 hidden 属性，
-   而 hidden 在 SVG 命名空间上不反射为内容属性，旧实现两个图标一直同时显示 */
-.music-block-card .mcc-btn .i-play { display: block; }
-.music-block-card .mcc-btn .i-pause { display: none; }
-.music-block-card.playing .mcc-btn .i-play { display: none; }
-.music-block-card.playing .mcc-btn .i-pause { display: block; }
 
-/* 进度轨：填在卡片底边（跟胶囊同款处理），整幅宽度读作"这首歌的进度"，
-   而不是飘在文字下方的一条游离线；悬停加粗 */
+/* 进度轨：收在歌曲信息列里，跟歌名/歌词同宽——读作"这首歌的进度"，
+   而不是横跨卡片底边的一条花边；悬停加粗 */
 .music-block-card .mcc-bar {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  height: 3px; overflow: hidden;
-  border-radius: 0 0 16px 16px;
-  background: var(--anzhiyu-card-border);
+  height: 3px; margin-top: 3px; flex-shrink: 0; overflow: hidden;
+  border-radius: 2px; background: var(--anzhiyu-card-border);
   transition: height .15s, background .2s;
 }
 .music-block-card.playing .mcc-bar { background: var(--anzhiyu-main-op); }
@@ -1992,12 +1981,10 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
 
 /* 编辑器内嵌态与窄屏 */
 @media (max-width: 640px) {
-  .music-block-card { gap: 8px; padding: 7px 8px 8px 7px; border-radius: 14px; }
+  .music-block-card { gap: 8px; padding: 8px; border-radius: 14px; }
   .music-block-card .mcc-cover-wrap { width: 46px; height: 46px; }
   .music-block-card .mcc-name { font-size: .8rem; }
-  .music-block-card .mcc-btn { width: 36px; height: 36px; }
   .music-block-card .mcc-lyric-btn { width: 24px; height: 24px; }
-  .music-block-card .mcc-bar { border-radius: 0 0 14px 14px; }
   .music-block-card .mcc-lyric { max-height: 170px; font-size: .74rem; }
 }
 
