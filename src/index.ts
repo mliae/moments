@@ -25,9 +25,11 @@ import indexnowAdminRoutes from "./routes/indexnow";
 import baiduAdminRoutes from "./routes/baidu";
 import bgRoutes from "./routes/bg";
 import { analyticsPublicRoutes, analyticsAdminRoutes } from "./routes/analytics";
+import opsRoutes, { runUptimeCheck, recordPerf } from "./routes/ops";
 import { getSettings } from "./settings";
 import { keyToSrc, ensureSchema, type PostRow } from "./db";
 import { isAdmin, hasAdminPassword, ADMIN_COOKIE } from "./auth";
+import { detectAttack, isBlocked, recordAttack, recordError } from "./security";
 import {
   buildSeoHead,
   websiteJsonLd,
@@ -48,6 +50,26 @@ const app = new Hono<HonoEnv>();
 app.use("*", async (c, next) => {
   await ensureSchema(c.env.DB);
   await next();
+});
+
+/* ==================== 性能监控 ====================
+ * 仅统计 /api/* 请求总耗时，异步采样写入 perf_log：
+ * - 耗时 ≥ 300ms 的慢请求必记（用于发现劣化接口）
+ * - 其余请求以 10% 概率采样（控制 D1 写入量，避免浪费免费额度）
+ */
+app.use("*", async (c, next) => {
+  const url = new URL(c.req.url);
+  if (!url.pathname.startsWith("/api/")) return next();
+  const start = Date.now();
+  await next();
+  const duration = Date.now() - start;
+  if (duration >= 300 || Math.random() < 0.1) {
+    try {
+      c.executionCtx.waitUntil(recordPerf(c.env.DB, c.req.method, url.pathname, duration));
+    } catch {
+      // 采样写入失败不影响请求
+    }
+  }
 });
 
 /* ==================== 规范域名跳转 ====================
@@ -101,19 +123,87 @@ app.use("*", async (c, next) => {
   }
 });
 
+/* ==================== 安全中间件 ====================
+ * 攻击检测 + 自动封禁。位于 SSR 缓存之后：缓存命中的请求不经此层，零额外开销。
+ * - 静态资源 / media / imgproxy 直接放行
+ * - 封禁 IP 返回 403（黑名单 60s 内存缓存，正常访客几乎无 D1 查询）
+ * - 命中高危规则（block=true）记录并 403；中危（后台探测/工具UA）仅记录放行
+ * - 攻击记录与封禁判断均异步执行（waitUntil），不阻塞正常响应
+ */
+const SAFE_STATIC_EXT_RE =
+  /\.(js|mjs|css|png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|eot|map|txt|xml|json|wasm|mp4|webm|mp3|ogg|pdf|webmanifest)(\?|#|$)/i;
+
+app.use("*", async (c, next) => {
+  try {
+    const url = new URL(c.req.url);
+    const path = url.pathname;
+    // 静态资源与安全前缀直接放行
+    if (
+      SAFE_STATIC_EXT_RE.test(path) ||
+      path.startsWith("/media/") ||
+      path === "/imgproxy" ||
+      path.startsWith("/imgproxy/") ||
+      path === "/favicon.ico"
+    ) {
+      return next();
+    }
+    // 已登录管理员的请求不触发攻击检测：后台合法操作可能命中敏感词规则
+    // （如备份导出 /api/admin/ops/backup/export），且接口本身由 requireAdmin 保护。
+    if (path.startsWith("/api/admin/")) {
+      if (await isAdmin(c)) return next();
+    }
+    const ip =
+      c.req.header("cf-connecting-ip") ||
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
+      "";
+    // 封禁检查：命中直接 403
+    if (ip && (await isBlocked(c.env.DB, ip))) {
+      return c.text("Forbidden", 403, { "cache-control": "no-store" });
+    }
+    // 攻击检测（命中即停）
+    const ua = c.req.header("user-agent") || "";
+    const hit = detectAttack(path, url.search.slice(1), ua);
+    if (hit) {
+      const s = await getSettings(c.env.DB);
+      const opts = {
+        autoBan: s.auto_ban_enabled,
+        threshold: parseInt(s.ban_threshold, 10) || 5,
+        durationHours: parseInt(s.ban_duration_hours, 10) || 24,
+      };
+      const info = {
+        ip,
+        path,
+        method: c.req.method,
+        ua,
+        country: c.req.header("cf-ipcountry") || "",
+      };
+      // 高危规则：异步记录（含封禁判断）并拦截
+      if (hit.block) {
+        c.executionCtx.waitUntil(recordAttack(c.env.DB, s.security_webhook_url, hit, info, opts));
+        return c.text("Forbidden", 403, { "cache-control": "no-store" });
+      }
+      // 中危规则：仅记录，不拦截（自动封禁只统计高危，传完整 opts 无害）
+      c.executionCtx.waitUntil(recordAttack(c.env.DB, s.security_webhook_url, hit, info, opts));
+    }
+  } catch {
+    // 安全模块自身异常绝不影响主请求
+  }
+  return next();
+});
+
 app.get("/api/health", c => ok(c, { site: c.env.SITE_NAME ?? "moments", time: new Date().toISOString() }));
 
 // 公开站点配置（横幅文案/站名等）；admin_path 等敏感字段不下发
 // 设置变更频率低：浏览器缓存 60s + Cloudflare 边缘缓存 5min（边缘命中不消耗 Worker 请求额度）
 app.get("/api/settings", async c => {
   const s = await getSettings(c.env.DB);
-  // 私密字段绝不下发：后台入口、QQ 登录态
+  // 私密字段绝不下发：后台入口、apihz 凭证、QQ 登录态、邮件 API Key、告警 Webhook
   const {
-    admin_path: _h1, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
-    indexnow_key: _h7, baidu_push_token: _h8,
+    admin_path: _h1, apihz_id: _h2, apihz_key: _h3, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
+    indexnow_key: _h7, baidu_push_token: _h8, mail_resend_key: _h9, security_webhook_url: _h10,
     ...publicSettings
   } = s;
-  void [_h1, _h4, _h5, _h6, _h7, _h8];
+  void [_h1, _h2, _h3, _h4, _h5, _h6, _h7, _h8, _h9, _h10];
   const res = ok(c, publicSettings);
   res.headers.set("Cache-Control", "public, max-age=60, s-maxage=300");
   return res;
@@ -124,6 +214,7 @@ app.route("/api/admin/photos", adminPhotoRoutes);
 app.route("/api/friends", friendRoutes);
 app.route("/api/admin/friends", adminFriendRoutes);
 app.route("/api/admin", adminRoutes);
+app.route("/api/admin/ops", opsRoutes);
 app.route("/api/moments", momentRoutes);
 app.route("/api/moments", socialRoutes);
 app.route("/api/posts", postRoutes);
@@ -520,6 +611,20 @@ app.notFound(async c => {
 
 app.onError((err, c) => {
   console.error(`[moments] ${c.req.method} ${new URL(c.req.url).pathname}`, err);
+  // 错误日志入库（异步，不影响错误响应返回）
+  try {
+    const url = new URL(c.req.url);
+    c.executionCtx.waitUntil(
+      recordError(c.env.DB, {
+        method: c.req.method,
+        path: url.pathname,
+        message: String((err as Error | undefined)?.message || err || "unknown error"),
+        stack: err instanceof Error ? err.stack || "" : "",
+      })
+    );
+  } catch {
+    // 日志写入失败不影响主流程
+  }
   return fail(c, "服务器开小差了", 500);
 });
 
@@ -531,7 +636,26 @@ app.onError((err, c) => {
 async function handleScheduled(env: HonoEnv["Bindings"]): Promise<void> {
   try {
     const s = await getSettings(env.DB);
-    if (!s.qq_ckqq || !s.qq_pskey) return; // 未配置 QQ 凭证，跳过
+
+    // 可用性监控：按后台配置的检测间隔执行（默认 5 分钟），未到期则跳过
+    let siteUrl = (s.site_domain || "").trim();
+    if (siteUrl && !/^https?:\/\//i.test(siteUrl)) siteUrl = "https://" + siteUrl;
+    if (siteUrl) {
+      const intervalMin = Math.max(1, Math.min(720, parseInt(s.uptime_check_interval, 10) || 5));
+      const last = await env.DB.prepare(
+        `SELECT created_at FROM uptime_log ORDER BY id DESC LIMIT 1`
+      ).first<{ created_at: string }>();
+      const lastTs = last?.created_at ? new Date(last.created_at).getTime() : 0;
+      if (!lastTs || Date.now() - lastTs >= intervalMin * 60_000) {
+        try {
+          await runUptimeCheck(env.DB, siteUrl, s.security_webhook_url);
+        } catch (e) {
+          console.error("[uptime] check failed:", e);
+        }
+      }
+    }
+
+    if (!s.apihz_id || !s.qq_ckqq || !s.qq_pskey) return; // 未配置 QQ 凭证，跳过
 
     // 检查上次保活时间，避免过于频繁调用
     const lastKey = "qq_keepalive_last";

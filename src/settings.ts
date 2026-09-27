@@ -71,7 +71,9 @@ export interface SiteSettings {
   // 评论头像
   random_avatar_api: string; // 随机头像 API 列表，每行一条，支持 {imgtype} 占位；留空=内置 apihz 默认
   random_avatar_imgtype: string; // 随机头像类型 imgtype（apihz 0-16），默认 9=古风
-  // QQ 昵称资料（自建接口，skey/pskey 直接调腾讯，不经过第三方）
+  // QQ 昵称资料（apihz 接口，凭证仅服务端使用）
+  apihz_id: string; // apihz 开发者 ID
+  apihz_key: string; // apihz 开发者 KEY
   qq_ckqq: string; // 系统 QQ 号
   qq_skey: string; // 系统 QQ 的 skey
   qq_pskey: string; // 系统 QQ 的 pskey（p_skey）
@@ -86,8 +88,27 @@ export interface SiteSettings {
   baidu_push_token: string; // 百度推送 token（私密，不公开）
   // 评论表情包
   comment_emoji_owo_url: string; // 评论区 OwO 表情包 JSON 地址；默认站内 /owo.json（willow-god 包）
+  // 打赏
+  reward_enabled: boolean; // 是否在文章底部展示打赏卡片
+  reward_qrcode: string; // 打赏收款二维码图片 URL
+  reward_text: string; // 打赏引导文案
   // 访问统计
   analytics_enabled: boolean; // 是否启用访客访问统计（后台不计入）
+  // 安全中心
+  security_webhook_url: string; // 告警 webhook（飞书/钉钉/企业微信兼容），空=不推送
+  auto_ban_enabled: boolean; // 是否启用自动封禁
+  ban_threshold: string; // 同 IP 10 分钟高危命中 N 次触发封禁（1-100）
+  ban_duration_hours: string; // 封禁时长（小时，1-720）
+  // 评论互动（邮件通知 / 防刷）
+  mail_enabled: boolean; // 是否启用邮件通知（需配置 Resend API Key）
+  mail_resend_key: string; // Resend API Key（私密，不公开）
+  mail_from: string; // 发件人邮箱（需在 Resend 验证的域名，如 notify@jxe.me）
+  mail_admin_to: string; // 管理员收件邮箱（新评论通知）
+  mail_notify_admin: boolean; // 新评论时是否通知管理员
+  mail_reply_notify: boolean; // 是否允许评论者订阅「收到回复邮件通知」
+  comment_rate_limit: string; // 同 IP 每分钟评论上限（1-100，默认 5）
+  // 运维监控
+  uptime_check_interval: string; // 可用性检测间隔（分钟，1-720，默认 5）
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -159,6 +180,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   random_avatar_api:
     "https://cn.apihz.cn/api/img/apihzimgtx.php?id=88888888&key=88888888&type=1&imgtype={imgtype}",
   random_avatar_imgtype: "9",
+  apihz_id: "",
+  apihz_key: "",
   qq_ckqq: "",
   qq_skey: "",
   qq_pskey: "",
@@ -173,6 +196,21 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   baidu_push_token: "",
   comment_emoji_owo_url: "/owo.json",
   analytics_enabled: true,
+  reward_enabled: false,
+  reward_qrcode: "",
+  reward_text: "如果觉得这篇文章不错，欢迎打赏支持一下 ~",
+  security_webhook_url: "",
+  auto_ban_enabled: true,
+  ban_threshold: "5",
+  ban_duration_hours: "24",
+  mail_enabled: false,
+  mail_resend_key: "",
+  mail_from: "",
+  mail_admin_to: "",
+  mail_notify_admin: true,
+  mail_reply_notify: true,
+  comment_rate_limit: "5",
+  uptime_check_interval: "5",
 };
 
 /** 字符串字段约束：最大长度 */
@@ -223,6 +261,8 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   site_icon: 300,
   random_avatar_api: 2000,
   random_avatar_imgtype: 2,
+  apihz_id: 20,
+  apihz_key: 64,
   qq_ckqq: 20,
   qq_skey: 200,
   qq_pskey: 256,
@@ -232,6 +272,16 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   baidu_push_site: 100,
   baidu_push_token: 64,
   comment_emoji_owo_url: 500,
+  security_webhook_url: 500,
+  ban_threshold: 3,
+  ban_duration_hours: 4,
+  mail_resend_key: 128,
+  mail_from: 200,
+  mail_admin_to: 200,
+  comment_rate_limit: 3,
+  reward_qrcode: 500,
+  reward_text: 300,
+  uptime_check_interval: 3,
 };
 
 /**
@@ -260,6 +310,11 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "indexnow_auto",
   "baidu_push_enabled",
   "analytics_enabled",
+  "auto_ban_enabled",
+  "mail_enabled",
+  "mail_notify_admin",
+  "mail_reply_notify",
+  "reward_enabled",
 ];
 
 export function clampSetting(value: unknown, max: number): string {
@@ -307,6 +362,26 @@ export function normalizeSettings(raw: Record<string, unknown> | null | undefine
   out.qq_keepalive_interval = Number.isFinite(ka)
     ? String(Math.max(1, Math.min(72, ka)))
     : DEFAULT_SETTINGS.qq_keepalive_interval;
+  // 自动封禁阈值（次/10分钟）：1-100，非法回退默认
+  const bt = parseInt(out.ban_threshold, 10);
+  out.ban_threshold = Number.isFinite(bt)
+    ? String(Math.max(1, Math.min(100, bt)))
+    : DEFAULT_SETTINGS.ban_threshold;
+  // 封禁时长（小时）：1-720，非法回退默认
+  const bd = parseInt(out.ban_duration_hours, 10);
+  out.ban_duration_hours = Number.isFinite(bd)
+    ? String(Math.max(1, Math.min(720, bd)))
+    : DEFAULT_SETTINGS.ban_duration_hours;
+  // 评论频控（次/分钟）：1-100，非法回退默认
+  const cr = parseInt(out.comment_rate_limit, 10);
+  out.comment_rate_limit = Number.isFinite(cr)
+    ? String(Math.max(1, Math.min(100, cr)))
+    : DEFAULT_SETTINGS.comment_rate_limit;
+  // 可用性检测间隔（分钟）：1-720，非法回退默认
+  const ui = parseInt(out.uptime_check_interval, 10);
+  out.uptime_check_interval = Number.isFinite(ui)
+    ? String(Math.max(1, Math.min(720, ui)))
+    : DEFAULT_SETTINGS.uptime_check_interval;
   if (out.banner_bg_mode !== "static" && out.banner_bg_mode !== "random") out.banner_bg_mode = DEFAULT_SETTINGS.banner_bg_mode;
   return out;
 }

@@ -23,6 +23,7 @@ import {
 } from "../comment-service";
 import { maybeScheduleAiReply } from "../ai-reply";
 import { ensureAvatar } from "../avatar";
+import { handleCommentMailNotifications } from "../mail";
 
 const app = new Hono<HonoEnv>();
 
@@ -327,10 +328,35 @@ app.post("/:slug/comments", async c => {
   );
   if (ensured) input.avatarUrl = ensured.src;
 
-  const result = await createComment(c.env.DB, "post", post.id, input, admin);
+  const result = await createComment(c.env.DB, "post", post.id, input, admin, {
+    ip: c.req.header("cf-connecting-ip") || "",
+    rateLimit: parseInt(ps.comment_rate_limit, 10) || 5,
+  });
   if ("error" in result) return fail(c, result.error, result.status ?? 400);
   // @AI 机器人：内容含 @机器人昵称 时异步生成楼中楼回复（开关关闭/未提及均无操作）
   await maybeScheduleAiReply(c, { type: "post", targetId: post.id, comment: result.comment });
+
+  // 邮件通知（异步执行，失败静默）：管理员新评论 + 被回复者订阅通知
+  const origin = new URL(c.req.url).origin;
+  c.executionCtx.waitUntil(
+    handleCommentMailNotifications({
+      mail: {
+        enabled: ps.mail_enabled,
+        apiKey: ps.mail_resend_key,
+        from: ps.mail_from,
+        adminTo: ps.mail_admin_to,
+        notifyAdmin: ps.mail_notify_admin,
+        replyNotify: ps.mail_reply_notify,
+      },
+      db: c.env.DB,
+      site: ps.site_title || "Moments",
+      comment: result.comment,
+      targetTypeLabel: "文章",
+      targetLabel: post.title,
+      url: `${origin}/post/${encodeURIComponent(post.slug)}#comments`,
+    })
+  );
+
   return ok(c, { ...result.comment, is_owner: result.comment.is_owner === 1 }, "评论成功");
 });
 

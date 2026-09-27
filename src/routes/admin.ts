@@ -21,6 +21,7 @@ import { getSettings, updateSettings, normalizeAdminPath } from "../settings";
 import { deleteCommentAnywhere, editCommentAnywhere } from "../comment-service";
 import { ensureAvatar } from "../avatar";
 import { fetchQqNickDirect } from "./misc";
+import { ATTACK_RULES, banIp, unbanIp, sendWebhookAlert } from "../security";
 
 const app = new Hono<HonoEnv>();
 
@@ -65,14 +66,42 @@ async function registerFailure(db: D1Database, ip: string): Promise<Date | null>
   return lockedUntil;
 }
 
-const IMAGE_TYPES: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/gif": "gif",
-  "image/webp": "webp",
-};
 const MAX_IMAGE = 30 * 1024 * 1024;
 const MAX_VIDEO = 100 * 1024 * 1024;
+
+/** 魔数 → 扩展名 / Content-Type（以文件真实内容为准，防止伪装成图片/视频的脚本上传） */
+const MAGIC_EXT: Record<string, string> = {
+  jpeg: "jpg",
+  png: "png",
+  gif: "gif",
+  webp: "webp",
+  mp4: "mp4",
+};
+const MAGIC_CONTENT_TYPE: Record<string, string> = {
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  mp4: "video/mp4",
+};
+
+/** 读取文件头 16 字节识别真实类型；读取失败或无法识别返回 null */
+async function sniffFileType(file: File): Promise<keyof typeof MAGIC_EXT | null> {
+  try {
+    const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    const ascii = (start: number, len: number) =>
+      String.fromCharCode(...head.slice(start, start + len));
+    if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return "jpeg";
+    if (head[0] === 0x89 && ascii(1, 3) === "PNG") return "png";
+    const gif = ascii(0, 6);
+    if (gif === "GIF87a" || gif === "GIF89a") return "gif";
+    if (ascii(0, 4) === "RIFF" && ascii(8, 4) === "WEBP") return "webp";
+    if (ascii(4, 4) === "ftyp") return "mp4";
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /api/admin/setup  { new_password, path }
@@ -215,20 +244,22 @@ app.post("/upload", requireAdmin, async c => {
 
   const date = new Date().toISOString().slice(0, 10);
   const uuid = crypto.randomUUID();
-  const originalExt = (file.name.split(".").pop() ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
   let key: string;
   let contentType: string;
 
   if (kind === "image") {
-    const ext = IMAGE_TYPES[file.type] ?? "";
-    if (!ext) return fail(c, "仅支持 JPG/PNG/GIF/WEBP 图片");
+    // 魔数校验：读取文件头确认真实图片类型（MIME 可伪造，魔数不可）
+    const sniffed = await sniffFileType(file);
+    if (sniffed !== "jpeg" && sniffed !== "png" && sniffed !== "gif" && sniffed !== "webp") {
+      return fail(c, "文件内容不是有效图片（仅支持 JPG/PNG/GIF/WEBP）");
+    }
     if (file.size > MAX_IMAGE) return fail(c, "图片不能超过 30MB");
-    contentType = file.type;
-    key = `uploads/images/${date}/${uuid}.${ext}`;
+    contentType = MAGIC_CONTENT_TYPE[sniffed];
+    key = `uploads/images/${date}/${uuid}.${MAGIC_EXT[sniffed]}`;
   } else if (kind === "video") {
-    const isMp4 = file.type === "video/mp4" || originalExt === "mp4";
-    if (!isMp4) return fail(c, "仅支持 MP4 视频（M3U8 请使用外链地址）");
+    const sniffed = await sniffFileType(file);
+    if (sniffed !== "mp4") return fail(c, "文件内容不是有效的 MP4 视频（M3U8 请使用外链地址）");
     if (file.size > MAX_VIDEO) return fail(c, "视频不能超过 100MB，建议使用外链");
     contentType = "video/mp4";
     key = `uploads/videos/${date}/${uuid}.mp4`;
@@ -355,7 +386,7 @@ app.post("/avatars/refresh", requireAdmin, async c => {
 });
 
 /**
- * POST /api/admin/qq/test  测试自建 QQ 凭证是否有效（CK 是否过期）
+ * POST /api/admin/qq/test  测试 apihz QQ 凭证是否有效（CK 是否过期）
  * body: { qq? }  不传则用 ckqq 自测；返回 {ok, nickname, msg}
  */
 app.post("/qq/test", requireAdmin, async c => {
@@ -365,12 +396,14 @@ app.post("/qq/test", requireAdmin, async c => {
   // 允许传入未保存的表单值进行测试，否则用已存配置
   const eff = {
     ...s,
+    apihz_id: typeof body.apihz_id === "string" ? body.apihz_id : s.apihz_id,
+    apihz_key: typeof body.apihz_key === "string" ? body.apihz_key : s.apihz_key,
     qq_ckqq: typeof body.qq_ckqq === "string" ? body.qq_ckqq : s.qq_ckqq,
     qq_skey: typeof body.qq_skey === "string" ? body.qq_skey : s.qq_skey,
     qq_pskey: typeof body.qq_pskey === "string" ? body.qq_pskey : s.qq_pskey,
   };
-  if (!eff.qq_ckqq || !eff.qq_pskey) {
-    return ok(c, { ok: false, msg: "请先填写系统 QQ(ckqq) 和 pskey" });
+  if (!eff.apihz_id || !eff.qq_ckqq || !eff.qq_pskey) {
+    return ok(c, { ok: false, msg: "请先填写 apihz 的 id、系统 QQ(ckqq)、pskey" });
   }
   const testQq = (typeof body.qq === "string" && body.qq.trim() ? body.qq : eff.qq_ckqq).trim();
   if (!/^[1-9]\d{4,11}$/.test(testQq)) {
@@ -477,6 +510,98 @@ app.put("/comments/:cid", requireAdmin, async c => {
   });
   if (!updated) return fail(c, "评论不存在", 404);
   return ok(c, updated, "已更新");
+});
+
+/* ==================== 安全中心 ==================== */
+
+app.get("/security/summary", requireAdmin, async c => {
+  const db = c.env.DB;
+  const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const nowIso = new Date().toISOString();
+  const [threats, banned24h, activeBans, totalHits] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) AS n FROM attack_log WHERE created_at > ?`).bind(dayAgo).first<{ n: number }>(),
+    db.prepare(`SELECT COUNT(*) AS n FROM blocked_ips WHERE blocked_at > ?`).bind(dayAgo).first<{ n: number }>(),
+    db.prepare(`SELECT COUNT(*) AS n FROM blocked_ips WHERE expires_at > ?`).bind(nowIso).first<{ n: number }>(),
+    db.prepare(`SELECT COUNT(*) AS n FROM attack_log`).first<{ n: number }>(),
+  ]);
+  return ok(c, {
+    threats24h: Number(threats?.n ?? 0),
+    banned24h: Number(banned24h?.n ?? 0),
+    activeBans: Number(activeBans?.n ?? 0),
+    totalHits: Number(totalHits?.n ?? 0),
+    ruleCount: ATTACK_RULES.length,
+  });
+});
+
+app.get("/security/attacks", requireAdmin, async c => {
+  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit")) || 50));
+  const level = (c.req.query("level") || "").trim();
+  const ip = (c.req.query("ip") || "").trim();
+  const db = c.env.DB;
+  let rows: D1Result<Record<string, unknown>>;
+  if (ip) {
+    rows = await db.prepare(`SELECT * FROM attack_log WHERE ip LIKE ? ORDER BY id DESC LIMIT ?`).bind(`%${ip}%`, limit).all();
+  } else if (level) {
+    rows = await db.prepare(`SELECT * FROM attack_log WHERE level = ? ORDER BY id DESC LIMIT ?`).bind(level, limit).all();
+  } else {
+    rows = await db.prepare(`SELECT * FROM attack_log ORDER BY id DESC LIMIT ?`).bind(limit).all();
+  }
+  return ok(c, { list: rows.results ?? [] });
+});
+
+app.get("/security/blocked", requireAdmin, async c => {
+  const nowIso = new Date().toISOString();
+  const rows = await c.env.DB
+    .prepare(`SELECT * FROM blocked_ips WHERE expires_at > ? ORDER BY blocked_at DESC`)
+    .bind(nowIso)
+    .all();
+  return ok(c, { list: rows.results ?? [] });
+});
+
+app.post("/security/ban", requireAdmin, async c => {
+  const body = await c.req.json<{ ip?: unknown; reason?: unknown; hours?: unknown }>().catch(() => null);
+  if (!body) return fail(c, "请求格式错误", 400);
+  const ip = String(body.ip ?? "").trim();
+  const reason = String(body.reason ?? "").trim() || "手动封禁";
+  const hours = Math.max(1, Math.min(720, Number(body.hours) || 24));
+  if (!ip) return fail(c, "请输入 IP 地址", 400);
+  await banIp(c.env.DB, ip, { reason, rule: "manual", level: "high", durationHours: hours });
+  return ok(c, { ip }, "已封禁");
+});
+
+app.post("/security/unban", requireAdmin, async c => {
+  const body = await c.req.json<{ ip?: unknown }>().catch(() => null);
+  if (!body) return fail(c, "请求格式错误", 400);
+  const ip = String(body.ip ?? "").trim();
+  if (!ip) return fail(c, "请输入 IP 地址", 400);
+  await unbanIp(c.env.DB, ip);
+  return ok(c, { ip }, "已解封");
+});
+
+app.get("/security/rules", requireAdmin, async c => {
+  const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const rows = await c.env.DB
+    .prepare(`SELECT rule, level, COUNT(*) AS n FROM attack_log WHERE created_at > ? GROUP BY rule ORDER BY n DESC`)
+    .bind(dayAgo)
+    .all();
+  return ok(c, { list: rows.results ?? [] });
+});
+
+app.get("/security/errors", requireAdmin, async c => {
+  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit")) || 50));
+  const rows = await c.env.DB
+    .prepare(`SELECT * FROM error_log ORDER BY id DESC LIMIT ?`)
+    .bind(limit)
+    .all();
+  return ok(c, { list: rows.results ?? [] });
+});
+
+app.post("/security/test-alert", requireAdmin, async c => {
+  const s = await getSettings(c.env.DB);
+  const webhook = s.security_webhook_url;
+  if (!webhook) return fail(c, "未配置告警 webhook", 400);
+  await sendWebhookAlert(webhook, "🧪 测试告警", "安全中心告警推送正常");
+  return ok(c, {}, "已推送测试告警");
 });
 
 export default app;

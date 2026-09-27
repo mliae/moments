@@ -266,18 +266,34 @@
     check: { stroke: '<path d="M20 6 9 17l-5-5"/>' },
     "circle-user": { stroke: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/>' },
     pin: { stroke: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>' },
+    /* —— 后台运维看板用到的图标 —— */
+    activity: { stroke: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>' },
+    timer: { stroke: '<line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/>' },
+    "heart-pulse": { stroke: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>' },
+    "calendar-check": { stroke: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>' },
+    "alert-triangle": { stroke: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>' },
+    zap: { stroke: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' },
+    "refresh-cw": { stroke: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>' },
+    download: { stroke: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>' },
+    radio: { stroke: '<circle cx="12" cy="12" r="2"/><path d="M4.93 19.07a10 10 0 0 1 0-14.14"/><path d="M7.76 16.24a6 6 0 0 1 0-8.49"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>' },
+    list: { stroke: '<line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>' },
+    upload: { stroke: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>' },
+    "rotate-ccw": { stroke: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>' },
+    x: { stroke: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>' },
   };
 
   function svgIcon(name, size) {
     const ic = ICONS[name];
     if (!ic) return "";
     const s = size || 16;
+    // flex 布局中禁止图标被压缩变形（文案过长时保持图标原始宽高）
+    const noShrink = ' style="flex:none;flex-shrink:0"';
     // stroke 字段：lucide 描边风（多元素 path，24 viewBox）
     if (ic.stroke) {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ic.stroke}</svg>`;
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${noShrink}>${ic.stroke}</svg>`;
     }
     // { vb, d }：FontAwesome 填充风（兼容原有图标）
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${ic.vb}" width="${s}" height="${s}" fill="currentColor"><path fill="currentColor" d="${ic.d}"/></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${ic.vb}" width="${s}" height="${s}" fill="currentColor"${noShrink}><path fill="currentColor" d="${ic.d}"/></svg>`;
   }
 
   /* ================= 工具 ================= */
@@ -317,6 +333,22 @@
     if (days < 30) return `${days}天前`;
     if (months < 12) return `${months}个月前`;
     return `${years}年前`;
+  }
+
+  /** 精确到分钟：今天显示 HH:mm，否则 MM-DD HH:mm（运维看板用） */
+  function fmtDT(dateString) {
+    if (!dateString) return "";
+    const d = new Date(dateString);
+    if (Number.isNaN(d.getTime())) return "";
+    const now = new Date();
+    const sameDay =
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate();
+    const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    if (sameDay) return `今天 ${hm}`;
+    const y = d.getFullYear() !== now.getFullYear() ? `${d.getFullYear()}-` : "";
+    return `${y}${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${hm}`;
   }
 
   /** 从 markdown 内容提取纯文本摘要 */
@@ -2081,6 +2113,35 @@
     const ta = form.content;
     if (!ta) return;
 
+    // SSR 直出的评论表单不含交互工具栏/图片预览/回复订阅开关，水合时补齐（与前端渲染版一致）
+    if (!form.querySelector(".comment-toolbar")) {
+      const tb = document.createElement("div");
+      tb.className = "comment-toolbar";
+      tb.innerHTML = `
+        <button type="button" class="comment-tool-btn" data-emoji-btn title="表情">${svgIcon("smile", 18)}</button>
+        <button type="button" class="comment-tool-btn" data-img-upload-btn title="上传图片">${svgIcon("image", 18)}</button>
+        <input type="file" accept="image/*" data-img-file hidden />
+        <input type="text" class="comment-img-url-input" data-img-url-input placeholder="图片 URL，回车添加" maxlength="500" />
+        <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="随机一句">${svgIcon("dices", 18)}</button>`;
+      form.insertBefore(tb, ta);
+    }
+    if (!form.querySelector(".comment-img-preview")) {
+      const pv = document.createElement("div");
+      pv.className = "comment-img-preview";
+      pv.style.display = "none";
+      const foot = form.querySelector(".comment-form-foot");
+      if (foot) foot.insertAdjacentElement("beforebegin", pv);
+      else form.appendChild(pv);
+    }
+    if (!form.querySelector(".comment-notify-row")) {
+      const nr = document.createElement("label");
+      nr.className = "comment-notify-row";
+      nr.innerHTML = `<input type="checkbox" name="notify_reply" value="1" checked /> 有人回复我的评论时邮件通知我`;
+      const foot = form.querySelector(".comment-form-foot");
+      if (foot) foot.insertAdjacentElement("beforebegin", nr);
+      else form.appendChild(nr);
+    }
+
     // 表情按钮
     const emojiBtn = form.querySelector("[data-emoji-btn]");
     if (emojiBtn) {
@@ -2584,6 +2645,7 @@
           </div>
           <textarea name="content" placeholder="说点什么…（支持 @ 提及他人）" maxlength="500" required style="min-height:80px"></textarea>
           <div class="comment-img-preview" data-comment-img-preview style="display:none"></div>
+          <label class="comment-notify-row"><input type="checkbox" name="notify_reply" value="1" checked /> 有人回复我的评论时邮件通知我</label>
           <div style="margin-top:.5rem;text-align:right">
             <button class="btn primary" type="submit">发表评论</button>
           </div>
@@ -2650,6 +2712,7 @@
         </div>
         <textarea name="content" placeholder="说点什么…（支持 @ 提及他人）" maxlength="500" required style="min-height:80px"></textarea>
         <div class="comment-img-preview" data-comment-img-preview style="display:none"></div>
+        <label class="comment-notify-row"><input type="checkbox" name="notify_reply" value="1" checked /> 有人回复我的评论时邮件通知我</label>
         <div style="margin-top:.5rem;text-align:right">
           <button class="btn primary" type="submit">发表评论</button>
         </div>
@@ -3246,6 +3309,145 @@
   }
 
   /** 水合服务端直出的文章页：保留 SSR DOM（无重绘闪烁），仅绑定交互/增强排版 */
+  /** 文章打赏卡片（SSR/SPA 通用）：已启用且有二维码时插入正文后，未启用则移除残留 */
+  function hydrateRewardCard(root) {
+    const enabled = state.settings.reward_enabled && state.settings.reward_qrcode;
+    root.querySelectorAll(".reward-card").forEach(el => {
+      if (!enabled) el.remove();
+    });
+    if (!enabled) return;
+    const body = root.querySelector(".article-body");
+    if (!body || root.querySelector(".reward-card")) return;
+    const div = document.createElement("div");
+    div.className = "reward-card";
+    div.innerHTML = `
+      <div class="reward-head">${svgIcon("coffee", 18)} ${esc(state.settings.reward_text || "如果觉得这篇文章不错，欢迎打赏支持一下 ~")}</div>
+      <div class="reward-qr-wrap"><img class="reward-qr" src="${esc(state.settings.reward_qrcode)}" alt="打赏二维码" loading="lazy" referrerpolicy="no-referrer" /></div>`;
+    body.insertAdjacentElement("afterend", div);
+  }
+
+  let tocDelegationBound = false;
+  /** 目录链接点击委托：SSR/SPA 下统一处理，避免局部绑定失效导致点击不跳转 */
+  function bindTocDelegation() {
+    if (tocDelegationBound) return;
+    tocDelegationBound = true;
+    document.addEventListener("click", e => {
+      const el = e.target && e.target.nodeType === 1 ? e.target : e.target.parentElement;
+      const link = el && el.closest ? el.closest('a[href^="#toc-"]') : null;
+      if (!link) return;
+      if (!link.closest("[data-toc-sidebar], [data-toc-drawer]")) return;
+      e.preventDefault();
+      const id = link.getAttribute("href").slice(1);
+      const card = document.querySelector(".article-card");
+      let target = null;
+      if (card) {
+        try {
+          target = card.querySelector("#" + (window.CSS && CSS.escape ? CSS.escape(id) : id));
+        } catch {
+          target = card.querySelector("#" + id);
+        }
+      }
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      // 关闭移动端抽屉
+      document.querySelector("[data-toc-drawer]")?.classList.remove("open");
+      document.querySelector("[data-toc-mask]")?.classList.remove("open");
+      document.querySelector("[data-toc-fab]")?.classList.remove("is-hidden");
+    });
+  }
+
+  /** 文章目录 TOC：扫描正文 h2/h3，生成可折叠目录并支持点击平滑滚动 + 滚动高亮 */
+  function buildArticleToc(root) {
+    // 清理旧实例（SPA 切换 / SSR 水合重复调用时，全局清理避免残留）
+    document.querySelectorAll("[data-toc-sidebar], [data-toc-fab], [data-toc-mask], [data-toc-drawer]").forEach(el => el.remove());
+    const cardEl = root.classList && root.classList.contains("article-card") ? root : root.querySelector(".article-card");
+    if (!cardEl) return;
+    const body = cardEl.querySelector(".article-body");
+    if (!body) return;
+    const headings = Array.from(body.querySelectorAll("h2, h3"));
+    if (headings.length < 2) return; // 标题太少不展示目录
+    headings.forEach((h, i) => {
+      if (!h.id) h.id = "toc-" + i;
+    });
+
+    const listHtml = headings
+      .map((h, i) => {
+        const isSub = h.tagName === "H3";
+        const text = (h.textContent || "").trim().replace(/[#*`]/g, "").slice(0, 50);
+        return `<li class="post-toc-item ${isSub ? "is-sub" : ""}" data-toc-idx="${i}"><a href="#${h.id}">${esc(text) || "标题"}</a></li>`;
+      })
+      .join("");
+
+    // ---------- 桌面端：文章卡片右侧 sticky 悬浮目录（可折叠） ----------
+    const aside = document.createElement("aside");
+    aside.className = "toc-sidebar";
+    aside.setAttribute("data-toc-sidebar", "");
+    aside.innerHTML = `
+      <div class="toc-sidebar-head">
+        <span class="toc-sidebar-title">${svgIcon("list", 14)} 目录</span>
+        <span class="toc-sidebar-count">${headings.length}</span>
+        <button class="toc-sidebar-fold" data-toc-fold type="button" aria-label="折叠目录">${svgIcon("chevron-right", 16)}</button>
+      </div>
+      <nav class="toc-sidebar-body"><ul>${listHtml}</ul></nav>`;
+    cardEl.insertAdjacentElement("afterend", aside);
+
+    // ---------- 移动端：右下角悬浮按钮 + 底部抽屉 ----------
+    const fab = document.createElement("button");
+    fab.className = "toc-fab";
+    fab.setAttribute("data-toc-fab", "");
+    fab.type = "button";
+    fab.setAttribute("aria-label", "文章目录");
+    fab.innerHTML = svgIcon("list", 20);
+    document.body.appendChild(fab);
+
+    const mask = document.createElement("div");
+    mask.className = "toc-drawer-mask";
+    mask.setAttribute("data-toc-mask", "");
+    document.body.appendChild(mask);
+
+    const drawer = document.createElement("div");
+    drawer.className = "toc-drawer";
+    drawer.setAttribute("data-toc-drawer", "");
+    drawer.innerHTML = `
+      <div class="toc-drawer-head">
+        <span>文章目录</span>
+        <button class="toc-drawer-close" data-toc-close type="button" aria-label="关闭目录">${svgIcon("x", 18)}</button>
+      </div>
+      <nav class="toc-drawer-body"><ul>${listHtml}</ul></nav>`;
+    document.body.appendChild(drawer);
+
+    const toggleDrawer = open => {
+      mask.classList.toggle("open", open);
+      drawer.classList.toggle("open", open);
+      fab.classList.toggle("is-hidden", open);
+    };
+
+    // ---------- 事件绑定 ----------
+    aside.querySelector("[data-toc-fold]").addEventListener("click", () => {
+      aside.classList.toggle("collapsed");
+    });
+    fab.addEventListener("click", () => toggleDrawer(true));
+    mask.addEventListener("click", () => toggleDrawer(false));
+    drawer.querySelector("[data-toc-close]").addEventListener("click", () => toggleDrawer(false));
+    // 目录链接点击走全局委托（bindTocDelegation），兼容 SSR/SPA 重复渲染
+    bindTocDelegation();
+
+    // ---------- 滚动高亮当前章节 ----------
+    const allItems = document.querySelectorAll(".post-toc-item");
+    if ("IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(
+        entries => {
+          entries.forEach(en => {
+            if (!en.isIntersecting) return;
+            const idx = headings.indexOf(en.target);
+            allItems.forEach(li => li.classList.toggle("is-active", Number(li.dataset.tocIdx) === idx));
+          });
+        },
+        { rootMargin: "-15% 0px -70% 0px" }
+      );
+      headings.forEach(h => observer.observe(h));
+    }
+  }
+
   async function hydrateSsrPost(slug) {
     try {
       const p = await api("/api/posts/" + encodeURIComponent(slug));
@@ -3270,6 +3472,8 @@
       if (bodyEl) bodyEl.innerHTML = sanitizeHtml(marked.parse(p.content_md || ""));
       hydrateMusicCards(app);
       hydrateVideos(app);
+      hydrateRewardCard(card);
+      buildArticleToc(card);
       const metaEl = card.querySelector(".article-meta");
       if (metaEl) metaEl.textContent = timeAgo(p.created_at);
       // 评论表单回填本地缓存（SSR 时无法读取访客 localStorage）
@@ -3345,6 +3549,7 @@
       });
       app.innerHTML = `
       <div class="essay">
+        <div class="post-layout">
         <div class="article-card">
           <a class="article-back" href="/" title="返回首页">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
@@ -3353,6 +3558,14 @@
           <h1>${p.pinned ? `<span class="top-badge">${svgIcon("pin", 13)}<span>置顶</span></span>` : ""}${esc(p.title)}${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h1>
           <div class="article-meta">${timeAgo(p.created_at)}</div>
           <div class="article-body">${sanitizeHtml(marked.parse(p.content_md || ""))}</div>
+          ${
+            state.settings.reward_enabled && state.settings.reward_qrcode
+              ? `<div class="reward-card">
+                  <div class="reward-head">${svgIcon("coffee", 18)} ${esc(state.settings.reward_text || "如果觉得这篇文章不错，欢迎打赏支持一下 ~")}</div>
+                  <div class="reward-qr-wrap"><img class="reward-qr" src="${esc(state.settings.reward_qrcode)}" alt="打赏二维码" loading="lazy" referrerpolicy="no-referrer" /></div>
+                </div>`
+              : ""
+          }
           ${
             state.admin
               ? `<div class="article-actions">
@@ -3383,15 +3596,19 @@
               </div>
               <textarea name="content" placeholder="说点什么…（支持 @ 提及他人）" maxlength="500" required style="min-height:100px"></textarea>
               <div class="comment-img-preview" data-comment-img-preview style="display:none"></div>
+              <label class="comment-notify-row"><input type="checkbox" name="notify_reply" value="1" checked /> 有人回复我的评论时邮件通知我</label>
               <div class="comment-form-foot">
                 <button class="btn primary" type="submit">发表评论</button>
               </div>
             </form>
           </section>
         </div>
+        </div>
       </div>`;
       hydrateMusicCards(app);
       hydrateVideos(app);
+      hydrateRewardCard(app);
+      buildArticleToc(app);
       app.querySelector('[data-act="edit-post"]')?.addEventListener("click", () => openPostEditor(p));
       app.querySelector('[data-act="del-post"]')?.addEventListener("click", async () => {
         if (!confirm("确定删除这篇文章？")) return;
@@ -3461,9 +3678,9 @@
     syncFab();
   }
 
-  /** 悬浮 + 仅管理员、且不在后台页时显示 */
+  /** 悬浮 + 仅管理员、且不在后台页、不在文章页时显示（文章页有 TOC 悬浮按钮，避免右下角重叠） */
   function syncFab() {
-    fabPublish.hidden = !state.admin || location.pathname === state.adminPath;
+    fabPublish.hidden = !state.admin || location.pathname === state.adminPath || location.pathname.startsWith("/post/");
   }
 
   fabPublish.addEventListener("click", () => openMomentComposer());
@@ -4224,6 +4441,7 @@
     { key: "ai", label: "AI 助手", icon: "bot" },
     { key: "seo", label: "搜索收录", icon: "search" },
     { key: "security", label: "安全", icon: "shield" },
+    { key: "ops", label: "运维", icon: "activity" },
   ];
 
   /**
@@ -4404,6 +4622,7 @@
     if (tab === "ai") return renderAdminAI(panel);
     if (tab === "seo") return renderAdminSeo(panel);
     if (tab === "security") return renderAdminSecurity(panel);
+    if (tab === "ops") return renderAdminOps(panel);
   }
 
   /* ---------- 后台 Tab：概览仪表盘 ---------- */
@@ -4909,6 +5128,23 @@
           <textarea name="about_qr_amounts" maxlength="1000" rows="4" placeholder="10元|https://.../10.png&#10;30元|https://.../30.png&#10;60元|https://.../60.png">${esc(s.about_qr_amounts)}</textarea>
         </div>
 
+        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>文章打赏</h3></div>
+        <div class="field">
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="reward_enabled" ${s.reward_enabled ? "checked" : ""} /><span></span></span>
+            <span>在文章底部展示打赏卡片</span>
+          </label>
+        </div>
+        <div class="field">
+          <label>打赏二维码图片 URL<br /><small style="color:var(--anzhiyu-secondtext)">微信/支付宝收款码图片地址，可上传到「媒体」后复制链接</small></label>
+          <input name="reward_qrcode" maxlength="500" value="${esc(s.reward_qrcode)}" placeholder="https://.../qrcode.png" />
+        </div>
+        <div class="field">
+          <label>打赏引导文案</label>
+          <input name="reward_text" maxlength="300" value="${esc(s.reward_text)}" />
+        </div>
+
+        
         <button class="btn primary" type="submit">保存设置</button>
       </form>`;
 
@@ -5099,14 +5335,59 @@
   async function renderAdminComments(panel) {
     panel.innerHTML = `<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
     let list = [];
+    let s;
     try {
-      list = (await api("/api/admin/comments?limit=200")).list;
+      [list, s] = await Promise.all([
+        api("/api/admin/comments?limit=200"),
+        api("/api/admin/settings"),
+      ]);
     } catch (e) {
       panel.innerHTML = `<div class="essay-empty">${esc(e.message)}</div>`;
       return;
     }
+    list = list.list || [];
+    const escA = v => esc(String(v ?? ""));
     panel.innerHTML = `
-      <div class="admin-panel-head"><h3>评论管理（${list.length}）</h3></div>
+      <div class="admin-panel-head"><h3>邮件通知设置（Resend）</h3></div>
+      <form class="settings-form" data-mail-settings-form style="max-width:680px">
+        <div class="field">
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="mail_enabled" ${s.mail_enabled ? "checked" : ""} /><span></span></span>
+            启用评论邮件通知
+          </label>
+          <small style="color:var(--anzhiyu-secondtext)">新评论时给管理员发邮件；评论者勾选订阅后，被回复时也会收到邮件。发送走 Resend，免费额度 3000 封/月。</small>
+        </div>
+        <div class="field">
+          <label>Resend API Key（<a href="https://resend.com/api-keys" target="_blank" rel="noopener">获取</a>）</label>
+          <input name="mail_resend_key" type="password" maxlength="128" value="${escA(s.mail_resend_key)}" placeholder="re_xxxxxxxx" autocomplete="off" style="font-family:monospace" />
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div class="field" style="flex:1;min-width:200px">
+            <label>发件邮箱（需在 Resend 验证域名）</label>
+            <input name="mail_from" maxlength="200" value="${escA(s.mail_from)}" placeholder="notify@jxe.me" />
+          </div>
+          <div class="field" style="flex:1;min-width:200px">
+            <label>管理员收件邮箱</label>
+            <input name="mail_admin_to" type="email" maxlength="200" value="${escA(s.mail_admin_to)}" placeholder="hi@jxe.me" />
+          </div>
+        </div>
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="mail_notify_admin" ${s.mail_notify_admin ? "checked" : ""} /><span></span></span>
+            新评论通知管理员
+          </label>
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="mail_reply_notify" ${s.mail_reply_notify ? "checked" : ""} /><span></span></span>
+            允许评论者订阅回复通知
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:.6rem">
+          <button class="btn primary" type="submit">保存邮件设置</button>
+          <span data-mail-msg style="font-size:.85rem;color:var(--anzhiyu-secondtext)"></span>
+        </div>
+      </form>
+
+      <div class="admin-panel-head" style="margin-top:1.5rem"><h3>评论管理（${list.length}）</h3></div>
       ${
         list.length
           ? `<div class="admin-batch-bar">
@@ -5142,6 +5423,34 @@
     if (list.length) {
       wireBatch(panel, { rowSel: ".admin-row", endpoint: "/api/admin/comments/batch-delete", label: "条评论", onDone: () => renderAdminComments(panel) });
     }
+
+    /* ---------- 邮件设置保存 ---------- */
+    const mailForm = panel.querySelector("[data-mail-settings-form]");
+    const mailMsg = panel.querySelector("[data-mail-msg]");
+    mailForm.addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = mailForm.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      try {
+        const updated = await api("/api/admin/settings", {
+          method: "PUT",
+          body: {
+            mail_enabled: mailForm.mail_enabled.checked,
+            mail_resend_key: mailForm.mail_resend_key.value.trim(),
+            mail_from: mailForm.mail_from.value.trim(),
+            mail_admin_to: mailForm.mail_admin_to.value.trim(),
+            mail_notify_admin: mailForm.mail_notify_admin.checked,
+            mail_reply_notify: mailForm.mail_reply_notify.checked,
+          },
+        });
+        if (mailMsg) { mailMsg.style.color = "#23b26d"; mailMsg.textContent = "✓ 已保存"; }
+        toast("邮件设置已保存");
+      } catch (err) {
+        if (mailMsg) { mailMsg.style.color = "#f56c6c"; mailMsg.textContent = "✗ " + err.message; }
+      } finally {
+        btn.disabled = false;
+      }
+    });
   }
 
   /** 后台：音乐播放器设置面板 */
@@ -5158,6 +5467,9 @@
     panel.innerHTML = `
       <div class="admin-panel-head"><h3>站点外观</h3></div>
       <form class="settings-form" data-settings-form>
+        <details class="admin-fold">
+          <summary class="admin-fold-summary">基础信息</summary>
+          <div class="admin-fold-body">
         <div class="field">
           <label>站点名称（顶栏品牌 / 浏览器标题）</label>
           <input name="site_title" maxlength="40" value="${esc(s.site_title)}" required />
@@ -5218,8 +5530,12 @@
           <label>自定义导航项（可选，每行一条：名称|链接，最多 6 条）<br /><small style="color:var(--anzhiyu-secondtext)">显示在顶栏"即刻"之后、"后台"之前，新标签打开</small></label>
           <textarea name="nav_links" maxlength="1000" rows="3" placeholder="友链|https://example.com&#10;相册|https://example.com/photos">${esc(s.nav_links)}</textarea>
         </div>
+          </div>
+        </details>
 
-        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>横幅</h3></div>
+        <details class="admin-fold">
+          <summary class="admin-fold-summary">横幅</summary>
+          <div class="admin-fold-body">
         <div class="field">
           <label>小标签</label>
           <input name="essay_tips" maxlength="60" value="${esc(s.essay_tips)}" />
@@ -5276,8 +5592,12 @@
           </div>
           <div class="field-hint" style="margin-top:.4rem">预览：<a href="/api/bg" target="_blank" rel="noopener" style="color:var(--anzhiyu-main)">/api/bg</a>（新标签打开，图片经本站抓取后缓存到 R2）</div>
         </div>
+          </div>
+        </details>
 
-        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>页脚</h3></div>
+        <details class="admin-fold">
+          <summary class="admin-fold-summary">页脚</summary>
+          <div class="admin-fold-body">
         <div class="field">
           <label>页脚文案（可选，支持 HTML）<br /><small style="color:var(--anzhiyu-secondtext)">例如：© 2024 Jxe · 轻博客 · Powered by Moments</small></label>
           <textarea name="footer_text" maxlength="2000" rows="3" placeholder="© 2024 My Site. All rights reserved.">${esc(s.footer_text)}</textarea>
@@ -5286,8 +5606,47 @@
           <label>网站运行起始时间（可选）<br /><small style="color:var(--anzhiyu-secondtext)">填写后页脚显示「网站已运行 X 天 HH:MM:SS」，支持 ISO 时间（如 2024-01-01T00:00:00）或 yyyy-mm-dd</small></label>
           <input name="footer_run_since" maxlength="40" value="${esc(s.footer_run_since)}" placeholder="2024-01-01T00:00:00" />
         </div>
+          </div>
+        </details>
 
-        <details class="admin-fold" style="margin-top:1.25rem">
+        <details class="admin-fold">
+          <summary class="admin-fold-summary">导航入口开关</summary>
+          <div class="admin-fold-body">
+        <div class="field">
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="links_enabled" ${s.links_enabled ? "checked" : ""} /><span></span></span>
+            <span>显示「友链」入口（/links）</span>
+          </label>
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="photos_enabled" ${s.photos_enabled ? "checked" : ""} /><span></span></span>
+            <span>显示「相册」入口（/photos）</span>
+          </label>
+          <small style="color:var(--anzhiyu-secondtext)">「关于我」入口开关在「关于我」Tab。三个入口可独立开关，关闭后顶栏与移动端菜单均不显示。</small>
+        </div>
+          </div>
+        </details>
+
+        <details class="admin-fold">
+          <summary class="admin-fold-summary">文章打赏</summary>
+          <div class="admin-fold-body">
+        <div class="field">
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="reward_enabled" ${s.reward_enabled ? "checked" : ""} /><span></span></span>
+            <span>在文章底部展示打赏卡片</span>
+          </label>
+        </div>
+        <div class="field">
+          <label>打赏二维码图片 URL<br /><small style="color:var(--anzhiyu-secondtext)">微信/支付宝收款码图片地址，可上传到「媒体」后复制链接</small></label>
+          <input name="reward_qrcode" maxlength="500" value="${esc(s.reward_qrcode)}" placeholder="https://.../qrcode.png" />
+        </div>
+        <div class="field">
+          <label>打赏引导文案</label>
+          <input name="reward_text" maxlength="300" value="${esc(s.reward_text)}" />
+        </div>
+          </div>
+        </details>
+
+        <details class="admin-fold">
           <summary class="admin-fold-summary">评论头像设置</summary>
           <div class="admin-fold-body">
         <div class="field">
@@ -5316,11 +5675,13 @@
         </details>
 
         <details class="admin-fold">
-          <summary class="admin-fold-summary">QQ 昵称资料（自建）</summary>
+          <summary class="admin-fold-summary">QQ 昵称资料（apihz）</summary>
           <div class="admin-fold-body">
         <div class="field" style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc)">
-          <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，用这组凭证查昵称。Worker 直连腾讯，凭证不出本站点，无泄露风险。</div>
+          <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，用这组凭证查昵称。凭证仅存服务端，绝不下发前台。</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">apihz 开发者 ID</label><input name="apihz_id" value="${esc(s.apihz_id)}" placeholder="个人资料里的数字 ID" /></div>
+            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">apihz 开发者 KEY</label><input name="apihz_key" value="${esc(s.apihz_key)}" placeholder="通讯秘钥" /></div>
             <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">系统 QQ（ckqq）</label><input name="qq_ckqq" value="${esc(s.qq_ckqq)}" placeholder="你的 QQ 号" /></div>
             <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">skey</label><input name="qq_skey" value="${esc(s.qq_skey)}" placeholder="cookie 里的 skey" /></div>
           </div>
@@ -5340,21 +5701,7 @@
           </div>
         </details>
 
-        <div class="admin-panel-head" style="margin-top:1.75rem"><h3>导航入口开关</h3></div>
-        <div class="field">
-          <label class="switch-row">
-            <span class="toggle"><input type="checkbox" name="links_enabled" ${s.links_enabled ? "checked" : ""} /><span></span></span>
-            <span>显示「友链」入口（/links）</span>
-          </label>
-          <label class="switch-row">
-            <span class="toggle"><input type="checkbox" name="photos_enabled" ${s.photos_enabled ? "checked" : ""} /><span></span></span>
-            <span>显示「相册」入口（/photos）</span>
-          </label>
-          <small style="color:var(--anzhiyu-secondtext)">「关于我」入口开关在「关于我」Tab。三个入口可独立开关，关闭后顶栏与移动端菜单均不显示。</small>
-        </div>
-
-        
-        <button class="btn primary" type="submit">保存设置</button>
+        <button class="btn primary" type="submit" style="margin-top:1rem">保存设置</button>
       </form>`;
 
     // 横幅背景图上传
@@ -5485,6 +5832,8 @@
       bmLink.addEventListener("click", e => e.preventDefault());
     }
     const qqFormVals = () => ({
+      apihz_id: panel.querySelector('[name="apihz_id"]')?.value || "",
+      apihz_key: panel.querySelector('[name="apihz_key"]')?.value || "",
       qq_ckqq: panel.querySelector('[name="qq_ckqq"]')?.value || "",
       qq_skey: panel.querySelector('[name="qq_skey"]')?.value || "",
       qq_pskey: panel.querySelector('[name="qq_pskey"]')?.value || "",
@@ -5898,15 +6247,97 @@
       panel.innerHTML = `<div class="essay-empty">${esc(e.message)}</div>`;
       return;
     }
+
+    const shortTime = t => {
+      if (!t) return "-";
+      const d = new Date(t);
+      if (Number.isNaN(d.getTime())) return "-";
+      const p = n => String(n).padStart(2, "0");
+      return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    };
+    const escA = v => esc(String(v ?? ""));
+    const levelLabel = l => (l === "high" ? "高危" : l === "medium" ? "中危" : "低危");
+    const secTable = (head, rows, emptyText) => {
+      if (!rows.length) return `<div class="essay-empty">${emptyText || "暂无数据"}</div>`;
+      return `<div class="sec-table-wrap"><table class="sec-table"><thead><tr>${head
+        .map(h => `<th>${h}</th>`)
+        .join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+    };
+
     panel.innerHTML = `
-      <div class="admin-panel-head"><h3>后台入口路径</h3></div>
+      <div class="sec-summary" data-sec-summary>
+        ${[0, 1, 2, 3].map(() => `<div class="sec-card"><div class="sec-num">-</div><div class="sec-label">…</div></div>`).join("")}
+      </div>
+
+      <div class="admin-panel-head"><h3>安全设置</h3></div>
+      <form class="settings-form" data-security-form style="max-width:700px">
+        <div class="field">
+          <label>告警 Webhook（飞书 / 钉钉 / 企业微信机器人地址，留空=不推送告警）</label>
+          <input name="security_webhook_url" maxlength="500" value="${escA(s.security_webhook_url)}" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxx" style="font-family:monospace" />
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+          <div class="field" style="flex:1;min-width:150px">
+            <label>封禁阈值（同 IP 10 分钟命中高危次数）</label>
+            <input name="ban_threshold" type="number" min="1" max="100" value="${escA(s.ban_threshold || "5")}" />
+          </div>
+          <div class="field" style="flex:1;min-width:150px">
+            <label>封禁时长（小时）</label>
+            <input name="ban_duration_hours" type="number" min="1" max="720" value="${escA(s.ban_duration_hours || "24")}" />
+          </div>
+          <label class="switch-row" style="margin-bottom:.7rem">
+            <span class="toggle"><input type="checkbox" name="auto_ban_enabled" ${s.auto_ban_enabled ? "checked" : ""} /><span></span></span>
+            启用自动封禁
+          </label>
+        </div>
+        <div class="field" style="margin-top:.4rem;max-width:280px">
+          <label>评论防刷（同 IP 每分钟评论上限，默认 5）</label>
+          <input name="comment_rate_limit" type="number" min="1" max="100" value="${escA(s.comment_rate_limit || "5")}" />
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:.6rem">
+          <button class="btn primary" type="submit">保存安全设置</button>
+          <button class="btn" type="button" data-test-alert>测试告警</button>
+          <span data-security-msg style="font-size:.85rem;color:var(--anzhiyu-secondtext)"></span>
+        </div>
+      </form>
+
+      <div class="admin-panel-head"><h3>攻击日志（最近 100 条）</h3></div>
+      <div class="sec-toolbar">
+        <select data-attack-level>
+          <option value="">全部等级</option>
+          <option value="high">高危</option>
+          <option value="medium">中危</option>
+          <option value="low">低危</option>
+        </select>
+        <input data-attack-ip placeholder="按 IP 筛选" style="max-width:180px;font-family:monospace" />
+        <button class="btn" data-attack-filter>筛选</button>
+        <button class="btn" data-attack-refresh>刷新</button>
+      </div>
+      <div data-attack-list class="sec-block">加载中...</div>
+
+      <div class="admin-panel-head"><h3>封禁 IP 管理</h3></div>
+      <form data-ban-form class="sec-ban-form">
+        <input name="ip" placeholder="IP 地址" required style="font-family:monospace" />
+        <input name="reason" placeholder="原因（可选）" />
+        <input name="hours" type="number" min="1" max="720" value="24" style="width:80px" title="封禁时长（小时）" />
+        <button class="btn primary" type="submit">封禁</button>
+        <span data-ban-msg style="font-size:.85rem;color:var(--anzhiyu-secondtext)"></span>
+      </form>
+      <div data-blocked-list class="sec-block">加载中...</div>
+
+      <div class="admin-panel-head"><h3>规则命中统计（最近 24 小时）</h3></div>
+      <div data-rules-list class="sec-block">加载中...</div>
+
+      <div class="admin-panel-head"><h3>错误日志（最近 50 条）</h3></div>
+      <div data-errors-list class="sec-block">加载中...</div>
+
+      <div class="admin-panel-head" style="margin-top:1.75rem"><h3>后台入口路径</h3></div>
       <form class="settings-form" data-adminpath-form style="max-width:560px">
         <div class="field">
           <label>后台入口路径<br />
             <small style="color:var(--anzhiyu-secondtext)">修改后旧地址 /admin 立即失效（访客访问显示 404），请牢记新地址，建议收藏。格式：/ 开头 + 3~39 位字母数字或短横线，如 /my-secret</small>
           </label>
           <div style="display:flex;gap:8px">
-            <input name="admin_path" maxlength="40" value="${esc(s.admin_path || "/admin")}" pattern="/admin|/[A-Za-z0-9][A-Za-z0-9-]{2,38}" required style="flex:1;font-family:monospace" />
+            <input name="admin_path" maxlength="40" value="${escA(s.admin_path || "/admin")}" pattern="/admin|/[A-Za-z0-9][A-Za-z0-9-]{2,38}" required style="flex:1;font-family:monospace" />
             <button type="button" class="btn" data-gen-path style="white-space:nowrap">随机生成</button>
           </div>
           <div class="field-hint" style="margin-top:.5rem;color:#e6a23c">
@@ -5934,9 +6365,530 @@
         <button class="btn primary" type="submit">修改密码</button>
         <div class="field-hint" style="margin-top:.5rem">修改后立即生效，无需重新部署；其他已登录设备需要用新密码重新解锁。</div>
       </form>`;
+
+    /* ---------- 数据加载 ---------- */
+    const loadAttacks = async () => {
+      const box = panel.querySelector("[data-attack-list]");
+      if (!box) return;
+      box.innerHTML = `<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
+      try {
+        const level = panel.querySelector("[data-attack-level]")?.value || "";
+        const ip = panel.querySelector("[data-attack-ip]")?.value.trim() || "";
+        const qs = new URLSearchParams();
+        if (level) qs.set("level", level);
+        if (ip) qs.set("ip", ip);
+        const data = await api(`/api/admin/security/attacks?${qs.toString()}`);
+        box.innerHTML = secTable(
+          ["时间", "IP", "等级", "规则", "路径", "UA"],
+          data.list.map(a => `<tr>
+            <td class="sec-time">${shortTime(a.created_at)}</td>
+            <td><code>${escA(a.ip || "-")}</code>${a.country ? `<span class="sec-country">${escA(a.country)}</span>` : ""}</td>
+            <td><span class="sec-badge ${escA(a.level)}">${levelLabel(a.level)}</span></td>
+            <td><span class="sec-badge rule">${escA(a.rule || "-")}</span></td>
+            <td class="sec-path" title="${escA(a.path)}">${escA(a.path || "-")}</td>
+            <td class="sec-ua" title="${escA(a.ua)}">${escA((a.ua || "-").slice(0, 40))}</td>
+          </tr>`),
+          "暂无攻击记录"
+        );
+      } catch (e) {
+        box.innerHTML = `<div class="essay-empty">${esc(e.message)}</div>`;
+      }
+    };
+
+    const loadAll = async () => {
+      try {
+        const [summary, blocked, rules, errors] = await Promise.all([
+          api("/api/admin/security/summary"),
+          api("/api/admin/security/blocked"),
+          api("/api/admin/security/rules"),
+          api("/api/admin/security/errors"),
+        ]);
+        const cards = [
+          [summary.threats24h, "24h 威胁"],
+          [summary.banned24h, "24h 封禁"],
+          [summary.activeBans, "封禁中 IP"],
+          [summary.totalHits, "累计命中"],
+        ];
+        panel.querySelector("[data-sec-summary]").innerHTML = cards
+          .map(([n, label]) => `<div class="sec-card"><div class="sec-num">${n}</div><div class="sec-label">${label}</div></div>`)
+          .join("");
+
+        panel.querySelector("[data-blocked-list]").innerHTML = secTable(
+          ["IP", "原因", "封禁时间", "到期时间", "操作"],
+          blocked.list.map(b => `<tr>
+            <td><code>${escA(b.ip)}</code></td>
+            <td>${escA(b.reason || "-")}</td>
+            <td class="sec-time">${shortTime(b.blocked_at)}</td>
+            <td class="sec-time">${shortTime(b.expires_at)}</td>
+            <td><button class="btn danger small" data-unban-btn="${escA(b.ip)}">解封</button></td>
+          </tr>`),
+          "暂无封禁 IP"
+        );
+
+        panel.querySelector("[data-rules-list]").innerHTML = secTable(
+          ["规则", "等级", "命中数"],
+          rules.list.map(r => `<tr>
+            <td><span class="sec-badge rule">${escA(r.rule)}</span></td>
+            <td><span class="sec-badge ${escA(r.level)}">${levelLabel(r.level)}</span></td>
+            <td>${r.n}</td>
+          </tr>`),
+          "暂无规则命中"
+        );
+
+        panel.querySelector("[data-errors-list]").innerHTML = secTable(
+          ["时间", "方法", "路径", "错误信息"],
+          errors.list.map(e => `<tr>
+            <td class="sec-time">${shortTime(e.created_at)}</td>
+            <td>${escA(e.method || "-")}</td>
+            <td class="sec-path" title="${escA(e.path)}">${escA(e.path || "-")}</td>
+            <td class="sec-msg" title="${escA(e.message)}">${escA((e.message || "").slice(0, 80))}</td>
+          </tr>`),
+          "暂无错误日志"
+        );
+
+        // 解封按钮
+        panel.querySelectorAll("[data-unban-btn]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            btn.disabled = true;
+            try {
+              await api("/api/admin/security/unban", { method: "POST", body: { ip: btn.dataset.unbanBtn } });
+              toast("已解封");
+              await loadAll();
+            } catch (e) {
+              toast(e.message);
+              btn.disabled = false;
+            }
+          });
+        });
+      } catch (e) {
+        panel.querySelector("[data-attack-list]").innerHTML = `<div class="essay-empty">${esc(e.message)}</div>`;
+      }
+    };
+
+    await loadAll();
+    await loadAttacks();
+
+    /* ---------- 安全设置表单 ---------- */
+    const secForm = panel.querySelector("[data-security-form]");
+    const secMsg = panel.querySelector("[data-security-msg]");
+    secForm.addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = secForm.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      try {
+        const patch = {
+          security_webhook_url: secForm.security_webhook_url.value.trim(),
+          auto_ban_enabled: secForm.auto_ban_enabled.checked,
+          ban_threshold: secForm.ban_threshold.value,
+          ban_duration_hours: secForm.ban_duration_hours.value,
+          comment_rate_limit: secForm.comment_rate_limit.value,
+        };
+        const updated = await api("/api/admin/settings", { method: "PUT", body: patch });
+        if (typeof updated.auto_ban_enabled === "boolean") {
+          secForm.auto_ban_enabled.checked = updated.auto_ban_enabled;
+        }
+        if (updated.comment_rate_limit) secForm.comment_rate_limit.value = updated.comment_rate_limit;
+        if (secMsg) { secMsg.style.color = "#23b26d"; secMsg.textContent = "✓ 已保存"; }
+        toast("安全设置已保存");
+      } catch (err) {
+        if (secMsg) { secMsg.style.color = "#f56c6c"; secMsg.textContent = "✗ " + err.message; }
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    const testBtn = panel.querySelector("[data-test-alert]");
+    testBtn.addEventListener("click", async () => {
+      testBtn.disabled = true;
+      if (secMsg) { secMsg.style.color = ""; secMsg.textContent = "推送中…"; }
+      try {
+        await api("/api/admin/security/test-alert", { method: "POST" });
+        if (secMsg) { secMsg.style.color = "#23b26d"; secMsg.textContent = "✓ 已推送，请检查机器人"; }
+      } catch (e) {
+        if (secMsg) { secMsg.style.color = "#f56c6c"; secMsg.textContent = "✗ " + e.message; }
+      } finally {
+        testBtn.disabled = false;
+      }
+    });
+
+    /* ---------- 攻击日志筛选 ---------- */
+    panel.querySelector("[data-attack-filter]").addEventListener("click", loadAttacks);
+    panel.querySelector("[data-attack-refresh]").addEventListener("click", () => { loadAttacks(); loadAll(); });
+
+    /* ---------- 手动封禁 ---------- */
+    const banForm = panel.querySelector("[data-ban-form]");
+    const banMsg = panel.querySelector("[data-ban-msg]");
+    banForm.addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = banForm.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      if (banMsg) banMsg.textContent = "";
+      try {
+        await api("/api/admin/security/ban", {
+          method: "POST",
+          body: { ip: banForm.ip.value.trim(), reason: banForm.reason.value.trim(), hours: banForm.hours.value },
+        });
+        banForm.reset();
+        banForm.hours.value = "24";
+        toast("已封禁");
+        await loadAll();
+      } catch (err) {
+        if (banMsg) { banMsg.style.color = "#f56c6c"; banMsg.textContent = "✗ " + err.message; }
+      } finally {
+        btn.disabled = false;
+      }
+    });
   }
 
-  /* ================= 音乐播放器 ================= */
+  /* ================= 后台 Tab：运维 ================= */
+  async function renderAdminOps(panel) {
+    panel.innerHTML = `<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
+
+    let u, p;
+    try {
+      [u, p] = await Promise.all([
+        api("/api/admin/ops/uptime/summary"),
+        api("/api/admin/ops/perf/summary"),
+      ]);
+    } catch (e) {
+      panel.innerHTML = `<div class="essay-empty">运维数据加载失败：${esc(e.message)}</div>`;
+      return;
+    }
+
+    const u24 = u.day24 || {};
+    const wk = u.week || {};
+    const pstats = p.stats || {};
+    const escA = v => esc(String(v ?? ""));
+
+    const rateColor = r => (r >= 99 ? "#23b26d" : r >= 90 ? "#e6a23c" : "#f56c6c");
+    const fmtMs = v => (Number(v) >= 1000 ? (Number(v) / 1000).toFixed(1) + "s" : Number(v) + "ms");
+
+    panel.innerHTML = `
+      <div class="ops-grid">
+        <div class="ov-chart-card">
+          <div class="ov-chart-head">
+            <h3>可用性监控</h3>
+            <button class="btn ghost sm" data-ops-refresh>${svgIcon("refresh-cw", 14)} 刷新</button>
+          </div>
+          <div class="ops-interval-row">
+            <span class="ops-hint">检测间隔</span>
+            <input type="number" min="1" max="720" value="${escA(u.interval || "5")}" style="width:86px" data-uptime-interval />
+            <span class="ops-hint">分钟</span>
+            <button class="btn ghost sm" data-uptime-save>保存</button>
+            <span class="ops-hint" data-uptime-msg style="flex:0">Cron 每分钟触发，按此间隔执行检测</span>
+          </div>
+          <div class="ov-cards">
+            <div class="ov-card"><div class="ov-card-ico" style="color:${rateColor(u24.rate)}">${svgIcon("heart-pulse", 26)}</div>
+              <div class="ov-card-num" style="color:${rateColor(u24.rate)}">${u24.rate}%</div>
+              <div class="ov-card-label">24h 可用率（${u24.ok}/${u24.total}）</div></div>
+            <div class="ov-card"><div class="ov-card-ico">${svgIcon("timer", 26)}</div>
+              <div class="ov-card-num">${fmtMs(u24.avgLatency)}</div>
+              <div class="ov-card-label">平均响应</div></div>
+            <div class="ov-card"><div class="ov-card-ico" style="color:${rateColor(wk.rate)}">${svgIcon("calendar-check", 26)}</div>
+              <div class="ov-card-num" style="color:${rateColor(wk.rate)}">${wk.rate}%</div>
+              <div class="ov-card-label">7 天可用率</div></div>
+            <div class="ov-card"><div class="ov-card-ico">${svgIcon("activity", 26)}</div>
+              <div class="ov-card-num">${u24.total}</div>
+              <div class="ov-card-label">24h 检测次数</div></div>
+          </div>
+          ${
+            (u.daily || []).length
+              ? `<div class="ops-daily">
+                  ${(u.daily || []).map(d => `
+                    <div class="ops-day" title="${d.day} 可用率 ${d.rate}%（${d.total} 次）">
+                      <em style="color:${rateColor(d.rate)}">${d.rate}%</em>
+                      <div class="ops-bar"><i style="height:${Math.max(4, Math.min(100, d.rate))}%;background:${rateColor(d.rate)}"></i></div>
+                      <span>${d.day.slice(5)}</span>
+                    </div>`).join("")}
+                </div>`
+              : `<div class="essay-empty" style="padding:1rem">暂无检测数据，等待首次 Cron 执行…</div>`
+          }
+          <div class="ops-table-wrap">
+            <table class="ops-table">
+              <thead><tr><th>时间</th><th>状态</th><th>耗时</th><th>说明</th></tr></thead>
+              <tbody>
+                ${(u.recent || []).slice(0, 8).map(r => `
+                  <tr>
+                    <td class="ops-td-time">${fmtDT(r.created_at)}</td>
+                    <td><span class="ops-pill ${r.status >= 200 && r.status < 400 ? "ok" : "bad"}">${r.status || "超时"}</span></td>
+                    <td>${fmtMs(r.latency_ms)}</td>
+                    <td class="ops-td-err" title="${escA(r.error)}">${escA(r.error || r.url).slice(0, 40) || "正常"}</td>
+                  </tr>`).join("") || `<tr><td colspan="4" class="essay-empty">暂无记录</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="ov-chart-card">
+          <div class="ov-chart-head">
+            <h3>性能监控</h3>
+            <span class="ov-chart-sub">≥300ms 必记，其余 10% 采样</span>
+          </div>
+          <div class="ov-cards">
+            <div class="ov-card"><div class="ov-card-ico">${svgIcon("bar-chart-3", 26)}</div>
+              <div class="ov-card-num">${pstats.total}</div>
+              <div class="ov-card-label">24h 样本数</div></div>
+            <div class="ov-card"><div class="ov-card-ico">${svgIcon("zap", 26)}</div>
+              <div class="ov-card-num">${fmtMs(pstats.avgMs)}</div>
+              <div class="ov-card-label">平均耗时</div></div>
+            <div class="ov-card"><div class="ov-card-ico" style="color:${pstats.slowCount ? "#f56c6c" : "#23b26d"}">${svgIcon("alert-triangle", 26)}</div>
+              <div class="ov-card-num" style="color:${pstats.slowCount ? "#f56c6c" : "#23b26d"}">${pstats.slowCount}</div>
+              <div class="ov-card-label">慢请求（≥500ms）</div></div>
+            <div class="ov-card"><div class="ov-card-ico">${svgIcon("timer", 26)}</div>
+              <div class="ov-card-num">${fmtMs(pstats.maxMs)}</div>
+              <div class="ov-card-label">最大耗时</div></div>
+          </div>
+          <h4 class="ops-subhead">最慢接口 TOP</h4>
+          <div class="ops-table-wrap">
+            <table class="ops-table">
+              <thead><tr><th>接口</th><th>次数</th><th>平均</th><th>最大</th></tr></thead>
+              <tbody>
+                ${(p.topPaths || []).slice(0, 8).map(t => `
+                  <tr>
+                    <td class="ops-td-path" title="${escA(t.path)}">${escA(t.path)}</td>
+                    <td>${t.total}</td>
+                    <td>${fmtMs(t.avgMs)}</td>
+                    <td>${fmtMs(t.maxMs)}</td>
+                  </tr>`).join("") || `<tr><td colspan="4" class="essay-empty">暂无数据</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+          <h4 class="ops-subhead">最近慢请求</h4>
+          <div class="ops-table-wrap">
+            <table class="ops-table">
+              <thead><tr><th>时间</th><th>方法</th><th>接口</th><th>耗时</th></tr></thead>
+              <tbody>
+                ${(p.recent || []).filter(r => r.duration_ms >= 300).slice(0, 6).map(r => `
+                  <tr>
+                    <td class="ops-td-time">${fmtDT(r.created_at)}</td>
+                    <td><span class="ops-method">${escA(r.method)}</span></td>
+                    <td class="ops-td-path" title="${escA(r.path)}">${escA(r.path)}</td>
+                    <td style="color:${r.duration_ms >= 1000 ? "#f56c6c" : "#e6a23c"}">${fmtMs(r.duration_ms)}</td>
+                  </tr>`).join("") || `<tr><td colspan="4" class="essay-empty">暂无慢请求</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="ov-chart-card">
+        <div class="ov-chart-head">
+          <h3>D1 数据备份</h3>
+          <span class="ov-chart-sub">导出全库 JSON（每个表最多 ${10000} 行，覆盖常规业务数据）</span>
+        </div>
+        <div class="ops-backup-row">
+          <button class="btn primary" data-backup-export>${svgIcon("download", 16)} 导出全库备份</button>
+          <span class="ops-hint">导出内容含全部文章、说说、评论、友链、相册、统计与日志数据，请妥善保存。大表（访问统计/攻击日志）仅保留最近 1 万条。</span>
+        </div>
+        <h4 class="ops-subhead" style="margin-top:1rem">数据恢复（危险操作）</h4>
+        <div class="ops-backup-row">
+          <button class="btn" data-backup-pick>${svgIcon("upload", 16)} 选择备份文件</button>
+          <input type="file" accept="application/json,.json" data-backup-file hidden />
+          <span class="ops-hint" data-restore-summary>选择之前导出的 JSON 备份，勾选要恢复的表，将「清空并覆盖」该表当前数据</span>
+        </div>
+        <div class="ops-restore-tables" data-restore-tables style="display:none;margin-top:.6rem"></div>
+        <div class="ops-backup-row" style="margin-top:.6rem">
+          <button class="btn danger" data-restore-run disabled>${svgIcon("rotate-ccw", 16)} 恢复所选表</button>
+          <span class="ops-hint" data-restore-msg></span>
+        </div>
+      </div>
+
+      <div class="ov-chart-card">
+        <div class="ov-chart-head">
+          <h3>SEO 死链检测</h3>
+          <span class="ov-chart-sub">扫描文章 / 说说 / 友链中的外链并检测可访问性</span>
+        </div>
+        <div class="ops-link-row">
+          <button class="btn" data-link-extract>${svgIcon("search", 16)} 提取外链</button>
+          <button class="btn primary" data-link-check disabled>${svgIcon("radio", 16)} 开始检测</button>
+          <span class="ops-hint" data-link-summary>尚未提取链接</span>
+        </div>
+        <div class="ops-link-progress" data-link-progress style="display:none">
+          <div class="ops-progress-track"><div class="ops-progress-bar" data-link-bar style="width:0"></div></div>
+          <span data-link-pct>0%</span>
+        </div>
+        <div class="ops-table-wrap" style="margin-top:.6rem">
+          <table class="ops-table">
+            <thead><tr><th>链接</th><th>状态</th><th>耗时</th><th>说明</th></tr></thead>
+            <tbody data-link-tbody>
+              <tr><td colspan="4" class="essay-empty">点击「提取外链」扫描站内所有外链</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    /* ---------- 可用性/性能刷新 ---------- */
+    const refreshBtn = panel.querySelector("[data-ops-refresh]");
+    refreshBtn.addEventListener("click", () => renderAdminOps(panel));
+
+    /* ---------- 备份导出 ---------- */
+    panel.querySelector("[data-backup-export]").addEventListener("click", () => {
+      const w = window.open("/api/admin/ops/backup/export", "_blank");
+      if (!w) location.href = "/api/admin/ops/backup/export";
+    });
+
+    /* ---------- 可用性检测间隔设置 ---------- */
+    const intervalInput = panel.querySelector("[data-uptime-interval]");
+    const intervalMsg = panel.querySelector("[data-uptime-msg]");
+    panel.querySelector("[data-uptime-save]").addEventListener("click", async () => {
+      const val = Math.max(1, Math.min(720, parseInt(intervalInput.value, 10) || 5));
+      intervalInput.value = val;
+      intervalMsg.textContent = "保存中…";
+      try {
+        await api("/api/admin/settings", { method: "PUT", body: { uptime_check_interval: String(val) } });
+        intervalMsg.textContent = "✓ 已保存（Cron 每分钟触发，按此间隔执行检测）";
+        toast("可用性检测间隔已更新");
+      } catch (e) {
+        intervalMsg.textContent = "✗ " + e.message;
+      }
+    });
+
+    /* ---------- 数据恢复（按表覆盖） ---------- */
+    const pickBtn = panel.querySelector("[data-backup-pick]");
+    const fileInput = panel.querySelector("[data-backup-file]");
+    const restoreSummary = panel.querySelector("[data-restore-summary]");
+    const restoreTablesEl = panel.querySelector("[data-restore-tables]");
+    const restoreRun = panel.querySelector("[data-restore-run]");
+    const restoreMsg = panel.querySelector("[data-restore-msg]");
+    let backupData = null; // { exported_at, tables: { [name]: rows[] } }
+
+    pickBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", async () => {
+      const f = fileInput.files[0];
+      if (!f) return;
+      try {
+        backupData = JSON.parse(await f.text());
+        const tables = backupData && typeof backupData.tables === "object" ? backupData.tables : null;
+        if (!tables) throw new Error("备份文件格式不正确（缺少 tables）");
+        const names = Object.keys(tables).filter(n => Array.isArray(tables[n]));
+        if (!names.length) throw new Error("备份文件中没有可恢复的表");
+        restoreTablesEl.innerHTML = names
+          .map(n => `
+            <label class="ops-restore-row">
+              <input type="checkbox" value="${escA(n)}" checked />
+              <span class="ops-restore-name">${escA(n)}</span>
+              <span class="ops-restore-count">${tables[n].length} 行</span>
+            </label>`)
+          .join("");
+        restoreTablesEl.style.display = "grid";
+        restoreRun.disabled = false;
+        restoreSummary.textContent = `已加载备份（${backupData.exported_at || ""}），共 ${names.length} 个表，勾选后点击恢复`;
+        restoreMsg.textContent = "";
+      } catch (e) {
+        restoreSummary.textContent = "读取失败：" + e.message;
+      } finally {
+        fileInput.value = "";
+      }
+    });
+
+    restoreRun.addEventListener("click", async () => {
+      if (!backupData) return;
+      const rowsEls = Array.from(restoreTablesEl.querySelectorAll("input:checked"));
+      if (!rowsEls.length) return restoreMsg.textContent = "请至少勾选一个表";
+      const tables = rowsEls.map(el => el.value);
+      if (!confirm(`确定恢复 ${tables.join("、")} 吗？\n\n该操作会【清空并覆盖】这些表的当前数据，且不可撤销！请确认备份文件正确后再继续。`)) return;
+      restoreRun.disabled = true;
+      restoreMsg.style.color = "";
+      let okCount = 0, failCount = 0;
+      try {
+        for (const name of tables) {
+          const rows = backupData.tables[name] || [];
+          restoreMsg.textContent = `正在恢复 ${name}（${rows.length} 行）…`;
+          try {
+            const r = await api("/api/admin/ops/backup/restore", { method: "POST", body: { table: name, rows } });
+            okCount++;
+            restoreMsg.textContent = `${name} 已恢复 ${r.data.inserted} 行`;
+          } catch (e) {
+            failCount++;
+            restoreMsg.textContent = `${name} 恢复失败：${e.message}`;
+          }
+        }
+        restoreMsg.style.color = failCount ? "#f56c6c" : "#23b26d";
+        restoreMsg.textContent = failCount
+          ? `完成：成功 ${okCount} 个表，失败 ${failCount} 个（请刷新页面检查）`
+          : `✓ 全部恢复完成（${okCount} 个表）`;
+        toast(failCount ? "部分表恢复失败" : "数据恢复完成");
+      } finally {
+        restoreRun.disabled = false;
+      }
+    });
+
+    /* ---------- 死链检测 ---------- */
+    const scan = { links: [], results: [], running: false, checked: 0 };
+    const tbody = panel.querySelector("[data-link-tbody]");
+    const extractBtn = panel.querySelector("[data-link-extract]");
+    const checkBtn = panel.querySelector("[data-link-check]");
+    const summaryEl = panel.querySelector("[data-link-summary]");
+    const progressWrap = panel.querySelector("[data-link-progress]");
+    const progressBar = panel.querySelector("[data-link-bar]");
+    const progressPct = panel.querySelector("[data-link-pct]");
+
+    const renderScan = () => {
+      const rows = scan.results.map(r => `
+        <tr>
+          <td class="ops-td-path" title="${escA(r.url)}"><a href="${escA(r.url)}" target="_blank" rel="noopener nofollow">${escA(r.url.length > 60 ? r.url.slice(0, 60) + "…" : r.url)}</a></td>
+          <td><span class="ops-pill ${r.ok ? "ok" : "bad"}">${r.status || "ERR"}</span></td>
+          <td>${fmtMs(r.latency)}</td>
+          <td class="ops-td-err" title="${escA(r.error)}">${escA(r.ok ? "正常" : (r.error || "无法访问")).slice(0, 60)}</td>
+        </tr>`).join("");
+      tbody.innerHTML = rows || `<tr><td colspan="4" class="essay-empty">暂无链接</td></tr>`;
+      const done = scan.results.length;
+      const dead = scan.results.filter(r => !r.ok).length;
+      summaryEl.textContent = scan.links.length
+        ? `共 ${scan.links.length} 个链接，已检测 ${done} 个，异常 ${dead} 个`
+        : "尚未提取链接";
+    };
+
+    extractBtn.addEventListener("click", async () => {
+      extractBtn.disabled = true;
+      try {
+        const d = await api("/api/admin/ops/seo/extract-links", { method: "POST" });
+        scan.links = d.list || [];
+        scan.results = [];
+        scan.checked = 0;
+        checkBtn.disabled = !scan.links.length;
+        summaryEl.textContent = `提取到 ${scan.links.length} 个外链（已排除站内域名），点击「开始检测」分批检查`;
+        renderScan();
+      } catch (e) {
+        summaryEl.textContent = "提取失败：" + e.message;
+      } finally {
+        extractBtn.disabled = false;
+      }
+    });
+
+    checkBtn.addEventListener("click", async () => {
+      if (scan.running) return;
+      scan.running = true;
+      checkBtn.disabled = true;
+      extractBtn.disabled = true;
+      progressWrap.style.display = "flex";
+      const total = scan.links.length;
+      const batchSize = 20;
+      try {
+        for (let i = 0; i < total; i += batchSize) {
+          const batch = scan.links.slice(i, i + batchSize);
+          const d = await api("/api/admin/ops/seo/check-links", { method: "POST", body: { links: batch } });
+          scan.results = scan.results.concat(d.list || []);
+          scan.checked = scan.results.length;
+          const pct = Math.round((scan.results.length / total) * 100);
+          progressBar.style.width = pct + "%";
+          progressPct.textContent = pct + "%";
+          renderScan();
+        }
+        toast("死链检测完成");
+      } catch (e) {
+        summaryEl.textContent = "检测中断：" + e.message;
+      } finally {
+        scan.running = false;
+        checkBtn.disabled = !scan.links.length;
+        extractBtn.disabled = false;
+        progressWrap.style.display = "none";
+      }
+    });
+
+    renderScan();
+  }
 
   const MUSIC_CACHE_KEY = "moments-playlist-cache";
   const MUSIC_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 天
@@ -8077,7 +9029,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
@@ -8091,6 +9043,9 @@
       if (linksEnabledEl) patch.links_enabled = linksEnabledEl.checked;
       const photosEnabledEl = settingsForm.querySelector('[name="photos_enabled"]');
       if (photosEnabledEl) patch.photos_enabled = photosEnabledEl.checked;
+      // 打赏开关
+      const rewardEnabledEl = settingsForm.querySelector('[name="reward_enabled"]');
+      if (rewardEnabledEl) patch.reward_enabled = rewardEnabledEl.checked;
       const btn = settingsForm.querySelector('button[type="submit"]');
       btn.disabled = true;
       try {
@@ -8338,6 +9293,7 @@
           website,
           parent_id: parentId,
           images: getCommentImages(form),
+          notify_reply: !!(form.elements["notify_reply"] && form.elements["notify_reply"].checked),
         },
       });
       localStorage.setItem("moments_nick", nickname);
@@ -8585,6 +9541,8 @@
     // 切换视图会整体覆盖 #app，先销毁时间线/文章里的 HLS 实例，
     // 否则视频元素随 DOM 丢弃后仍在后台拉 m3u8/ts 分片，累积耗 CPU/网络导致卡顿
     disposeVideos(app);
+    // 清理文章悬浮目录（侧栏/FAB/抽屉），避免切页残留
+    document.querySelectorAll("[data-toc-sidebar], [data-toc-fab], [data-toc-mask], [data-toc-drawer]").forEach(el => el.remove());
     if (path === "/") {
       renderFeed();
     } else if (path === "/about") {
@@ -8678,5 +9636,26 @@
     await refreshAdmin();
     route();
     initMusicPlayer();
+
+    // 评论邮件链接定位：`#moment-<id>` → 滚动到对应说说并打开评论区
+    const hashMoment = location.hash.match(/^#moment-(\d+)$/);
+    if (hashMoment) {
+      const mid = Number(hashMoment[1]);
+      let tries = 0;
+      const timer = setInterval(() => {
+        tries++;
+        const card = document.querySelector(`.bber-item[data-id="${mid}"]`);
+        if (card) {
+          clearInterval(timer);
+          card.scrollIntoView({ behavior: "smooth", block: "center" });
+          setTimeout(() => {
+            const reply = card.querySelector('[data-act="reply"]');
+            if (reply) reply.click();
+          }, 500);
+        } else if (tries > 30) {
+          clearInterval(timer);
+        }
+      }, 200);
+    }
   })();
 })();

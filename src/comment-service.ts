@@ -20,6 +20,7 @@ export interface ParsedCommentInput {
   website: string;
   parentId: number;
   images: string; // JSON 数组字符串
+  notifyReply: boolean; // 评论者是否订阅「收到回复邮件通知」
 }
 
 /** 解析评论提交体（字段合法性由 validateCommentInput 校验） */
@@ -52,6 +53,8 @@ export function parseCommentBody(body: unknown): ParsedCommentInput {
       .map(s => s.slice(0, 500));
   }
 
+  const notifyReply = b.notify_reply === true || b.notify_reply === "true" || b.notify_reply === "1";
+
   return {
     nickname,
     content,
@@ -61,6 +64,7 @@ export function parseCommentBody(body: unknown): ParsedCommentInput {
     website,
     parentId: Number(b.parent_id ?? 0) || 0,
     images: imgs.length ? JSON.stringify(imgs) : "",
+    notifyReply,
   };
 }
 
@@ -104,7 +108,8 @@ export async function createComment(
   type: CommentTargetType,
   targetId: number,
   raw: ParsedCommentInput,
-  owner: boolean
+  owner: boolean,
+  opts?: { ip?: string; rateLimit?: number }
 ): Promise<{ error: string; status?: 400 | 404 | 429 | 500 } | { comment: CommentRow }> {
   if (!(await targetExists(db, type, targetId))) {
     return { error: type === "post" ? "文章不存在" : "动态不存在", status: 404 };
@@ -133,7 +138,20 @@ export async function createComment(
     .first();
   if (dup) return { error: "刚刚发过相同评论了", status: 429 };
 
-  const result = await db.prepare(
+  // 同 IP 高频评论频控：60 秒窗口内超过 rateLimit 次则拒绝（管理员不受限）
+  if (opts?.ip && !owner) {
+    const limit = Math.max(1, Math.min(100, opts.rateLimit ?? 5));
+    const windowStart = new Date(Date.now() - 60_000).toISOString();
+    const cnt = await db
+      .prepare(`SELECT COUNT(*) AS n FROM comment_rate WHERE ip = ? AND created_at > ?`)
+      .bind(opts.ip, windowStart)
+      .first<{ n: number }>();
+    if (Number(cnt?.n ?? 0) >= limit) {
+      return { error: "评论过于频繁，请稍后再试", status: 429 };
+    }
+  }
+
+  const commentStmt = db.prepare(
     `INSERT INTO comments (target_type, target_id, parent_id, nickname, content, is_owner, qq, email, avatar_url, website, images)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
   )
@@ -149,10 +167,16 @@ export async function createComment(
       raw.avatarUrl,
       raw.website,
       raw.images
-    )
-    .first<CommentRow>();
-  if (!result) return { error: "评论失败", status: 500 };
-  return { comment: result };
+    );
+  // 评论 + 频控记录在同一个 batch 原子提交，确保下一条请求计数立即可见（管理员不计数）
+  const stmts: D1PreparedStatement[] = [commentStmt];
+  if (opts?.ip && !owner) {
+    stmts.push(db.prepare(`INSERT INTO comment_rate (ip) VALUES (?)`).bind(opts.ip));
+  }
+  const batch = await db.batch(stmts);
+  const inserted = batch[0].results?.[0] as CommentRow | undefined;
+  if (!inserted) return { error: "评论失败", status: 500 };
+  return { comment: inserted };
 }
 
 /** 删除目标下的评论整楼（根评论连带回复）；未命中返回 false */

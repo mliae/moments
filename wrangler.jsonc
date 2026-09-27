@@ -39,10 +39,11 @@
   "ai": {
     "binding": "AI"
   },
-  // Cron Trigger：定时执行 scheduled 函数（QQ Cookie 保活等）
-  // 当前触发频率：每小时整点执行一次，内部会根据后台配置的保活间隔判断是否执行
+  // Cron Trigger：每分钟触发一次 scheduled 函数
+  // - 可用性监控：按后台「运维」配置的检测间隔（分钟）判断是否执行
+  // - QQ Cookie 保活：内部按后台配置的保活间隔判断是否执行
   "triggers": {
-    "crons": ["0 * * * *"]
+    "crons": ["* * * * *"]
   },
   "observability": {
     "enabled": true

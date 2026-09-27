@@ -16,6 +16,7 @@ import {
 import { maybeScheduleAiReply } from "../ai-reply";
 import { getSettings } from "../settings";
 import { ensureAvatar } from "../avatar";
+import { handleCommentMailNotifications } from "../mail";
 
 const app = new Hono<HonoEnv>();
 
@@ -90,10 +91,41 @@ app.post("/:id/comments", async c => {
   if (ensured) input.avatarUrl = ensured.src;
 
   const owner = await isAdmin(c);
-  const result = await createComment(c.env.DB, "moment", id, input, owner);
+  const ip = c.req.header("cf-connecting-ip") || "";
+  const result = await createComment(c.env.DB, "moment", id, input, owner, {
+    ip,
+    rateLimit: parseInt(s.comment_rate_limit, 10) || 5,
+  });
   if ("error" in result) return fail(c, result.error, result.status ?? 400);
   // @AI 机器人：内容含 @机器人昵称 时异步生成楼中楼回复（开关关闭/未提及均无操作）
   await maybeScheduleAiReply(c, { type: "moment", targetId: id, comment: result.comment });
+
+  // 邮件通知（异步执行，失败静默）：管理员新评论 + 被回复者订阅通知
+  const moment = await c.env.DB
+    .prepare(`SELECT content FROM moments WHERE id = ?`)
+    .bind(id)
+    .first<{ content: string }>();
+  const targetLabel = (moment?.content ?? "").replace(/\s+/g, " ").slice(0, 60) || `说说 #${id}`;
+  const origin = new URL(c.req.url).origin;
+  c.executionCtx.waitUntil(
+    handleCommentMailNotifications({
+      mail: {
+        enabled: s.mail_enabled,
+        apiKey: s.mail_resend_key,
+        from: s.mail_from,
+        adminTo: s.mail_admin_to,
+        notifyAdmin: s.mail_notify_admin,
+        replyNotify: s.mail_reply_notify,
+      },
+      db: c.env.DB,
+      site: s.site_title || "Moments",
+      comment: result.comment,
+      targetTypeLabel: "说说",
+      targetLabel,
+      url: `${origin}/#moment-${id}`,
+    })
+  );
+
   return ok(c, { ...result.comment, is_owner: result.comment.is_owner === 1 }, "评论成功");
 });
 
