@@ -7353,10 +7353,14 @@
   }
 
   // 音频事件
+  // 进度改画在封面圆环上（conic-gradient 的 --mp 角度），圆环和隐藏进度条共用这一份比例；
+  // 拖动期间由 _seeking 让位，否则回填会把把手打回去。
+  const paintProgress = p => {
+    musicCapsule.style.setProperty("--mp", p.toFixed(5));
+    if (musicProgressBar) musicProgressBar.style.width = (p * 100).toFixed(3) + "%";
+  };
   audio.addEventListener("timeupdate", () => {
-    if (audio.duration && !audio._seeking) {
-      musicProgressBar.style.width = (audio.currentTime / audio.duration) * 100 + "%";
-    }
+    if (audio.duration && !audio._seeking) paintProgress(audio.currentTime / audio.duration);
     updateLyricIndex();
   });
   audio.addEventListener("ended", () => {
@@ -7398,7 +7402,7 @@
   });
 
   // 进度条：点击跳转 + 按住拖动
-  bindSeek(musicProgress, musicProgressBar, () => audio);
+  bindSeek(musicProgress, musicProgressBar, () => audio, paintProgress);
 
   // 音量滑块
   musicVolume.addEventListener("input", e => {
@@ -7578,9 +7582,10 @@
    * 给进度轨接上"点击定位 + 按住拖动"。胶囊播放器和正文卡片共用一套。
    * track 是加高的透明命中区，fill 是表示已播比例的子元素；
    * getAudio() 返回 null 表示当前不可跳（比如这张卡没在播）。
+   * onPaint(p) 可选：拖动/跳完时把比例同步给别的进度载体（胶囊的封面圆环）。
    * 拖动期间把 a._seeking 立起来，timeupdate 据此让位，避免回填写把把手打回去。
    */
-  function bindSeek(track, fill, getAudio) {
+  function bindSeek(track, fill, getAudio, onPaint) {
     if (!track || track._seekBound) return;
     track._seekBound = true;
     const pctAt = ev => {
@@ -7594,7 +7599,10 @@
       a._seeking = true;
       track.classList.add("dragging");
       try { track.setPointerCapture(ev.pointerId); } catch { /* 不支持也要能点跳 */ }
-      const show = p => { if (fill) fill.style.width = (p * 100).toFixed(2) + "%"; };
+      const show = p => {
+        if (fill) fill.style.width = (p * 100).toFixed(2) + "%";
+        if (onPaint) onPaint(p);
+      };
       const move = e2 => show(pctAt(e2));
       const done = e2 => {
         track.removeEventListener("pointermove", move);

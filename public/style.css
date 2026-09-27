@@ -1567,7 +1567,9 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
   width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--anzhiyu-card-border);
 }
 .music-capsule.collapsed .music-cover-ring {
-  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 30%), 0 0 0 2px var(--anzhiyu-main);
+  /* 折叠成圆球时没有边框可依，底槽用半透明白，色弧仍走 --mp */
+  background: conic-gradient(from -90deg,
+    var(--anzhiyu-main) calc(var(--mp, 0) * 360deg), rgb(255 255 255 / 28%) 0);
 }
 /* 折叠态中央的播放/暂停图标浮层 */
 .music-capsule.collapsed .music-cover-overlay {
@@ -1586,8 +1588,19 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
 }
 .music-cover { width: 100%; height: 100%; object-fit: cover; display: block; }
 .music-cover-ring {
-  position: absolute; inset: 0; border-radius: 50%;
-  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 15%); pointer-events: none;
+  position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  /* 进度画在封面外圈：--mp（0~1，由 app.js 的 paintProgress 写在胶囊上）转成角度，
+     mask 只留最外 3px，于是这段色弧看起来就是"绕着封面走"的进度。
+     注意只能用 var(--mp, 0) 兜底，不能在环上声明 --mp——那会盖掉从胶囊继承的值 */
+  background: conic-gradient(from -90deg,
+    var(--anzhiyu-main) calc(var(--mp, 0) * 360deg), rgb(0 0 0 / 14%) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+}
+/* 暗底上黑色未播槽几乎看不见，换半透明白 */
+html[data-theme="dark"] .music-cover-ring {
+  background: conic-gradient(from -90deg,
+    var(--anzhiyu-main) calc(var(--mp, 0) * 360deg), rgb(255 255 255 / 20%) 0);
 }
 .music-capsule.playing .music-cover {
   animation: music-spin 8s linear infinite;
@@ -1656,32 +1669,32 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
   background: var(--anzhiyu-main); cursor: pointer;
 }
 
-/* 进度轨：贴在胶囊底边横穿整个播放器（左右各内缩 10px 让圆角收得住），
-   12px 透明命中区 + 4px 轨道，hover/拖动长出拖拽头。
-   宽度不再跟着歌名长短浮动——旧写法放在 .music-info 里，短歌名会缩成一条小线段。
-   z-index 抬到按键之上：胶囊只有 60px 高，任何够用的命中区都必然压住按键下缘几个
-   像素，两害相权宁可让条一定能拖，按键圆心仍远在那几个像素之外 */
+/* 进度轨：常态完全隐形，只在 hover/拖动时淡出一条细线，日常进度看封面圆环。
+   命中带坐在胶囊最底下 8px（离底 0~8）：桌面封面圆盘下缘离底 8px、播放键离底 12px，
+   窄屏分别是 9px 和 11px，所以这条既不压封面也不割按键；左右内缩 16px 才收得进
+   28px 圆角（旧版 bottom:5 + 内缩 10px 时，线头戳到弧线外面，看着就像分体）。 */
 .music-progress {
-  position: absolute; left: 10px; right: 10px; bottom: 5px; height: 12px; z-index: 2;
+  position: absolute; left: 16px; right: 16px; bottom: 0; height: 8px; z-index: 2;
   display: flex; align-items: center; cursor: pointer; touch-action: pan-y;
 }
 .music-progress::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 4px;
-  margin-top: -2px; background: var(--anzhiyu-card-border); border-radius: 2px;
-  transition: height .15s, margin-top .15s;
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px;
+  margin-top: -1.5px; background: var(--anzhiyu-card-border); border-radius: 2px;
+  opacity: 0; transition: opacity .18s;
 }
 .music-progress-bar {
-  position: relative; flex: none; height: 4px; width: 0;
+  position: relative; flex: none; height: 3px; width: 0;
   background: var(--anzhiyu-main); border-radius: 2px; transition: width .15s linear;
 }
 .music-progress-bar::after {
-  content: ""; position: absolute; right: -5px; top: 50%; width: 10px; height: 10px;
-  margin-top: -5px; border-radius: 50%; background: var(--anzhiyu-main);
+  content: ""; position: absolute; right: -4px; top: 50%; width: 8px; height: 8px;
+  margin-top: -4px; border-radius: 50%; background: var(--anzhiyu-main);
   box-shadow: 0 0 0 2px var(--anzhiyu-card-bg);
   opacity: 0; transform: scale(.5); transition: opacity .15s, transform .15s;
 }
-.music-progress:hover::before, .music-progress.dragging::before { height: 6px; margin-top: -3px; }
-.music-progress:hover .music-progress-bar::after,
+.music-capsule:hover .music-progress::before,
+.music-progress.dragging::before { opacity: 1; }
+.music-capsule:hover .music-progress-bar::after,
 .music-progress.dragging .music-progress-bar::after { opacity: 1; transform: none; }
 
 /* 歌词面板 */
@@ -1724,8 +1737,10 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
   .music-seg-aux .music-ctrl svg { width: 13px; height: 13px; }
   /* 窄屏不放开音量滑块：音量键退化为纯静音开关 */
   .music-volume-wrap { display: none; }
-  /* 触屏没有 hover，进度条靠加高命中区 + 常驻拖拽头来保证可点 */
-  .music-progress { height: 14px; }
+  /* 触屏没有 hover，常态隐藏的跳转条在窄屏要常驻（9px 命中带离底 1~10，
+     仍低于封面圆盘下缘 9px 和播放键下缘 11px，不会压住两者） */
+  .music-progress::before { opacity: 1; }
+  .music-progress-bar::after { opacity: 1; transform: none; }
   .music-progress-bar::after { opacity: 1; transform: none; }
   .music-lyric { bottom: 62px; max-height: 200px; font-size: .8rem; }
 }
