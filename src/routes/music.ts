@@ -347,20 +347,9 @@ async function searchNeteaseOfficial(kw: string, limit = 10): Promise<SearchHit[
     const songs = (data.result?.songs || []).filter(s => Number(s.id) && s.name);
     if (!songs.length) return [];
 
-    // 批量补封面（song/detail 的 album.picUrl 才有值）
-    const coverMap = new Map<number, string>();
-    try {
-      const ids = songs.map(s => Number(s.id));
-      const dres = await fetch(`https://music.163.com/api/song/detail?ids=${encodeURIComponent(JSON.stringify(ids))}`, {
-        headers: { "User-Agent": UA, Referer: "https://music.163.com/" },
-      });
-      const ddata = (await dres.json()) as { songs?: Array<{ id?: number; album?: { picUrl?: string } }> };
-      for (const s of ddata.songs || []) {
-        if (s.id && s.album?.picUrl) coverMap.set(s.id, toHttps(s.album.picUrl));
-      }
-    } catch {
-      // 封面缺失不影响搜索结果
-    }
+    // 批量补封面：官方 detail 被风控时自动切 netstart 镜像 detail
+    const ids = songs.map(s => Number(s.id));
+    const coverMap = await fetchNeteaseCoverMap(ids);
 
     return songs
       .map((s): SearchHit | null => {
@@ -386,6 +375,29 @@ async function searchNeteaseOfficial(kw: string, limit = 10): Promise<SearchHit[
   }
 }
 
+/** 批量取网易云封面：官方 song/detail 失败时切 netstart 镜像（CF→CF 稳定可达） */
+async function fetchNeteaseCoverMap(ids: number[]): Promise<Map<number, string>> {
+  const map = new Map<number, string>();
+  if (!ids.length) return map;
+  const detailUrls = [
+    `https://music.163.com/api/song/detail?ids=${encodeURIComponent(JSON.stringify(ids))}`,
+    `https://apis.netstart.cn/music/song/detail?ids=${encodeURIComponent(JSON.stringify(ids))}`,
+  ];
+  for (const u of detailUrls) {
+    try {
+      const dres = await fetch(u, { headers: { "User-Agent": UA, Referer: "https://music.163.com/" } });
+      const ddata = (await dres.json()) as { songs?: Array<{ id?: number; album?: { picUrl?: string } }> };
+      for (const s of ddata.songs || []) {
+        if (s.id && s.album?.picUrl) map.set(s.id, toHttps(s.album.picUrl));
+      }
+      if (map.size) break; // 任一来源拿到即止
+    } catch {
+      // 换下一个来源
+    }
+  }
+  return map;
+}
+
 /** netstart 镜像（NeteaseCloudMusicApi 部署）：官方接口被拦时的备用搜索 */
 async function searchNeteaseMirror(kw: string, limit = 10): Promise<SearchHit[]> {
   try {
@@ -396,7 +408,14 @@ async function searchNeteaseMirror(kw: string, limit = 10): Promise<SearchHit[]>
     const data = (await res.json()) as {
       result?: { songs?: Array<Record<string, unknown>> };
     };
-    return (data.result?.songs || [])
+    const songs = (data.result?.songs || []).filter(s => Number(s.id) && s.name);
+    if (!songs.length) return [];
+
+    // 镜像搜索同样补封面（走 netstart detail，与搜索同源稳定）
+    const ids = songs.map(s => Number(s.id));
+    const coverMap = await fetchNeteaseCoverMap(ids);
+
+    return songs
       .map((s): SearchHit | null => {
         const id = Number(s.id);
         const name = String(s.name ?? "");
@@ -409,7 +428,7 @@ async function searchNeteaseMirror(kw: string, limit = 10): Promise<SearchHit[]>
           title: name,
           artist: artists.map(a => a.name).filter(Boolean).join(" / ") || "未知歌手",
           album: album.name || "",
-          cover: "",
+          cover: coverMap.get(id) || "",
           vip: [1, 4, 16].includes(Number(s.fee ?? 0)),
           duration: Math.round(Number(s.duration ?? 0) / 1000),
         };
@@ -543,7 +562,8 @@ async function searchKugou(kw: string, limit = 10): Promise<SearchHit[]> {
           title: name,
           artist: String(s.Singer ?? "").replace(/<[^>]+>/g, "") || "未知歌手",
           album: String(s.AlbumName ?? "").replace(/<[^>]+>/g, ""),
-          cover: albumId ? `https://imge.kugou.com/stdmusic/150/${albumId}.jpg` : "",
+          cover: (String(s.Image ?? "").trim() || "").replace("{size}", "480").replace(/^http:/, "https:") ||
+            (albumId ? `https://imge.kugou.com/stdmusic/300/${albumId}.jpg` : ""),
           vip: Number(s.Privilege ?? 0) < 10,
           duration: Number(s.Duration ?? 0),
         };
@@ -778,7 +798,14 @@ async function downloadCover(
     return d?.albummid ? fetchImage(qqCoverUrl(d.albummid)) : null;
   }
   if (source === "kugou" && songId) {
-    return fetchImage(`https://api.qijieya.cn/meting/?server=kugou&type=pic&id=${encodeURIComponent(songId)}`);
+    // 酷狗 CDN 可能拦截 Worker 出口：qijieya pic 兜底，再不行跨平台网易同名封面
+    const hit = await fetchImage(`https://api.qijieya.cn/meting/?server=kugou&type=pic&id=${encodeURIComponent(songId)}`);
+    if (hit) return hit;
+    if (title) {
+      const neHits = await searchNetease(`${title} ${artist || ""}`.trim(), 1);
+      if (neHits[0]?.cover) return fetchImage(neHits[0].cover);
+    }
+    return null;
   }
   if (source === "kuwo") {
     // 搜索结果给的是 120 小图，优先换 500 大图入库
