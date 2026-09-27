@@ -2837,6 +2837,14 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   background: var(--anzhiyu-main-op); color: var(--anzhiyu-main); line-height: 1.5;
 }
 .emp-item .btn { flex-shrink: 0; padding: 4px 11px; font-size: .74rem; }
+.emp-play {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+  border: none; cursor: pointer; background: var(--anzhiyu-main-op); color: var(--anzhiyu-main);
+  display: inline-flex; align-items: center; justify-content: center; transition: .15s;
+}
+.emp-play:hover { transform: scale(1.12); background: var(--anzhiyu-main); color: #fff; }
+.emp-play svg { width: 15px; height: 15px; }
+.emp-item.playing { background: var(--anzhiyu-main-op); }
 
 /* ---------- 后台：站内音乐库列表 ---------- */
 .mlib-list { display: flex; flex-direction: column; gap: 8px; max-width: 680px; }

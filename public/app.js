@@ -8361,19 +8361,22 @@
     });
   }
 
-  /** 音乐插入面板（3 Tab：搜歌入库 / 本地上传 / 网络地址，入库成功自动插入 [music=tN]） */
+  /** 音乐插入面板（4 Tab：搜歌入库 / 我的曲库 / 本地上传 / 网络地址，入库成功自动插入 [music=tN]） */
   function toggleMusicInsertPanel(container, ta) {
     const exist = container.querySelector("[data-music-panel]");
     if (exist) {
       exist.remove();
       return;
     }
+    const PLAY_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    const PAUSE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
     const panel = document.createElement("div");
     panel.className = "editor-music-panel";
     panel.dataset.musicPanel = "";
     panel.innerHTML = `
       <div class="emp-tabs">
         <button type="button" class="on" data-emp-tab="search">搜歌入库</button>
+        <button type="button" data-emp-tab="lib">我的曲库</button>
         <button type="button" data-emp-tab="upload">本地上传</button>
         <button type="button" data-emp-tab="url">网络地址</button>
         <span class="emp-flex"></span>
@@ -8385,8 +8388,11 @@
           <button type="button" class="btn primary" data-emp-search>搜索</button>
         </div>
         <div class="emp-results" data-emp-results>
-          <div class="emp-help">输入关键词搜索，点「入库」自动下载全曲音频/封面/歌词到站内并插入。</div>
+          <div class="emp-help">输入关键词搜索，先试听，满意再「入库」（自动下载全曲音频/封面/歌词到站内）。</div>
         </div>
+      </div>
+      <div class="emp-body" data-emp-pane="lib" hidden>
+        <div class="emp-results" data-emp-lib><div class="emp-help">加载中…</div></div>
       </div>
       <div class="emp-body" data-emp-pane="upload" hidden>
         <div class="emp-row"><input type="file" accept=".mp3,.m4a,.flac,.wav,.ogg,audio/*" data-emp-file /></div>
@@ -8394,8 +8400,9 @@
           <input type="text" data-emp-title placeholder="歌曲名（默认取文件名）" />
           <input type="text" data-emp-artist placeholder="歌手" />
         </div>
+        <div class="emp-row"><input type="file" accept="image/*" data-emp-coverfile /></div>
         <div class="emp-row"><button type="button" class="btn primary" data-emp-upload>上传并插入</button></div>
-        <div class="emp-help">支持 mp3 / m4a / flac / wav / ogg，≤60MB。汽水音乐可先下载到本地再上传。</div>
+        <div class="emp-help">支持 mp3 / m4a / flac / wav / ogg，≤60MB，第三行可选封面图片。汽水音乐可先下载到本地再上传。</div>
       </div>
       <div class="emp-body" data-emp-pane="url" hidden>
         <div class="emp-row"><input type="url" data-emp-url placeholder="音频直链 https://…" /></div>
@@ -8403,6 +8410,7 @@
           <input type="text" data-emp-urltitle placeholder="歌曲名" />
           <input type="text" data-emp-urlartist placeholder="歌手" />
         </div>
+        <div class="emp-row"><input type="url" data-emp-urlcover placeholder="封面图直链（可选）" /></div>
         <div class="emp-row"><button type="button" class="btn primary" data-emp-saveurl>转存并插入</button></div>
         <div class="emp-help">服务端转存到站内存储；支持任何可直接访问的音频地址。</div>
       </div>`;
@@ -8410,29 +8418,107 @@
 
     const resultsBox = panel.querySelector("[data-emp-results]");
     const searchInput = panel.querySelector('[data-emp-pane="search"] input');
+    const libBox = panel.querySelector("[data-emp-lib]");
 
-    // Tab 切换
+    /* ---- Tab 切换（曲库懒加载） ---- */
+    let libLoaded = false;
     panel.querySelector(".emp-tabs").addEventListener("click", e => {
       const tab = e.target.closest("[data-emp-tab]");
       if (tab) {
         panel.querySelectorAll("[data-emp-tab]").forEach(b => b.classList.toggle("on", b === tab));
         panel.querySelectorAll("[data-emp-pane]").forEach(p => (p.hidden = p.dataset.empPane !== tab.dataset.empTab));
+        if (tab.dataset.empTab === "lib" && !libLoaded) {
+          libLoaded = true;
+          renderLib();
+        }
         return;
       }
-      if (e.target.closest("[data-emp-close]")) panel.remove();
+      if (e.target.closest("[data-emp-close]")) {
+        previewAudio.pause();
+        panel.remove();
+      }
     });
 
     const insertAndClose = id => {
       mdInsertBlock(ta, `[music=${id}]`);
+      previewAudio.pause();
       panel.remove();
     };
 
-    /* ---- Tab1：搜歌入库 ---- */
+    /* ---- 我的曲库：一键插入 ---- */
+    const renderLib = async () => {
+      libBox.innerHTML = `<div class="emp-help"><span class="spinner"></span> 加载中…</div>`;
+      try {
+        const data = await api("/api/music/library");
+        const list = data.list || [];
+        if (!list.length) {
+          libBox.innerHTML = `<div class="emp-help">曲库还是空的，去「搜歌入库」添加吧。</div>`;
+          return;
+        }
+        libBox.innerHTML = list
+          .map(
+            t => `
+        <div class="emp-item">
+          ${t.cover_url ? `<img class="emp-cover" src="${esc(t.cover_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="emp-cover emp-cover--ph">${svgIcon("music", 18)}</span>`}
+          <div class="emp-info">
+            <div class="emp-name">${esc(t.title)}${t.enabled ? "" : '<span class="emp-src">已停用</span>'}</div>
+            <div class="emp-artist">${esc(t.artist)}${t.album ? " · " + esc(t.album) : ""} · ${esc(t.id)}</div>
+          </div>
+          <button type="button" class="btn" data-emp-use="${esc(t.id)}">插入</button>
+        </div>`
+          )
+          .join("");
+      } catch (e) {
+        libBox.innerHTML = `<div class="emp-help">${esc(e.message || "曲库加载失败")}</div>`;
+      }
+    };
+    libBox.addEventListener("click", e => {
+      const use = e.target.closest("[data-emp-use]");
+      if (!use) return;
+      insertAndClose(use.dataset.empUse);
+      toast("已插入音乐块");
+    });
+
+    /* ---- 搜歌入库：搜索 + 试听 + 入库 ---- */
+    const previewAudio = new Audio();
+    let previewRow = -1;
+    const setRowIcon = (row, playing) => {
+      const btn = resultsBox.querySelector(`[data-emp-preview="${row}"]`);
+      if (btn) btn.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
+      const item = resultsBox.querySelector(`[data-emp-row="${row}"]`);
+      if (item) item.classList.toggle("playing", playing);
+    };
+    previewAudio.addEventListener("pause", () => setRowIcon(previewRow, false));
+    previewAudio.addEventListener("ended", () => setRowIcon(previewRow, false));
+    const togglePreview = async i => {
+      if (previewRow === i && !previewAudio.paused) {
+        previewAudio.pause();
+        return;
+      }
+      if (previewRow >= 0) setRowIcon(previewRow, false);
+      const hit = (resultsBox._hits || [])[i];
+      if (!hit) return;
+      try {
+        if (!hit._previewUrl) {
+          const d = await api(`/api/music/preview?source=${hit.source}&id=${encodeURIComponent(hit.songId)}`);
+          hit._previewUrl = d.url;
+        }
+        previewAudio.src = hit._previewUrl;
+        previewAudio.volume = 0.8;
+        await previewAudio.play();
+        previewRow = i;
+        setRowIcon(i, true);
+      } catch {
+        toast("试听加载失败，可能该歌曲暂无音源");
+      }
+    };
+
     let searchBusy = false;
     const doSearch = async () => {
       const kw = searchInput.value.trim();
       if (!kw || searchBusy) return;
       searchBusy = true;
+      previewAudio.pause();
       resultsBox.innerHTML = `<div class="emp-help"><span class="spinner"></span> 搜索中…</div>`;
       try {
         const data = await api(`/api/music/search?kw=${encodeURIComponent(kw)}`);
@@ -8447,12 +8533,13 @@
         resultsBox.innerHTML = hits
           .map(
             (h, i) => `
-        <div class="emp-item">
+        <div class="emp-item" data-emp-row="${i}">
           ${h.cover ? `<img class="emp-cover" src="${esc(proxyCover(h.cover))}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="emp-cover emp-cover--ph">${svgIcon("music", 18)}</span>`}
           <div class="emp-info">
             <div class="emp-name">${esc(h.title)}${h.vip ? '<span class="emp-vip">VIP</span>' : ""}<span class="emp-src">${h.sourceLabel}</span></div>
             <div class="emp-artist">${esc(h.artist)}${h.album ? " · " + esc(h.album) : ""}</div>
           </div>
+          <button type="button" class="emp-play" data-emp-preview="${i}" title="试听">${PLAY_SVG}</button>
           <button type="button" class="btn" data-emp-import="${i}">入库</button>
         </div>`
           )
@@ -8473,6 +8560,11 @@
       }
     });
     resultsBox.addEventListener("click", async e => {
+      const play = e.target.closest("[data-emp-preview]");
+      if (play) {
+        togglePreview(Number(play.dataset.empPreview));
+        return;
+      }
       const btn = e.target.closest("[data-emp-import]");
       if (!btn || btn.disabled) return;
       const hit = (resultsBox._hits || [])[Number(btn.dataset.empImport)];
@@ -8492,7 +8584,7 @@
       }
     });
 
-    /* ---- Tab2：本地上传 ---- */
+    /* ---- 本地上传 ---- */
     const uploadBtn = panel.querySelector("[data-emp-upload]");
     uploadBtn.addEventListener("click", async () => {
       const fileInput = panel.querySelector("[data-emp-file]");
@@ -8508,6 +8600,8 @@
         const artist = panel.querySelector("[data-emp-artist]").value.trim();
         if (title) form.append("title", title);
         if (artist) form.append("artist", artist);
+        const coverFile = panel.querySelector("[data-emp-coverfile]").files[0];
+        if (coverFile) form.append("cover", coverFile);
         const data = await api("/api/music/upload", { form });
         insertAndClose(data.id);
         toast("上传成功，已插入");
@@ -8519,7 +8613,7 @@
       }
     });
 
-    /* ---- Tab3：网络地址转存 ---- */
+    /* ---- 网络地址转存 ---- */
     const saveUrlBtn = panel.querySelector("[data-emp-saveurl]");
     const saveUrl = async () => {
       const url = panel.querySelector("[data-emp-url]").value.trim();
@@ -8532,6 +8626,7 @@
             url,
             title: panel.querySelector("[data-emp-urltitle]").value.trim(),
             artist: panel.querySelector("[data-emp-urlartist]").value.trim(),
+            cover: panel.querySelector("[data-emp-urlcover]").value.trim(),
           },
         });
         insertAndClose(data.id);

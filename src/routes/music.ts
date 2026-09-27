@@ -324,7 +324,8 @@ interface SearchHit {
   duration: number; // 秒
 }
 
-/** 网易云搜索：fee 0/8=免费，1/4/16=VIP */
+/** 网易云搜索：fee 0/8=免费，1/4/16=VIP。
+ *  search/get 响应不含封面，需再调 song/detail 批量补 picUrl */
 async function searchNetease(kw: string, limit = 10): Promise<SearchHit[]> {
   try {
     const res = await fetch(
@@ -334,20 +335,38 @@ async function searchNetease(kw: string, limit = 10): Promise<SearchHit[]> {
     const data = (await res.json()) as {
       result?: { songs?: Array<Record<string, unknown>> };
     };
-    return (data.result?.songs || [])
+    const songs = (data.result?.songs || []).filter(s => Number(s.id) && s.name);
+    if (!songs.length) return [];
+
+    // 批量补封面（song/detail 的 album.picUrl 才有值）
+    const coverMap = new Map<number, string>();
+    try {
+      const ids = songs.map(s => Number(s.id));
+      const dres = await fetch(`https://music.163.com/api/song/detail?ids=${encodeURIComponent(JSON.stringify(ids))}`, {
+        headers: { "User-Agent": UA, Referer: "https://music.163.com/" },
+      });
+      const ddata = (await dres.json()) as { songs?: Array<{ id?: number; album?: { picUrl?: string } }> };
+      for (const s of ddata.songs || []) {
+        if (s.id && s.album?.picUrl) coverMap.set(s.id, toHttps(s.album.picUrl));
+      }
+    } catch {
+      // 封面缺失不影响搜索结果
+    }
+
+    return songs
       .map((s): SearchHit | null => {
         const id = Number(s.id);
         const name = String(s.name ?? "");
         if (!id || !name) return null;
         const artists = Array.isArray(s.artists) ? (s.artists as Array<{ name?: string }>) : [];
-        const album = (s.album as { name?: string; picUrl?: string } | undefined) || {};
+        const album = (s.album as { name?: string } | undefined) || {};
         return {
           source: "netease" as const,
           songId: String(id),
           title: name,
           artist: artists.map(a => a.name).filter(Boolean).join(" / ") || "未知歌手",
           album: album.name || "",
-          cover: toHttps(album.picUrl || ""),
+          cover: coverMap.get(id) || "",
           vip: [1, 4, 16].includes(Number(s.fee ?? 0)),
           duration: Math.round(Number(s.duration ?? 0) / 1000),
         };
@@ -358,8 +377,15 @@ async function searchNetease(kw: string, limit = 10): Promise<SearchHit[]> {
   }
 }
 
-/** QQ 音乐搜索：pay.payplay=1 为 VIP；封面用 gtimg 静态域（无防盗链） */
+/** QQ 音乐搜索：pay.payplay=1 为 VIP；封面用 gtimg 静态域（无防盗链）。
+ *  主源 client_search_cp 不可用（Cloudflare 出口被拦等）时回退 smartbox 联想接口 */
 async function searchQQ(kw: string, limit = 10): Promise<SearchHit[]> {
+  const primary = await searchQQPrimary(kw, limit);
+  if (primary.length) return primary;
+  return searchQQFallback(kw, limit);
+}
+
+async function searchQQPrimary(kw: string, limit: number): Promise<SearchHit[]> {
   try {
     const res = await fetch(
       `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w=${encodeURIComponent(kw)}&format=json&n=${limit}&p=1&cr=1&t=0`,
@@ -393,12 +419,57 @@ async function searchQQ(kw: string, limit = 10): Promise<SearchHit[]> {
   }
 }
 
+/** smartbox 联想搜索（仅 mid/歌名/歌手，无封面与 VIP 信息） */
+async function searchQQFallback(kw: string, limit: number): Promise<SearchHit[]> {
+  try {
+    const res = await fetch(
+      `https://c.y.qq.com/splcloud/fcgi-bin/smartbox_new.fcg?key=${encodeURIComponent(kw)}&format=json`,
+      { headers: { "User-Agent": UA, Referer: "https://y.qq.com/" } }
+    );
+    const data = (await res.json()) as {
+      data?: { song?: { itemlist?: Array<{ mid?: string; name?: string; singer?: string }> } };
+    };
+    return (data.data?.song?.itemlist || [])
+      .slice(0, limit)
+      .map((s): SearchHit | null => {
+        if (!s.mid || !s.name) return null;
+        return {
+          source: "qq",
+          songId: s.mid,
+          title: s.name,
+          artist: s.singer || "未知歌手",
+          album: "",
+          cover: "",
+          vip: false,
+          duration: 0,
+        };
+      })
+      .filter((s): s is SearchHit => s !== null);
+  } catch {
+    return [];
+  }
+}
+
 /** 双平台聚合搜索（管理端）：GET /api/music/search?kw=xxx */
 app.get("/search", requireAdmin, async c => {
   const kw = (c.req.query("kw") || "").trim();
   if (!kw) return fail(c, "请输入搜索关键词", 400);
   const [netease, qq] = await Promise.all([searchNetease(kw), searchQQ(kw)]);
   return ok(c, { netease, qq });
+});
+
+/** 试听地址解析（管理端）：GET /api/music/preview?source=netease|qq&id=xxx
+ *  返回可直接给 <audio> 播放的 URL；VIP 歌自然只会播出试听片段 */
+app.get("/preview", requireAdmin, async c => {
+  const source = c.req.query("source") === "qq" ? "qq" : "netease";
+  const id = (c.req.query("id") || "").trim();
+  if (!id || !/^[A-Za-z0-9-]+$/.test(id)) return fail(c, "参数错误", 400);
+  let url: string | null = null;
+  if (source === "netease") url = await getOuterUrl(id);
+  if (!url) {
+    url = `https://api.injahow.cn/meting/?server=${source === "qq" ? "tencent" : "netease"}&type=url&id=${encodeURIComponent(id)}`;
+  }
+  return ok(c, { url });
 });
 
 /** 音频魔数判断（防把 HTML 错误页当音频入库） */
@@ -495,12 +566,11 @@ async function resolveAudio(
   return null;
 }
 
-/** 下载封面（网易 126.net 有 Referer 防盗链，QQ gtimg 不需要） */
-async function downloadCover(coverUrl: string): Promise<{ buf: ArrayBuffer; ext: string } | null> {
-  if (!coverUrl || !/^https?:\/\//i.test(coverUrl)) return null;
+/** 下载封面图片（126.net 有 Referer 防盗链，QQ gtimg 不需要） */
+async function fetchImage(url: string): Promise<{ buf: ArrayBuffer; ext: string } | null> {
   try {
-    const referer = coverUrl.includes("126.net") ? "https://music.163.com/" : coverUrl.includes("gtimg") ? "https://y.qq.com/" : undefined;
-    const res = await fetch(coverUrl, { headers: { "User-Agent": UA, ...(referer ? { Referer: referer } : {}) } });
+    const referer = url.includes("126.net") ? "https://music.163.com/" : url.includes("gtimg") ? "https://y.qq.com/" : undefined;
+    const res = await fetch(url, { headers: { "User-Agent": UA, ...(referer ? { Referer: referer } : {}) } });
     if (!res.ok || !res.body) return null;
     const buf = await res.arrayBuffer();
     if (buf.byteLength < 1024 || buf.byteLength > 5 * 1024 * 1024) return null;
@@ -509,6 +579,22 @@ async function downloadCover(coverUrl: string): Promise<{ buf: ArrayBuffer; ext:
   } catch {
     return null;
   }
+}
+
+/** 封面下载：优先给定 URL；失败或为空时网易云可走 meting pic 兜底 */
+async function downloadCover(
+  coverUrl: string,
+  source?: string,
+  songId?: string
+): Promise<{ buf: ArrayBuffer; ext: string } | null> {
+  if (coverUrl) {
+    const hit = await fetchImage(coverUrl);
+    if (hit) return hit;
+  }
+  if (source === "netease" && songId) {
+    return fetchImage(`https://api.injahow.cn/meting/?server=netease&type=pic&id=${encodeURIComponent(songId)}`);
+  }
+  return null;
 }
 
 async function getLyricSafe(id: string): Promise<string> {
@@ -555,7 +641,7 @@ app.post("/import", requireAdmin, async c => {
   if (!resolved) return fail(c, "解析失败：所有音源均不可用（VIP 付费或已下架），未入库", 502);
 
   const [coverRes, lyric] = await Promise.all([
-    downloadCover(coverUrl),
+    downloadCover(coverUrl, source, songId),
     source === "netease" ? getLyricSafe(songId) : metingLrc("tencent", songId),
   ]);
 
@@ -647,17 +733,30 @@ app.post("/url", requireAdmin, async c => {
     const title = String(body?.title ?? "").trim() || fallbackName;
     const artist = String(body?.artist ?? "").trim() || "网络音乐";
 
+    // 可选封面转存
+    let coverKey = "";
+    const coverUrl = String(body?.cover ?? "").trim();
+    if (coverUrl) {
+      const coverRes = await fetchImage(coverUrl);
+      if (coverRes) {
+        coverKey = newKey("cover", coverRes.ext);
+        await c.env.R2.put(coverKey, coverRes.buf, {
+          httpMetadata: { contentType: `image/${coverRes.ext === "jpg" ? "jpeg" : coverRes.ext}` },
+        });
+      }
+    }
+
     const audioKey = newKey("audio", ext);
     await c.env.R2.put(audioKey, buf, {
       httpMetadata: { contentType: AUDIO_MIME[ext] || "audio/mpeg" },
     });
 
     const r = await c.env.DB.prepare(
-      "INSERT INTO music_tracks (title, artist, source, source_id, audio_key) VALUES (?, ?, 'url', ?, ?)"
+      "INSERT INTO music_tracks (title, artist, source, source_id, audio_key, cover_key) VALUES (?, ?, 'url', ?, ?, ?)"
     )
-      .bind(title, artist, url.slice(0, 500), audioKey)
+      .bind(title, artist, url.slice(0, 500), audioKey, coverKey)
       .run();
-    return ok(c, { id: `t${r.meta.last_row_id}`, title, artist }, "转存成功");
+    return ok(c, { id: `t${r.meta.last_row_id}`, title, artist }, coverKey ? "转存成功" : "转存成功（封面获取失败，可忽略）");
   } catch (e) {
     return fail(c, `转存失败：${e instanceof Error ? e.message : "网络错误"}`, 502);
   }
