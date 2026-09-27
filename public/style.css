@@ -1520,7 +1520,7 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
 }
 .music-capsule:hover { box-shadow: var(--anzhiyu-shadow-border), 0 12px 32px -8px rgb(0 0 0 / 35%); }
 
-.music-seg { display: flex; align-items: center; flex-shrink: 0; position: relative; z-index: 1; }
+.music-seg { display: flex; align-items: center; flex-shrink: 0; }
 /* basis auto 让信息列按歌名实际长度撑开（长标题不再被压成固定 184px），
    宽度上限见 .music-info 的 max-width */
 .music-seg-info { flex: 1 1 auto; min-width: 0; gap: 10px; }
@@ -1659,9 +1659,10 @@ body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(-
 /* 进度轨：贴在胶囊底边横穿整个播放器（左右各内缩 10px 让圆角收得住），
    12px 透明命中区 + 4px 轨道，hover/拖动长出拖拽头。
    宽度不再跟着歌名长短浮动——旧写法放在 .music-info 里，短歌名会缩成一条小线段。
-   命中区会盖到控制键下缘几个像素，靠 .music-seg 的 z-index:1 让按键优先吃掉那段点击 */
+   z-index 抬到按键之上：胶囊只有 60px 高，任何够用的命中区都必然压住按键下缘几个
+   像素，两害相权宁可让条一定能拖，按键圆心仍远在那几个像素之外 */
 .music-progress {
-  position: absolute; left: 10px; right: 10px; bottom: 5px; height: 12px;
+  position: absolute; left: 10px; right: 10px; bottom: 5px; height: 12px; z-index: 2;
   display: flex; align-items: center; cursor: pointer; touch-action: pan-y;
 }
 .music-progress::before {
