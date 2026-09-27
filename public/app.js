@@ -7803,6 +7803,10 @@
               <svg class="h-pause" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
             </span>
           </div>
+          <button type="button" class="mcc-btn" aria-label="播放/暂停" title="播放/暂停">
+            <svg class="i-play" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg class="i-pause" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+          </button>
           <div class="mcc-info">
             <div class="mcc-name">${esc(meta.title)}</div>
             <div class="mcc-sub">
@@ -7810,15 +7814,9 @@
               <span class="mcc-now-lyric is-empty" data-mcc-now-lyric></span>
             </div>
           </div>
-          <div class="mcc-seg">
-            <button type="button" class="mcc-lyric-btn" data-mcc-lyric aria-label="歌词" title="歌词">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M14 3v2h3.59l-9.3 9.29 1.42 1.42L19 6.41V10h2V3h-7zM5 5v14h14v-7h-2v5H7V7h5V5H5z"/></svg>
-            </button>
-            <button type="button" class="mcc-btn" aria-label="播放/暂停" title="播放/暂停">
-              <svg class="i-play" viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-              <svg class="i-pause" viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
-            </button>
-          </div>
+          <button type="button" class="mcc-lyric-btn" data-mcc-lyric aria-label="歌词" title="歌词">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zm14-10v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
+          </button>
           <div class="mcc-bar"><i></i></div>
           <div class="mcc-lyric" data-mcc-lyric-panel><div class="mcc-lyric-empty">暂无歌词</div></div>`;
         card.querySelector(".mcc-btn").addEventListener("click", () => toggleMusicCard(card, id, meta));

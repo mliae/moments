@@ -1236,10 +1236,35 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
   }
 }
 
+/* ==================== 右下角悬浮物统一栅格 ====================
+   发布 / 返回顶部 / 目录 / 音乐播放器共用同一套尺寸、右边缘和纵向档位。
+   旧写法是各组件各挑断点（发布在 768 换档、另两个在 640 和 1024），
+   641~1024px 之间会出现两个按钮尺寸不同、右边缘差 16px 的错位。 */
+:root {
+  --fab-size: 52px;
+  --fab-right: 2rem;
+  --fab-gap: 12px;
+  --music-h: 56px;
+  --fab-base: calc(2rem + env(safe-area-inset-bottom, 0px));
+  --fab-bottom: var(--fab-base);
+}
+@media (max-width: 1024px) {
+  :root { --fab-size: 46px; --fab-right: 16px; --fab-base: calc(16px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 640px) {
+  :root { --fab-size: 42px; --fab-right: 12px; --fab-base: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
+/* 播放器可见时整栈抬到播放条上方（播放器自己始终坐 --fab-base，不参与抬升）。
+   播放器收起态实测 56px 高，各断点一致，所以 --music-h 不用跟着换档。
+   但"上一档的 bottom"必须写在用它的规则里，不能在 :root 定义 slot 变量：
+   :root 上的 var() 在 html 就替换完了，之后 body.music-visible 改 --fab-base 也追不上。 */
+body.music-visible { --fab-bottom: calc(var(--fab-base) + var(--music-h) + var(--fab-gap)); }
+
 /* ==================== 悬浮发布按钮 ==================== */
 .fab-publish {
-  position: fixed; right: 2rem; bottom: 2rem; z-index: 60;
-  width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
+  position: fixed; right: var(--fab-right); bottom: var(--fab-bottom); z-index: 60;
+  width: var(--fab-size); height: var(--fab-size);
+  display: flex; align-items: center; justify-content: center;
   border: none; border-radius: 50%; color: #fff; cursor: pointer;
   background: var(--anzhiyu-main);
   box-shadow: 0 8px 24px -6px var(--anzhiyu-main-op), 0 6px 20px -6px rgb(0 0 0 / 35%);
@@ -1248,9 +1273,6 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
 .fab-publish:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 12px 28px -6px var(--anzhiyu-main-op); }
 .fab-publish:active { transform: translateY(-1px) scale(.98); }
 .fab-publish[hidden] { display: none; }
-@media (max-width: 768px) {
-  .fab-publish { right: 1.1rem; bottom: 1.1rem; width: 46px; height: 46px; }
-}
 
 /* ==================== 后台管理页（bloom 侧栏布局） ==================== */
 .admin-wrap { max-width: 900px; margin: 0 auto; }   /* 登录页用 */
@@ -1432,7 +1454,7 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
 
 /* ==================== 音乐播放器 ==================== */
 .music-player {
-  position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 70;
+  position: fixed; right: var(--fab-right); bottom: var(--fab-base); z-index: 70;
   display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
 }
 .music-player[hidden] { display: none; }
@@ -1676,7 +1698,7 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
 
 /* 响应式：窄屏自适应布局 */
 @media (max-width: 640px) {
-  .music-player { right: .5rem; bottom: .5rem; left: .5rem; align-items: stretch; }
+  .music-player { right: var(--fab-right); bottom: var(--fab-base); left: var(--fab-right); align-items: stretch; }
   .music-playlist { width: 100%; max-height: 50vh; }
   /* 单行三段保持不折行：靠 info 段 flex 收缩吃掉宽度，标题省略号截断。
      高度要容下 标题+歌手+进度 三行，故比旧版 52px 高一档 */
@@ -1710,9 +1732,6 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
   .music-seg-aux .music-ctrl { width: 20px; height: 20px; }
   .music-title { font-size: .72rem; }
 }
-
-/* 音乐播放器可见时，FAB 上移避让 */
-body.music-visible .fab-publish { bottom: 6rem; }
 
 /* ==================== Markdown 编辑器工具栏 ==================== */
 /* Jxe 编辑器风格：白底工具条与编辑区一体化边框；按钮过多时自动换行，保证全部可见 */
@@ -1852,10 +1871,11 @@ body.music-visible .fab-publish { bottom: 6rem; }
   box-shadow: var(--anzhiyu-shadow-border);
   position: relative;
 }
-/* 歌词面板（说说/文章内卡片） */
+/* 歌词面板：向下展开。卡片在正文流里，向上顶会把读者刚看过的段落盖住，
+   而且卡片贴近视口顶部时面板直接跑到屏外，点了像没反应。 */
 .music-block-card .mcc-lyric {
-  display: none; position: absolute; left: 0; right: 0; bottom: 100%;
-  margin-bottom: 8px; max-height: 200px; overflow-y: auto;
+  display: none; position: absolute; left: 0; right: 0; top: 100%;
+  margin-top: 8px; max-height: 200px; overflow-y: auto;
   background: var(--anzhiyu-card-bg); border: var(--style-border-always);
   border-radius: 12px; padding: 10px 14px; text-align: center;
   font-size: .78rem; line-height: 1.9; color: var(--anzhiyu-secondtext);
@@ -1931,12 +1951,7 @@ body.music-visible .fab-publish { bottom: 6rem; }
   opacity: 0;
 }
 
-/* 控件组：分隔线 + 次要歌词键 + 主播放键 */
-.music-block-card .mcc-seg { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.music-block-card .mcc-seg::before {
-  content: ""; width: 1px; height: 24px; margin-right: 2px; flex-shrink: 0;
-  background: var(--anzhiyu-card-border);
-}
+/* 控件：播放键紧跟封面（阅读起点即主操作），歌词键降到最右、只用次级色区分 */
 .music-block-card .mcc-lyric-btn {
   width: 26px; height: 26px; flex-shrink: 0; border: none; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; padding: 0;
@@ -1982,7 +1997,6 @@ body.music-visible .fab-publish { bottom: 6rem; }
   .music-block-card .mcc-name { font-size: .8rem; }
   .music-block-card .mcc-btn { width: 36px; height: 36px; }
   .music-block-card .mcc-lyric-btn { width: 24px; height: 24px; }
-  .music-block-card .mcc-seg { gap: 6px; }
   .music-block-card .mcc-bar { border-radius: 0 0 14px 14px; }
   .music-block-card .mcc-lyric { max-height: 170px; font-size: .74rem; }
 }
@@ -2564,19 +2578,19 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 .toc-sidebar.collapsed .toc-sidebar-head { border-bottom: none; padding: 0; justify-content: center; }
 .toc-sidebar.collapsed .toc-sidebar-fold { transform: rotate(180deg); }
 
-/* 移动端：右下角悬浮按钮 + 底部抽屉 */
+/* 移动端：右下角悬浮按钮 + 底部抽屉。目录钮固定在返回顶部的上一档 */
 .toc-fab {
   display: none;
   position: fixed;
-  right: 16px;
-  bottom: calc(92px + env(safe-area-inset-bottom, 0px));
-  width: 46px;
-  height: 46px;
+  right: var(--fab-right);
+  bottom: calc(var(--fab-bottom) + var(--fab-size) + var(--fab-gap));
+  width: var(--fab-size);
+  height: var(--fab-size);
   border-radius: 50%;
   background: var(--anzhiyu-main);
   color: #fff;
   border: none;
-  box-shadow: 0 6px 18px rgb(0 0 0 / .2);
+  box-shadow: 0 8px 24px -6px var(--anzhiyu-main-op), 0 6px 20px -6px rgb(0 0 0 / 35%);
   z-index: 80;
   align-items: center;
   justify-content: center;
@@ -2624,19 +2638,14 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   .toc-sidebar { display: none !important; }
   .toc-fab { display: inline-flex; }
 }
-@media (max-width: 640px) {
-  .toc-fab { right: 12px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); width: 42px; height: 42px; }
-}
-
 /* ==================== 文章页返回顶部 ====================
-   与 .fab-publish 共用视觉规范（正圆 / 主色底 / 上浮反馈）。
-   位置分三档，均避开同时可见的悬浮物：
-   ≥1025px 右下角（音乐胶囊可见时上抬一档）；
-   ≤1024px 与 .toc-fab 组成纵向栈（占底格，目录钮上移一格）；
-   ≤640px 音乐播放器变全宽底条，整栈再抬过条高。 */
+   与发布 / 目录钮共用上面那套 --fab-* 栅格：默认坐贴底那一档；
+   首页发布 FAB 可见时让一档；音乐播放器可见时整栈由 body.music-visible 抬升，
+   不再需要每个组件各写一份断点位置。 */
 .back-top {
-  position: fixed; right: 2rem; bottom: 2rem; z-index: 60;
-  width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center;
+  position: fixed; right: var(--fab-right); bottom: var(--fab-bottom); z-index: 60;
+  width: var(--fab-size); height: var(--fab-size);
+  display: inline-flex; align-items: center; justify-content: center;
   border: none; border-radius: 50%; color: #fff; cursor: pointer; padding: 0;
   background: var(--anzhiyu-main);
   box-shadow: 0 8px 24px -6px var(--anzhiyu-main-op), 0 6px 20px -6px rgb(0 0 0 / 35%);
@@ -2650,36 +2659,12 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 .back-top:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 12px 28px -6px var(--anzhiyu-main-op); }
 .back-top:active { transform: translateY(-1px) scale(.98); }
 .back-top[hidden] { display: none; }
-
-@media (min-width: 1025px) {
-  body.music-visible .back-top { bottom: 6rem; }
-}
-@media (min-width: 641px) and (max-width: 1024px) {
-  .back-top { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 46px; height: 46px; }
-  /* 音乐胶囊占底部 24~76px，留出入场位移的余量后再叠目录钮 */
-  body.music-visible .back-top { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
-  body.music-visible .toc-fab { bottom: calc(146px + env(safe-area-inset-bottom, 0px)); }
-}
-@media (max-width: 640px) {
-  .back-top { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: 42px; height: 42px; }
-  /* 全宽播放条占底部 8~58px */
-  body.music-visible .back-top { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
-  body.music-visible .toc-fab { bottom: calc(128px + env(safe-area-inset-bottom, 0px)); }
-}
 @media (prefers-reduced-motion: reduce) {
   .back-top { transition: none; animation: none; transform: none; }
 }
 
-/* 首页右下角会被管理员的发布 FAB 占用（文章页 FAB 隐藏，不涉及），
-   此时返回顶部让到 FAB 上方一格；音乐播放器可见时 FAB 已抬到 96px，再让一格。 */
-.fab-publish:not([hidden]) ~ .back-top { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
-@media (max-width: 768px) {
-  .fab-publish:not([hidden]) ~ .back-top { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
-}
-body.music-visible .fab-publish:not([hidden]) ~ .back-top { bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
-@media (max-width: 768px) {
-  body.music-visible .fab-publish:not([hidden]) ~ .back-top { bottom: calc(154px + env(safe-area-inset-bottom, 0px)); }
-}
+/* 首页右下角被管理员的发布 FAB 占用（文章页发布 FAB 隐藏，不涉及），此时让一档 */
+.fab-publish:not([hidden]) ~ .back-top { bottom: calc(var(--fab-bottom) + var(--fab-size) + var(--fab-gap)); }
 
 /* ==================== 打赏卡片 ==================== */
 .reward-card {
