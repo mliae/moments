@@ -538,7 +538,7 @@ async function searchKuwo(kw: string, limit = 10): Promise<SearchHit[]> {
           title: name,
           artist: String(s.ARTIST ?? "").replace(/&nbsp;/g, " ").trim() || "未知歌手",
           album: String(s.ALBUM ?? "").replace(/&nbsp;/g, " ").trim(),
-          cover: pic ? `https://img4.kuwo.cn/star/albumcover/${pic.replace(/^\d+\//, "")}` : "",
+          cover: pic ? `https://img4.kuwo.cn/star/albumcover/${pic}` : "",
           vip: Number(s.PAY ?? 0) > 0,
           duration: Number(s.DURATION ?? 0),
         };
@@ -716,11 +716,14 @@ async function fetchImage(url: string): Promise<{ buf: ArrayBuffer; ext: string 
 }
 
 /** 封面下载：优先给定 URL；失败或为空时按来源兜底——
- *  网易→meting pic；QQ→单曲详情拿 albummid 拼 gtimg；酷狗→qijieya pic */
+ *  网易→meting pic；QQ→单曲详情拿 albummid 拼 gtimg；酷狗→qijieya pic；
+ *  酷我→120 小图升 500 大图，仍失败再跨平台网易同名封面 */
 async function downloadCover(
   coverUrl: string,
   source?: string,
-  songId?: string
+  songId?: string,
+  title?: string,
+  artist?: string
 ): Promise<{ buf: ArrayBuffer; ext: string } | null> {
   if (coverUrl) {
     const hit = await fetchImage(coverUrl);
@@ -735,6 +738,17 @@ async function downloadCover(
   }
   if (source === "kugou" && songId) {
     return fetchImage(`https://api.qijieya.cn/meting/?server=kugou&type=pic&id=${encodeURIComponent(songId)}`);
+  }
+  if (source === "kuwo") {
+    // 搜索结果给的是 120 小图，优先换 500 大图入库
+    if (coverUrl && coverUrl.includes("/120/")) {
+      const big = await fetchImage(coverUrl.replace(/\/120\//, "/500/"));
+      if (big) return big;
+    }
+    if (title) {
+      const neHits = await searchNetease(`${title} ${artist || ""}`.trim(), 1);
+      if (neHits[0]?.cover) return fetchImage(neHits[0].cover);
+    }
   }
   return null;
 }
@@ -794,7 +808,10 @@ app.post("/import", requireAdmin, async c => {
     return neHits[0] ? getLyricSafe(neHits[0].songId) : "";
   })();
 
-  const [coverRes, lyric] = await Promise.all([downloadCover(coverUrl, source, songId), lyricPromise]);
+  const [coverRes, lyric] = await Promise.all([
+    downloadCover(coverUrl, source, songId, title, artist),
+    lyricPromise,
+  ]);
 
   const ext = audioExt(resolved.buf);
   const audioKey = newKey("audio", ext);
