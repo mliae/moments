@@ -2547,6 +2547,17 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   .back-top { transition: none; animation: none; transform: none; }
 }
 
+/* 首页右下角会被管理员的发布 FAB 占用（文章页 FAB 隐藏，不涉及），
+   此时返回顶部让到 FAB 上方一格；音乐播放器可见时 FAB 已抬到 96px，再让一格。 */
+.fab-publish:not([hidden]) ~ .back-top { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+@media (max-width: 768px) {
+  .fab-publish:not([hidden]) ~ .back-top { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+}
+body.music-visible .fab-publish:not([hidden]) ~ .back-top { bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
+@media (max-width: 768px) {
+  body.music-visible .fab-publish:not([hidden]) ~ .back-top { bottom: calc(154px + env(safe-area-inset-bottom, 0px)); }
+}
+
 /* ==================== 打赏卡片 ==================== */
 .reward-card {
   margin: 1.2rem 0;

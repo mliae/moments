@@ -3454,9 +3454,10 @@
 
   function syncBackTop() {
     if (!backTop) return;
-    // 只服务长文：非文章页一律收起，避免与首页 FAB / 各视图抢右下角
+    // 只服务两类长页面：文章详情、首页无限下拉流
+    const p = location.pathname;
     const show =
-      location.pathname.startsWith("/post/") &&
+      (p === "/" || p.startsWith("/post/")) &&
       (window.scrollY || document.documentElement.scrollTop || 0) > 480;
     if (show === backTopShown) return;
     backTopShown = show;
