@@ -6042,7 +6042,7 @@
     // 站内音乐库列表
     const libBox = panel.querySelector("[data-music-library]");
     if (libBox) {
-      const SRC_LABEL = { netease: "网易云", qq: "QQ", upload: "上传", url: "外链" };
+      const SRC_LABEL = { netease: "网易云", qq: "QQ", kugou: "酷狗", kuwo: "酷我", upload: "上传", url: "外链" };
       const loadLibrary = async () => {
         try {
           const data = await api("/api/music/library");
@@ -8500,7 +8500,9 @@
       if (!hit) return;
       try {
         if (!hit._previewUrl) {
-          const d = await api(`/api/music/preview?source=${hit.source}&id=${encodeURIComponent(hit.songId)}`);
+          const d = await api(
+            `/api/music/preview?source=${hit.source}&id=${encodeURIComponent(hit.songId)}&title=${encodeURIComponent(hit.title || "")}&artist=${encodeURIComponent(hit.artist || "")}`
+          );
           hit._previewUrl = d.url;
         }
         previewAudio.src = hit._previewUrl;
@@ -8522,10 +8524,9 @@
       resultsBox.innerHTML = `<div class="emp-help"><span class="spinner"></span> 搜索中…</div>`;
       try {
         const data = await api(`/api/music/search?kw=${encodeURIComponent(kw)}`);
-        const hits = [
-          ...(data.netease || []).map(h => ({ ...h, sourceLabel: "网易云" })),
-          ...(data.qq || []).map(h => ({ ...h, sourceLabel: "QQ" })),
-        ];
+        const SRC_LB = { netease: "网易云", qq: "QQ", kugou: "酷狗", kuwo: "酷我" };
+        const hits = ["netease", "qq", "kugou", "kuwo"]
+          .flatMap(k => (data[k] || []).map(h => ({ ...h, sourceLabel: SRC_LB[k] || k })));
         if (!hits.length) {
           resultsBox.innerHTML = `<div class="emp-help">没有找到相关歌曲，换个关键词试试。</div>`;
           return;
