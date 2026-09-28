@@ -6171,14 +6171,20 @@
           <input type="range" name="music_volume" id="m_volume" min="0" max="1" step="0.05" value="${vol}" data-vol-range style="width:100%" />
         </div>
         <div class="field">
-          <label>网易云歌单 ID（纯数字，如 8152976493）</label>
-          <input name="music_playlist_id" maxlength="32" value="${esc(s.music_playlist_id)}" placeholder="8152976493" />
-        </div>
-        <div class="field">
           <label>自定义歌单 JSON 链接（可选，优先级高于网易云歌单）</label>
           <input name="music_custom_playlist" maxlength="500" value="${esc(s.music_custom_playlist)}" placeholder="https://.../playlist.json" />
           <div class="field-hint">JSON 格式：<code>[{"name":"歌名","artist":"歌手","url":"音频直链","cover":"封面URL"}]</code><br />填入 <code>/api/music/playlist.json</code> 播放全部启用曲目；<code>/api/music/playlist.json?tag=标签名</code> 播放指定标签的歌单。</div>
         </div>
+        <details class="admin-fold">
+          <summary class="admin-fold-summary">高级：网易云在线歌单（备用）</summary>
+          <div class="admin-fold-body">
+            <div class="field">
+              <label>网易云歌单 ID（纯数字，如 8152976493）</label>
+              <input name="music_playlist_id" maxlength="32" value="${esc(s.music_playlist_id)}" placeholder="8152976493" />
+              <div class="field-hint">仅当上方自定义歌单链接为空或拉取失败时，作为兜底直接在线解析该网易云歌单播放（不经过中央音乐库）。</div>
+            </div>
+          </div>
+        </details>
         <button class="btn primary" type="submit">保存音乐设置</button>
       </form>
 
