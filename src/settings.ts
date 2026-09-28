@@ -18,6 +18,9 @@ export interface SiteSettings {
   music_preload: boolean; // 页面加载后预解析第一首音源，点播放即时出声
   music_collapsed: boolean; // 初始折叠成球形
   music_volume: string; // 初始音量 0-1
+  // 中央音乐服务（music-api）
+  music_api_url: string; // 中央音乐解析服务地址（如 https://music-api.xxx.workers.dev）；留空=音乐库功能不可用
+  music_api_key: string; // 中央音乐服务 ApiKey（私密，不公开）
   // 品牌 / 作者
   brand_avatar: string; // 顶栏品牌头像（仅图片 URL；空=lucide 占位图标）
   author_name: string; // 说说作者昵称（卡片头像 fallback 取首字符）
@@ -125,6 +128,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   music_preload: true,
   music_collapsed: false,
   music_volume: "0.7",
+  music_api_url: "",
+  music_api_key: "",
   brand_avatar: "",
   author_name: "Jxe",
   author_avatar: "",
@@ -224,6 +229,8 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   music_playlist_id: 32,
   music_custom_playlist: 500,
   music_volume: 4,
+  music_api_url: 200,
+  music_api_key: 64,
   brand_avatar: 200,
   author_name: 32,
   author_avatar: 200,

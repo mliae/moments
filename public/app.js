@@ -6182,8 +6182,22 @@
         <button class="btn primary" type="submit">保存音乐设置</button>
       </form>
 
-      <div class="admin-panel-head" style="margin-top:1.75rem"><h3>站内音乐库</h3></div>
-      <p style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:-.4rem 0 1rem">文章中插入的音乐（<code>[music=tN]</code>）存在站内存储，不依赖第三方接口。停用后前台显示「音乐不可用」，删除会同时移除音频和封面文件。</p>
+      <div class="admin-panel-head" style="margin-top:1.75rem"><h3>中央音乐服务</h3></div>
+      <form class="settings-form" data-music-api-form style="max-width:680px">
+        <div class="field">
+          <label>服务地址（music-api Worker）</label>
+          <input name="music_api_url" maxlength="200" value="${esc(s.music_api_url || "")}" placeholder="https://music-api.xxx.workers.dev" />
+        </div>
+        <div class="field">
+          <label>ApiKey（在中央服务后台「授权」页生成）</label>
+          <input name="music_api_key" maxlength="64" value="${esc(s.music_api_key || "")}" placeholder="mk_..." autocomplete="off" />
+          <div class="field-hint">搜歌、试听、入库、曲库管理均由中央服务执行，本站不落地存储；服务地址留空时音乐库功能不可用。</div>
+        </div>
+        <button class="btn primary" type="submit">保存服务配置</button>
+      </form>
+
+      <div class="admin-panel-head" style="margin-top:1.75rem"><h3>音乐曲库</h3></div>
+      <p style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:-.4rem 0 1rem">文章中插入的音乐（<code>[music=tN]</code>）托管在中央音乐服务，停用后前台显示「音乐不可用」，删除会同时移除音频和封面文件。</p>
       <div data-music-library><div class="emp-help"><span class="spinner"></span> 加载中…</div></div>`;
 
     // 音量滑块实时显示
@@ -6198,7 +6212,7 @@
     // 站内音乐库列表
     const libBox = panel.querySelector("[data-music-library]");
     if (libBox) {
-      const SRC_LABEL = { netease: "网易云", qq: "QQ", kugou: "酷狗", kuwo: "酷我", upload: "上传", url: "外链" };
+      const SRC_LABEL = { netease: "网易云", qq: "QQ", kugou: "酷狗", kuwo: "酷我", qishui: "汽水", upload: "上传", url: "外链" };
       let libList = [];
       let tagFilter = "";
 
@@ -8852,8 +8866,8 @@
       resultsBox.innerHTML = `<div class="emp-help"><span class="spinner"></span> 搜索中…</div>`;
       try {
         const data = await api(`/api/music/search?kw=${encodeURIComponent(kw)}`);
-        const SRC_LB = { netease: "网易云", qq: "QQ", kugou: "酷狗", kuwo: "酷我" };
-        const hits = ["netease", "qq", "kugou", "kuwo"]
+        const SRC_LB = { netease: "网易云", qq: "QQ", kugou: "酷狗", kuwo: "酷我", qishui: "汽水" };
+        const hits = ["netease", "qq", "kugou", "kuwo", "qishui"]
           .flatMap(k => (data[k] || []).map(h => ({ ...h, sourceLabel: SRC_LB[k] || k })));
         if (!hits.length) {
           resultsBox.innerHTML = `<div class="emp-help">没有找到相关歌曲，换个关键词试试。</div>`;
@@ -9833,6 +9847,29 @@
         applySettings();
         initMusicPlayer();
         toast("音乐设置已保存");
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+      return;
+    }
+
+    /* ---------- 后台：中央音乐服务配置 ---------- */
+    const musicApiForm = e.target.closest("[data-music-api-form]");
+    if (musicApiForm) {
+      e.preventDefault();
+      const fd = new FormData(musicApiForm);
+      const patch = {
+        music_api_url: String(fd.get("music_api_url") || "").trim(),
+        music_api_key: String(fd.get("music_api_key") || "").trim(),
+      };
+      const btn = musicApiForm.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      try {
+        const s = await api("/api/admin/settings", { method: "PUT", body: patch });
+        state.settings = s;
+        toast("音乐服务配置已保存");
       } catch (err) {
         toast(err.message);
       } finally {

@@ -201,9 +201,10 @@ app.get("/api/settings", async c => {
   const {
     admin_path: _h1, apihz_id: _h2, apihz_key: _h3, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
     indexnow_key: _h7, baidu_push_token: _h8, mail_resend_key: _h9, security_webhook_url: _h10,
+    music_api_key: _h11,
     ...publicSettings
   } = s;
-  void [_h1, _h2, _h3, _h4, _h5, _h6, _h7, _h8, _h9, _h10];
+  void [_h1, _h2, _h3, _h4, _h5, _h6, _h7, _h8, _h9, _h10, _h11];
   const res = ok(c, publicSettings);
   res.headers.set("Cache-Control", "public, max-age=60, s-maxage=300");
   return res;
