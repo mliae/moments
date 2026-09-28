@@ -4746,10 +4746,10 @@
     ];
     const barList = (title, rows) => {
       const max = Math.max(1, ...rows.map(r => r.n));
-      return `<div class="an-block"><h4>${title}</h4>${rows.length ? rows.map(r => `
-        <div class="an-barrow"><span class="an-barname" title="${esc(r.name)}">${esc(r.name || "未知")}</span>
-          <span class="an-bartrack"><span class="an-barfill" style="width:${(r.n / max * 100).toFixed(1)}%"></span></span>
-          <span class="an-barnum">${r.n}</span></div>`).join("") : `<p class="an-empty">暂无数据</p>`}</div>`;
+      return `<div class="an-block"><h4>${title}</h4>${rows.length ? rows.map(r => {
+        const nm = r.href ? `<a href="${esc(r.href)}" target="_blank" rel="noopener nofollow" title="${esc(r.href)}">${esc(r.name || "未知")}</a>` : `<span title="${esc(r.name)}">${esc(r.name || "未知")}</span>`;
+        return `<div class="an-barrow"><span class="an-barname">${nm}</span><span class="an-bartrack"><span class="an-barfill" style="width:${(r.n / max * 100).toFixed(1)}%"></span></span><span class="an-barnum">${r.n}</span></div>`;
+      }).join("") : `<p class="an-empty">暂无数据</p>`}</div>`;
     };
     // 趋势图（PV/UV 双折线）
     const trend = s.trend || [];
@@ -4759,7 +4759,11 @@
     const y = v => H - pad - (v / maxV) * (H - pad * 2);
     const line = arr => trend.map((t, i) => `${x(i).toFixed(1)},${y(arr(t)).toFixed(1)}`).join(" ");
 
-    const visitors = (v.list || []).map(sess => {
+    const visitorList = v.list || [];
+    let vPage = 1;
+    const vPerPage = 15;
+    const vPages = Math.ceil(visitorList.length / vPerPage) || 1;
+    const visitorHtml = list => list.map(sess => {
       const loc = [sess.country, sess.region, sess.city].filter(Boolean).join(" · ") || "未知";
       const pages = sess.pages.map(p => `<span class="an-page" title="${esc(p.path || "/")}">${esc(pageName(p.path, p.title))}<i>${fmtDur(p.dur)}</i></span>`).join("");
       const t = new Date(sess.last);
@@ -4774,6 +4778,8 @@
         <div class="an-vpages">${pages}</div>
       </div>`;
     }).join("");
+    const vStart = (vPage - 1) * vPerPage;
+    const vPager = vPages > 1 ? `<div class="an-pager"><button type="button" class="btn sm" data-vprev ${vPage <= 1 ? "disabled" : ""}>上一页</button><span>${vPage} / ${vPages}</span><button type="button" class="btn sm" data-vnext ${vPage >= vPages ? "disabled" : ""}>下一页</button></div>` : "";
 
     panel.innerHTML = `
       ${head}
@@ -4791,12 +4797,27 @@
       </div>
       <div class="an-grid">
         ${barList("热门页面", s.topPaths.map(r => ({ name: pageName(r.name, r.title), n: r.n })))}
-        ${barList("来源网站", s.referrers.map(r => ({ name: (() => { try { return new URL(r.name).host; } catch { return r.name; } })(), n: r.n })))}
+        ${barList("来源网站", s.referrers.map(r => ({ name: (() => { try { return new URL(r.name).host; } catch { return r.name; } })(), href: /^https?:\/\//i.test(r.name) ? r.name : "", n: r.n })))}
         ${barList("国家/地区", s.countries)}
         ${barList("设备", s.devices)}
       </div>
-      <div class="an-block"><h4>最近访客（${(v.list || []).length} 个会话）</h4>
-        ${visitors || `<p class="an-empty">暂无访客记录</p>`}</div>`;
+      <div class="an-block"><h4>最近访客（${visitorList.length} 个会话）</h4>
+        <div id="anVisitorBox">${visitorHtml(visitorList.slice(vStart, vStart + vPerPage)) || `<p class="an-empty">暂无访客记录</p>`}</div>${vPager}</div>`;
+
+    const refreshVisitors = () => {
+      const box = panel.querySelector("#anVisitorBox");
+      const pager = panel.querySelector(".an-pager");
+      if (!box) return;
+      const start = (vPage - 1) * vPerPage;
+      box.innerHTML = visitorHtml(visitorList.slice(start, start + vPerPage)) || `<p class="an-empty">暂无访客记录</p>`;
+      if (pager) pager.innerHTML = `<button type="button" class="btn sm" data-vprev ${vPage <= 1 ? "disabled" : ""}>上一页</button><span>${vPage} / ${vPages}</span><button type="button" class="btn sm" data-vnext ${vPage >= vPages ? "disabled" : ""}>下一页</button>`;
+      bindVPager();
+    };
+    const bindVPager = () => {
+      panel.querySelector("[data-vprev]")?.addEventListener("click", () => { if (vPage > 1) { vPage--; refreshVisitors(); } });
+      panel.querySelector("[data-vnext]")?.addEventListener("click", () => { if (vPage < vPages) { vPage++; refreshVisitors(); } });
+    };
+    bindVPager();
 
     panel.querySelectorAll("[data-asub]").forEach(b => b.addEventListener("click", () => { analyticsSub = b.dataset.asub; renderAdminAnalytics(panel); }));
     panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); renderAdminAnalytics(panel); }));
@@ -4809,10 +4830,10 @@
     const hostOf = url => { try { return new URL(url).host; } catch { return url || "直接访问"; } };
     const barList = (title, rows) => {
       const max = Math.max(1, ...rows.map(r => r.n));
-      return `<div class="an-block"><h4>${title}</h4>${rows.length ? rows.map(r => `
-        <div class="an-barrow"><span class="an-barname" title="${esc(r.name)}">${esc(r.name || "未知")}</span>
-          <span class="an-bartrack"><span class="an-barfill" style="width:${(r.n / max * 100).toFixed(1)}%"></span></span>
-          <span class="an-barnum">${r.n}</span></div>`).join("") : `<p class="an-empty">暂无数据</p>`}</div>`;
+      return `<div class="an-block"><h4>${title}</h4>${rows.length ? rows.map(r => {
+        const nm = r.href ? `<a href="${esc(r.href)}" target="_blank" rel="noopener nofollow" title="${esc(r.href)}">${esc(r.name || "未知")}</a>` : `<span title="${esc(r.name)}">${esc(r.name || "未知")}</span>`;
+        return `<div class="an-barrow"><span class="an-barname">${nm}</span><span class="an-bartrack"><span class="an-barfill" style="width:${(r.n / max * 100).toFixed(1)}%"></span></span><span class="an-barnum">${r.n}</span></div>`;
+      }).join("") : `<p class="an-empty">暂无数据</p>`}</div>`;
     };
     let data;
     try {
@@ -4849,8 +4870,15 @@
             { label: "访客数", val: d.uv },
             { label: "平均停留", val: fmtDur(d.avgDuration) },
           ];
-          const visitors = (d.visitors || []).slice(0, 30).map(v => {
+          const visitorList2 = d.visitors || [];
+          let dPage = 1;
+          const dPerPage = 15;
+          const dPages = Math.ceil(visitorList2.length / dPerPage) || 1;
+          const visitorHtml2 = list => list.map(v => {
             const t = new Date(v.at);
+            const fromHtml = v.from && /^https?:\/\//i.test(v.from)
+              ? `<a class="an-vfrom" href="${esc(v.from)}" target="_blank" rel="noopener nofollow" title="${esc(v.from)}">${esc(hostOf(v.from))}</a>`
+              : `<span class="an-vfrom">直接访问</span>`;
             return `<div class="an-visitor">
               <div class="an-vhead">
                 <span class="an-vip" data-copy="${esc(v.ip)}" title="点击复制IP">${esc(shortIp(v.ip))}</span>
@@ -4858,14 +4886,29 @@
                 <span class="an-vdev">${esc(v.device)} · ${esc(v.os)} · ${esc(v.browser)}</span>
                 <span class="an-vtime">${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}</span>
                 <span class="an-vdur">${fmtDur(v.dur)}</span>
-                <span class="an-vfrom" title="${esc(v.from)}">${esc(hostOf(v.from))}</span>
+                ${fromHtml}
               </div></div>`;
           }).join("");
+          const dStart = (dPage - 1) * dPerPage;
+          const dPager = dPages > 1 ? `<div class="an-pager"><button type="button" class="btn sm" data-dprev ${dPage <= 1 ? "disabled" : ""}>上一页</button><span>${dPage} / ${dPages}</span><button type="button" class="btn sm" data-dnext ${dPage >= dPages ? "disabled" : ""}>下一页</button></div>` : "";
           detail.innerHTML = `
             <div class="ov-cards">${cards.map(c => `<div class="ov-card"><div class="ov-card-num">${c.val}</div><div class="ov-card-label">${c.label}</div></div>`).join("")}</div>
-            <div class="an-grid">${barList("来源", d.referrers.map(r=>({name:hostOf(r.name),n:r.n})))}${barList("地域", d.regions)}</div>
-            <div class="an-block"><h4>访客明细（${(d.visitors||[]).length} 条）</h4>${visitors || `<p class="an-empty">暂无记录</p>`}</div>`;
+            <div class="an-grid">${barList("来源", d.referrers.map(r=>({name:hostOf(r.name),href:/^https?:\/\//i.test(r.name)?r.name:"",n:r.n})))}${barList("地域", d.regions)}</div>
+            <div class="an-block"><h4>访客明细（${visitorList2.length} 条）</h4>
+              <div class="an-detail-visitors">${visitorHtml2(visitorList2.slice(dStart, dStart + dPerPage)) || `<p class="an-empty">暂无记录</p>`}</div>${dPager}</div>`;
           detail.dataset.loaded = "1";
+          const refreshDetailVisitors = () => {
+            const box = detail.querySelector(".an-detail-visitors");
+            const pager = detail.querySelector(".an-pager");
+            if (!box) return;
+            const start = (dPage - 1) * dPerPage;
+            box.innerHTML = visitorHtml2(visitorList2.slice(start, start + dPerPage)) || `<p class="an-empty">暂无记录</p>`;
+            if (pager) pager.innerHTML = `<button type="button" class="btn sm" data-dprev ${dPage <= 1 ? "disabled" : ""}>上一页</button><span>${dPage} / ${dPages}</span><button type="button" class="btn sm" data-dnext ${dPage >= dPages ? "disabled" : ""}>下一页</button>`;
+            detail.querySelector("[data-dprev]")?.addEventListener("click", () => { if (dPage > 1) { dPage--; refreshDetailVisitors(); } });
+            detail.querySelector("[data-dnext]")?.addEventListener("click", () => { if (dPage < dPages) { dPage++; refreshDetailVisitors(); } });
+          };
+          detail.querySelector("[data-dprev]")?.addEventListener("click", () => { if (dPage > 1) { dPage--; refreshDetailVisitors(); } });
+          detail.querySelector("[data-dnext]")?.addEventListener("click", () => { if (dPage < dPages) { dPage++; refreshDetailVisitors(); } });
         } catch (e) { detail.innerHTML = `<p>加载失败：${esc(e.message)}</p>`; }
       });
     });

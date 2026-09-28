@@ -2498,8 +2498,12 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 .an-post-toggle { font-size: .76rem; padding: .2rem .6rem; border-radius: 6px; border: var(--style-border); background: var(--anzhiyu-secondbg); color: var(--anzhiyu-secondtext); cursor: pointer; transition: all .15s; }
 .an-post-toggle:hover { color: var(--anzhiyu-main); border-color: var(--anzhiyu-main); }
 .an-post-detail { padding: 0 14px 14px; }
-.an-vfrom { font-size: .72rem; color: var(--anzhiyu-secondtext); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-vfrom { font-size: .72rem; color: var(--anzhiyu-main); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
+.an-vfrom:visited { color: var(--anzhiyu-main); }
 .post-pv-num { font-size: .72rem; color: var(--anzhiyu-main); }
+.an-pager { display: flex; align-items: center; gap: 10px; justify-content: center; padding: 10px 0 0; font-size: .8rem; color: var(--anzhiyu-secondtext); }
+.an-barname a { color: var(--anzhiyu-main); text-decoration: none; }
+.an-barname a:hover { text-decoration: underline; }
 .an-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem; }
 .an-block { background: var(--anzhiyu-card-bg); border: var(--style-border); border-radius: 12px; padding: .9rem 1rem; margin-top: 1rem; }
 .an-block h4 { margin: 0 0 .6rem; font-size: .92rem; color: var(--anzhiyu-main); }
