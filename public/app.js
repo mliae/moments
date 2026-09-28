@@ -5988,7 +5988,7 @@
         <div class="field">
           <label>自定义歌单 JSON 链接（可选，优先级高于网易云歌单）</label>
           <input name="music_custom_playlist" maxlength="500" value="${esc(s.music_custom_playlist)}" placeholder="https://.../playlist.json" />
-          <div class="field-hint">JSON 格式：<code>[{"name":"歌名","artist":"歌手","url":"音频直链","cover":"封面URL"}]</code><br />填入 <code>/api/music/playlist.json</code> 可让胶囊播放器播放下方站内音乐库的歌。</div>
+          <div class="field-hint">JSON 格式：<code>[{"name":"歌名","artist":"歌手","url":"音频直链","cover":"封面URL"}]</code><br />填入 <code>/api/music/playlist.json</code> 播放全部启用曲目；<code>/api/music/playlist.json?tag=标签名</code> 播放指定标签的歌单。</div>
         </div>
         <button class="btn primary" type="submit">保存音乐设置</button>
       </form>
@@ -6043,56 +6043,173 @@
     const libBox = panel.querySelector("[data-music-library]");
     if (libBox) {
       const SRC_LABEL = { netease: "网易云", qq: "QQ", kugou: "酷狗", kuwo: "酷我", upload: "上传", url: "外链" };
+      let libList = [];
+      let tagFilter = "";
+
+      const rowHtml = t => `
+          <div class="mlib-item${t.enabled ? "" : " is-off"}">
+            <input type="checkbox" class="mlib-check" data-mlib-check="${esc(t.id)}" title="选择" />
+            ${t.cover_url ? `<img class="mlib-cover" src="${esc(t.cover_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="mlib-cover">${svgIcon("music", 18)}</span>`}
+            <div class="mlib-info">
+              <div class="mlib-name">${esc(t.title)}${t.vip ? '<span class="emp-vip">VIP</span>' : ""}<span class="emp-src">${SRC_LABEL[t.source] || esc(t.source)}</span>${t.tag ? `<span class="mlib-tag">${esc(t.tag)}</span>` : ""}${!t.has_cover || !t.has_lyric ? `<span class="mlib-miss">缺${[!t.has_cover ? "封面" : "", !t.has_lyric ? "歌词" : ""].filter(Boolean).join("/")}</span>` : ""}</div>
+              <div class="mlib-artist">${esc(t.artist)}${t.album ? " · " + esc(t.album) : ""} · ${esc(t.id)}</div>
+            </div>
+            ${!t.has_cover || !t.has_lyric ? `<button type="button" class="btn sm" data-mlib-fill="${esc(t.id)}">补全</button>` : ""}
+            <label class="toggle" title="${t.enabled ? "停用" : "启用"}"><input type="checkbox" data-mlib-toggle="${esc(t.id)}" ${t.enabled ? "checked" : ""} /><span></span></label>
+            <button type="button" class="btn sm ghost" data-mlib-del="${esc(t.id)}">删除</button>
+          </div>`;
+
+      const renderRows = () => {
+        const rowsBox = libBox.querySelector("[data-mlib-rows]");
+        if (!rowsBox) return;
+        const shown = tagFilter ? libList.filter(t => t.tag === tagFilter) : libList;
+        rowsBox.innerHTML = shown.length
+          ? shown.map(rowHtml).join("")
+          : `<div class="emp-help">该标签下暂无曲目。</div>`;
+      };
+
       const loadLibrary = async () => {
         try {
           const data = await api("/api/music/library");
-          const list = data.list || [];
-          if (!list.length) {
+          libList = data.list || [];
+          if (!libList.length) {
             libBox.innerHTML = `<div class="emp-help">曲库还是空的。在文章/说说编辑器点「插入音乐」即可搜歌入库、上传本地音乐或转存网络音频。</div>`;
             return;
           }
-          libBox.innerHTML = `<div class="mlib-list">${list
-            .map(
-              t => `
-          <div class="mlib-item${t.enabled ? "" : " is-off"}">
-            ${t.cover_url ? `<img class="mlib-cover" src="${esc(t.cover_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="mlib-cover">${svgIcon("music", 18)}</span>`}
-            <div class="mlib-info">
-              <div class="mlib-name">${esc(t.title)}${t.vip ? '<span class="emp-vip">VIP</span>' : ""}<span class="emp-src">${SRC_LABEL[t.source] || esc(t.source)}</span></div>
-              <div class="mlib-artist">${esc(t.artist)}${t.album ? " · " + esc(t.album) : ""} · ${esc(t.id)}</div>
-            </div>
-            <label class="toggle" title="${t.enabled ? "停用" : "启用"}"><input type="checkbox" data-mlib-toggle="${esc(t.id)}" ${t.enabled ? "checked" : ""} /><span></span></label>
-            <button type="button" class="btn sm ghost" data-mlib-del="${esc(t.id)}">删除</button>
-          </div>`
-            )
-            .join("")}</div>`;
+          const tags = [...new Set(libList.map(t => t.tag).filter(Boolean))];
+          const missing = libList.filter(t => !t.has_cover || !t.has_lyric).length;
+          libBox.innerHTML = `
+          <div class="mlib-bar">
+            <label class="mlib-all"><input type="checkbox" data-mlib-all /> 全选</label>
+            <input type="text" data-mlib-tag-input placeholder="标签名，如：最爱" maxlength="30" />
+            <button type="button" class="btn sm" data-mlib-tag-set>打标签</button>
+            <button type="button" class="btn sm ghost" data-mlib-tag-clear>清除标签</button>
+            <select data-mlib-tag-filter><option value="">全部标签</option>${tags.map(t => `<option value="${esc(t)}"${t === tagFilter ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
+            <button type="button" class="btn sm" data-mlib-fill-all>一键补全${missing ? `（缺 ${missing} 首）` : ""}</button>
+          </div>
+          <div class="mlib-list" data-mlib-rows></div>
+          <div class="emp-help" style="margin-top:.6rem">歌单链接：<code>/api/music/playlist.json</code> = 全部启用曲目；<code>/api/music/playlist.json?tag=最爱</code> = 指定标签的歌单，填入上方「自定义歌单 JSON 链接」即可。</div>`;
+          renderRows();
         } catch (e) {
           libBox.innerHTML = `<div class="emp-help">${esc(e.message || "加载失败")}</div>`;
         }
       };
+
+      const checkedIds = () => [...libBox.querySelectorAll("[data-mlib-check]:checked")].map(cb => cb.dataset.mlibCheck);
+      const fillMsg = d => {
+        const okParts = [d.cover === "ok" ? "封面" : "", d.lyric === "ok" ? "歌词" : ""].filter(Boolean);
+        const failParts = [d.cover === "fail" ? "封面" : "", d.lyric === "fail" ? "歌词" : ""].filter(Boolean);
+        if (!okParts.length && !failParts.length) return "封面和歌词都已存在";
+        return [okParts.length ? okParts.join("、") + "已补" : "", failParts.length ? failParts.join("、") + "补全失败" : ""].filter(Boolean).join("，");
+      };
+
       libBox.addEventListener("change", async e => {
         const cb = e.target.closest("[data-mlib-toggle]");
-        if (!cb) return;
-        try {
-          await api("/api/music/library/toggle", { body: { id: cb.dataset.mlibToggle, enabled: cb.checked } });
-          toast(cb.checked ? "已启用" : "已停用");
-          cb.closest(".mlib-item").classList.toggle("is-off", !cb.checked);
-        } catch (err) {
-          toast(err.message || "操作失败");
-          cb.checked = !cb.checked;
+        if (cb) {
+          try {
+            await api("/api/music/library/toggle", { body: { id: cb.dataset.mlibToggle, enabled: cb.checked } });
+            toast(cb.checked ? "已启用" : "已停用");
+            cb.closest(".mlib-item").classList.toggle("is-off", !cb.checked);
+            const t = libList.find(x => x.id === cb.dataset.mlibToggle);
+            if (t) t.enabled = cb.checked;
+          } catch (err) {
+            toast(err.message || "操作失败");
+            cb.checked = !cb.checked;
+          }
+          return;
+        }
+        const all = e.target.closest("[data-mlib-all]");
+        if (all) {
+          libBox.querySelectorAll("[data-mlib-check]").forEach(c => (c.checked = all.checked));
+          return;
+        }
+        const filter = e.target.closest("[data-mlib-tag-filter]");
+        if (filter) {
+          tagFilter = filter.value;
+          renderRows();
         }
       });
+
       libBox.addEventListener("click", async e => {
         const del = e.target.closest("[data-mlib-del]");
-        if (!del) return;
-        if (!confirm("删除后音频和封面文件会一并移除，确定删除？")) return;
-        del.disabled = true;
-        try {
-          await api("/api/music/library/delete", { body: { id: del.dataset.mlibDel } });
-          toast("已删除");
+        if (del) {
+          if (!confirm("删除后音频和封面文件会一并移除，确定删除？")) return;
+          del.disabled = true;
+          try {
+            await api("/api/music/library/delete", { body: { id: del.dataset.mlibDel } });
+            toast("已删除");
+            loadLibrary();
+          } catch (err) {
+            del.disabled = false;
+            toast(err.message || "删除失败");
+          }
+          return;
+        }
+        const fill = e.target.closest("[data-mlib-fill]");
+        if (fill) {
+          fill.disabled = true;
+          fill.textContent = "补全中…";
+          try {
+            const d = await api("/api/music/library/fill", { body: { id: fill.dataset.mlibFill } });
+            toast(fillMsg(d || {}));
+            loadLibrary();
+          } catch (err) {
+            fill.disabled = false;
+            fill.textContent = "补全";
+            toast(err.message || "补全失败");
+          }
+          return;
+        }
+        const tagSet = e.target.closest("[data-mlib-tag-set]");
+        if (tagSet) {
+          const ids = checkedIds();
+          const tag = libBox.querySelector("[data-mlib-tag-input]").value.trim();
+          if (!ids.length) return toast("请先勾选曲目");
+          if (!tag) return toast("请输入标签名");
+          tagSet.disabled = true;
+          try {
+            await api("/api/music/library/tag", { body: { ids, tag } });
+            toast(`已给 ${ids.length} 首打上「${tag}」标签`);
+            loadLibrary();
+          } catch (err) {
+            tagSet.disabled = false;
+            toast(err.message || "设置失败");
+          }
+          return;
+        }
+        const tagClear = e.target.closest("[data-mlib-tag-clear]");
+        if (tagClear) {
+          const ids = checkedIds();
+          if (!ids.length) return toast("请先勾选曲目");
+          tagClear.disabled = true;
+          try {
+            await api("/api/music/library/tag", { body: { ids, tag: "" } });
+            toast(`已清除 ${ids.length} 首的标签`);
+            loadLibrary();
+          } catch (err) {
+            tagClear.disabled = false;
+            toast(err.message || "操作失败");
+          }
+          return;
+        }
+        const fillAll = e.target.closest("[data-mlib-fill-all]");
+        if (fillAll) {
+          const targets = libList.filter(t => !t.has_cover || !t.has_lyric);
+          if (!targets.length) return toast("没有缺封面或歌词的曲目");
+          if (!confirm(`将逐首补全 ${targets.length} 首曲目的封面/歌词，需要逐个请求上游接口，继续？`)) return;
+          fillAll.disabled = true;
+          let done = 0;
+          for (let i = 0; i < targets.length; i++) {
+            fillAll.textContent = `补全中 ${i + 1}/${targets.length}…`;
+            try {
+              const d = await api("/api/music/library/fill", { body: { id: targets[i].id } });
+              if (d && (d.cover === "ok" || d.lyric === "ok")) done++;
+            } catch {
+              // 单首失败不影响整体
+            }
+          }
+          toast(`补全完成：${done}/${targets.length} 首有更新`);
           loadLibrary();
-        } catch (err) {
-          del.disabled = false;
-          toast(err.message || "删除失败");
         }
       });
       loadLibrary();
@@ -8392,6 +8509,7 @@
         </div>
       </div>
       <div class="emp-body" data-emp-pane="lib" hidden>
+        <div class="emp-row"><input type="text" data-emp-lib-filter placeholder="筛选：歌名 / 歌手 / 标签" /></div>
         <div class="emp-results" data-emp-lib><div class="emp-help">加载中…</div></div>
       </div>
       <div class="emp-body" data-emp-pane="upload" hidden>
@@ -8445,33 +8563,43 @@
       panel.remove();
     };
 
-    /* ---- 我的曲库：一键插入 ---- */
-    const renderLib = async () => {
-      libBox.innerHTML = `<div class="emp-help"><span class="spinner"></span> 加载中…</div>`;
-      try {
-        const data = await api("/api/music/library");
-        const list = data.list || [];
-        if (!list.length) {
-          libBox.innerHTML = `<div class="emp-help">曲库还是空的，去「搜歌入库」添加吧。</div>`;
-          return;
-        }
-        libBox.innerHTML = list
-          .map(
-            t => `
+    /* ---- 我的曲库：一键插入（支持按歌名/歌手/标签筛选） ---- */
+    const libFilter = panel.querySelector("[data-emp-lib-filter]");
+    let libCache = [];
+    const renderLibRows = () => {
+      const q = (libFilter.value || "").trim().toLowerCase();
+      const shown = q
+        ? libCache.filter(t => `${t.title} ${t.artist} ${t.album || ""} ${t.tag || ""}`.toLowerCase().includes(q))
+        : libCache;
+      if (!shown.length) {
+        libBox.innerHTML = `<div class="emp-help">${q ? "没有匹配的曲目。" : "曲库还是空的，去「搜歌入库」添加吧。"}</div>`;
+        return;
+      }
+      libBox.innerHTML = shown
+        .map(
+          t => `
         <div class="emp-item">
           ${t.cover_url ? `<img class="emp-cover" src="${esc(t.cover_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="emp-cover emp-cover--ph">${svgIcon("music", 18)}</span>`}
           <div class="emp-info">
-            <div class="emp-name">${esc(t.title)}${t.enabled ? "" : '<span class="emp-src">已停用</span>'}</div>
+            <div class="emp-name">${esc(t.title)}${t.tag ? `<span class="emp-src">${esc(t.tag)}</span>` : ""}${t.enabled ? "" : '<span class="emp-src">已停用</span>'}</div>
             <div class="emp-artist">${esc(t.artist)}${t.album ? " · " + esc(t.album) : ""} · ${esc(t.id)}</div>
           </div>
           <button type="button" class="btn" data-emp-use="${esc(t.id)}">插入</button>
         </div>`
-          )
-          .join("");
+        )
+        .join("");
+    };
+    const renderLib = async () => {
+      libBox.innerHTML = `<div class="emp-help"><span class="spinner"></span> 加载中…</div>`;
+      try {
+        const data = await api("/api/music/library");
+        libCache = data.list || [];
+        renderLibRows();
       } catch (e) {
         libBox.innerHTML = `<div class="emp-help">${esc(e.message || "曲库加载失败")}</div>`;
       }
     };
+    libFilter.addEventListener("input", renderLibRows);
     libBox.addEventListener("click", e => {
       const use = e.target.closest("[data-emp-use]");
       if (!use) return;

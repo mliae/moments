@@ -818,6 +818,11 @@ async function downloadCover(
       if (neHits[0]?.cover) return fetchImage(neHits[0].cover);
     }
   }
+  // 最终兜底：有歌名就跨平台搜网易同名封面（upload/url 等无来源封面场景）
+  if (title) {
+    const neHits = await searchNetease(`${title} ${artist || ""}`.trim(), 1);
+    if (neHits[0]?.cover) return fetchImage(neHits[0].cover);
+  }
   return null;
 }
 
@@ -1021,13 +1026,21 @@ app.get("/track", async c => {
   });
 });
 
-/** 胶囊播放器歌单（公开）：GET /api/music/playlist.json
- *  自定义歌单格式纯数组 [{ id, name, artist, url, pic, lrc }]，后台 music_custom_playlist 填此 URL */
+/** 胶囊播放器歌单（公开）：GET /api/music/playlist.json[?tag=xxx]
+ *  自定义歌单格式纯数组 [{ id, name, artist, url, pic, lrc }]，后台 music_custom_playlist 填此 URL；
+ *  带 tag 参数时只输出该标签下的启用曲目，可实现多歌单 */
 app.get("/playlist.json", async c => {
   const s = await getSettings(c.env.DB);
-  const { results } = await c.env.DB.prepare(
-    "SELECT id, title, artist, audio_key, cover_key, lyric FROM music_tracks WHERE enabled = 1 ORDER BY id DESC LIMIT 500"
-  ).all<{ id: number; title: string; artist: string; audio_key: string; cover_key: string; lyric: string }>();
+  const tag = (c.req.query("tag") || "").trim().slice(0, 30);
+  const { results } = tag
+    ? await c.env.DB.prepare(
+        "SELECT id, title, artist, audio_key, cover_key, lyric FROM music_tracks WHERE enabled = 1 AND tag = ? ORDER BY id DESC LIMIT 500"
+      )
+        .bind(tag)
+        .all<{ id: number; title: string; artist: string; audio_key: string; cover_key: string; lyric: string }>()
+    : await c.env.DB.prepare(
+        "SELECT id, title, artist, audio_key, cover_key, lyric FROM music_tracks WHERE enabled = 1 ORDER BY id DESC LIMIT 500"
+      ).all<{ id: number; title: string; artist: string; audio_key: string; cover_key: string; lyric: string }>();
   const list = (results || []).map(r => ({
     id: `t${r.id}`,
     name: r.title,
@@ -1043,7 +1056,7 @@ app.get("/playlist.json", async c => {
 app.get("/library", requireAdmin, async c => {
   const s = await getSettings(c.env.DB);
   const { results } = await c.env.DB.prepare(
-    "SELECT id, title, artist, album, source, source_id, vip, audio_key, cover_key, duration, enabled, created_at FROM music_tracks ORDER BY id DESC LIMIT 1000"
+    "SELECT id, title, artist, album, source, source_id, vip, audio_key, cover_key, duration, enabled, tag, LENGTH(lyric) AS lyric_len, created_at FROM music_tracks ORDER BY id DESC LIMIT 1000"
   ).all<{
     id: number;
     title: string;
@@ -1056,6 +1069,8 @@ app.get("/library", requireAdmin, async c => {
     cover_key: string;
     duration: number;
     enabled: number;
+    tag: string;
+    lyric_len: number;
     created_at: string;
   }>();
   const list = (results || []).map(r => ({
@@ -1067,11 +1082,89 @@ app.get("/library", requireAdmin, async c => {
     vip: !!r.vip,
     duration: r.duration,
     enabled: !!r.enabled,
+    tag: r.tag,
+    has_cover: !!r.cover_key,
+    has_lyric: r.lyric_len > 0,
     created_at: r.created_at,
     audio_url: r.audio_key ? keyToSrc(r.audio_key, s.r2_domain) : "",
     cover_url: r.cover_key ? keyToSrc(r.cover_key, s.r2_domain) : "",
   }));
   return ok(c, { list, total: list.length });
+});
+
+/** 批量设置标签：POST /api/music/library/tag { ids: ["t1","t2"], tag: "最爱" }（tag 为空即清除） */
+app.post("/library/tag", requireAdmin, async c => {
+  const body = await c.req.json().catch(() => null);
+  const ids = (Array.isArray(body?.ids) ? body.ids : [])
+    .map((v: unknown) => Number(String(v).replace(/^t/, "")))
+    .filter((n: number) => Number.isInteger(n) && n > 0)
+    .slice(0, 200);
+  const tag = String(body?.tag ?? "").trim().slice(0, 30);
+  if (!ids.length) return fail(c, "请先勾选曲目", 400);
+  const stmts = ids.map((id: number) =>
+    c.env.DB.prepare("UPDATE music_tracks SET tag = ? WHERE id = ?").bind(tag, id)
+  );
+  await c.env.DB.batch(stmts);
+  return ok(c, { count: ids.length, tag }, tag ? `已给 ${ids.length} 首打上「${tag}」标签` : `已清除 ${ids.length} 首的标签`);
+});
+
+/** 补全封面/歌词：POST /api/music/library/fill { id: "tN" }
+ *  按来源链路重拉缺失的封面（存 R2）与歌词（存 D1）；已有的项不覆盖 */
+app.post("/library/fill", requireAdmin, async c => {
+  const body = await c.req.json().catch(() => null);
+  const id = Number(String(body?.id ?? "").replace(/^t/, ""));
+  if (!id) return fail(c, "参数错误", 400);
+  const row = await c.env.DB.prepare(
+    "SELECT id, title, artist, source, source_id, cover_key, lyric FROM music_tracks WHERE id = ?"
+  )
+    .bind(id)
+    .first<{ id: number; title: string; artist: string; source: string; source_id: string; cover_key: string; lyric: string }>();
+  if (!row) return fail(c, "曲目不存在", 404);
+
+  const result: { cover: "ok" | "exists" | "fail"; lyric: "ok" | "exists" | "fail" } = { cover: "exists", lyric: "exists" };
+
+  // 封面：按来源链路重拉（upload/url 走 downloadCover 末尾的跨平台兜底）
+  if (!row.cover_key) {
+    const coverRes = await downloadCover("", row.source, row.source_id, row.title, row.artist);
+    if (coverRes) {
+      const coverKey = newKey("cover", coverRes.ext);
+      await c.env.R2.put(coverKey, coverRes.buf, {
+        httpMetadata: { contentType: `image/${coverRes.ext === "jpg" ? "jpeg" : coverRes.ext}` },
+      });
+      await c.env.DB.prepare("UPDATE music_tracks SET cover_key = ? WHERE id = ?").bind(coverKey, id).run();
+      result.cover = "ok";
+    } else {
+      result.cover = "fail";
+    }
+  }
+
+  // 歌词：网易直接取；QQ/酷狗走 meting；其余跨平台搜网易同名歌词
+  if (!row.lyric) {
+    let lyric = "";
+    if (row.source === "netease" && row.source_id) {
+      lyric = await getLyricSafe(row.source_id);
+    } else if (row.source === "qq" && row.source_id) {
+      lyric = await metingLrc("tencent", row.source_id);
+    } else if (row.source === "kugou" && row.source_id) {
+      lyric = await metingLrc("kugou", row.source_id);
+    }
+    if (!lyric && row.title) {
+      const neHits = await searchNetease(`${row.title} ${row.artist}`.trim(), 1);
+      if (neHits[0]) lyric = await getLyricSafe(neHits[0].songId);
+    }
+    if (lyric) {
+      await c.env.DB.prepare("UPDATE music_tracks SET lyric = ? WHERE id = ?").bind(lyric, id).run();
+      result.lyric = "ok";
+    } else {
+      result.lyric = "fail";
+    }
+  }
+
+  const parts = [
+    result.cover === "ok" ? "封面已补" : result.cover === "fail" ? "封面补全失败" : "",
+    result.lyric === "ok" ? "歌词已补" : result.lyric === "fail" ? "歌词补全失败" : "",
+  ].filter(Boolean);
+  return ok(c, { id: `t${id}`, ...result }, parts.join("，") || "封面和歌词都已存在，无需补全");
 });
 
 /** 启用/停用：POST /api/music/library/toggle { id: "tN", enabled: bool } */

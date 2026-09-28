@@ -237,9 +237,11 @@ CREATE TABLE IF NOT EXISTS music_tracks (
   lyric      TEXT NOT NULL DEFAULT '',
   duration   INTEGER NOT NULL DEFAULT 0,
   enabled    INTEGER NOT NULL DEFAULT 1,
+  tag        TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_music_tracks_enabled ON music_tracks (enabled, id);
+CREATE INDEX IF NOT EXISTS idx_music_tracks_tag ON music_tracks (tag);
 `;
 
 let schemaPromise: Promise<void> | null = null;
