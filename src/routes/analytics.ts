@@ -227,6 +227,58 @@ adminApp.get("/summary", requireAdmin, async c => {
   });
 });
 
+/* ---------------- 后台：文章统计列表 ---------------- */
+adminApp.get("/posts", requireAdmin, async c => {
+  const db = c.env.DB;
+  const days = Math.max(1, Math.min(90, Number(c.req.query("days")) || 7));
+  const where = `created_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${days} days')`;
+  const rows = await db
+    .prepare(
+      `SELECT path, MIN(title) AS title, COUNT(*) AS pv, COUNT(DISTINCT ip) AS uv,
+              ROUND(AVG(CASE WHEN duration > 0 THEN duration END), 1) AS avg_dur,
+              MAX(created_at) AS last_visit
+       FROM analytics_pv WHERE ${where} AND path LIKE '/post/%'
+       GROUP BY path ORDER BY pv DESC LIMIT 100`
+    )
+    .all<{ path: string; title: string | null; pv: number; uv: number; avg_dur: number | null; last_visit: string }>();
+  return ok(c, { days, posts: rows.results || [] });
+});
+
+/* ---------------- 后台：单篇文章统计详情 ---------------- */
+adminApp.get("/post", requireAdmin, async c => {
+  const db = c.env.DB;
+  const path = (c.req.query("path") || "").slice(0, 300);
+  if (!path) return ok(c, { error: "缺少 path 参数" });
+  const days = Math.max(1, Math.min(90, Number(c.req.query("days")) || 7));
+  const where = `created_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${days} days') AND path = ?`;
+
+  const batch = await db.batch([
+    db.prepare(`SELECT COUNT(*) AS pv, COUNT(DISTINCT ip) AS uv, ROUND(AVG(CASE WHEN duration > 0 THEN duration END),1) AS avg_dur FROM analytics_pv WHERE ${where}`).bind(path),
+    db.prepare(`SELECT referrer, COUNT(*) AS n FROM analytics_pv WHERE ${where} AND referrer <> '' GROUP BY referrer ORDER BY n DESC LIMIT 8`).bind(path),
+    db.prepare(`SELECT country, region, city, COUNT(*) AS n FROM analytics_pv WHERE ${where} GROUP BY country, region, city ORDER BY n DESC LIMIT 8`).bind(path),
+    db.prepare(
+      `SELECT id, created_at, country, region, city, isp, ip, device, browser, os, sid, duration, referrer
+       FROM analytics_pv WHERE ${where} ORDER BY created_at DESC LIMIT 200`
+    ).bind(path),
+  ]);
+
+  const summary = batch[0].results[0] as { pv: number; uv: number; avg_dur: number | null };
+  const referrers = (batch[1].results as Array<{ referrer: string; n: number }>).map(r => ({ name: r.referrer, n: r.n }));
+  const regions = (batch[2].results as Array<{ country: string; region: string; city: string; n: number }>).map(r => ({
+    name: [r.country, r.region, r.city].filter(Boolean).join(" · ") || "未知", n: r.n,
+  }));
+  const visitors = (batch[3].results as Array<{
+    id: number; created_at: string; country: string; region: string; city: string; isp: string;
+    ip: string; device: string; browser: string; os: string; sid: string; duration: number; referrer: string;
+  }>).map(r => ({
+    at: r.created_at, ip: r.ip, loc: [r.country, r.region, r.city].filter(Boolean).join(" · ") || "未知",
+    isp: r.isp, device: r.device, browser: r.browser, os: r.os, dur: r.duration || 0,
+    from: r.referrer || "", sid: r.sid,
+  }));
+
+  return ok(c, { path, days, pv: Number(summary?.pv ?? 0), uv: Number(summary?.uv ?? 0), avgDuration: Math.round(Number(summary?.avg_dur ?? 0)), referrers, regions, visitors });
+});
+
 /* ---------------- 后台：最近访客（按会话聚合） ---------------- */
 adminApp.get("/visitors", requireAdmin, async c => {
   const db = c.env.DB;

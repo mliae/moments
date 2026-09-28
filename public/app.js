@@ -4702,16 +4702,23 @@
 
   /* ---------- 后台 Tab：访问统计 ---------- */
   let analyticsDays = 7;
+  let analyticsSub = "overview";
   async function renderAdminAnalytics(panel) {
     const head = `
       <div class="ov-chart-head" style="margin-bottom:1rem">
         <h3>访问统计</h3>
+        <span class="an-subtabs">
+          <button type="button" class="an-subtab ${analyticsSub === "overview" ? "on" : ""}" data-asub="overview">总览</button>
+          <button type="button" class="an-subtab ${analyticsSub === "posts" ? "on" : ""}" data-asub="posts">文章统计</button>
+        </span>
         <span class="an-days">
           ${[7, 30, 90].map(d => `<button type="button" class="an-daybtn ${analyticsDays === d ? "on" : ""}" data-andays="${d}">${d}天</button>`).join("")}
         </span>
       </div>`;
     panel.innerHTML = `${head}<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
+    panel.querySelectorAll("[data-asub]").forEach(b => b.addEventListener("click", () => { analyticsSub = b.dataset.asub; renderAdminAnalytics(panel); }));
     panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); renderAdminAnalytics(panel); }));
+    if (analyticsSub === "posts") return renderAnalyticsPosts(panel, head);
 
     let s, v;
     try {
@@ -4792,6 +4799,75 @@
         ${visitors || `<p class="an-empty">暂无访客记录</p>`}</div>`;
 
     panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); renderAdminAnalytics(panel); }));
+  }
+
+  /* ---------- 文章统计子标签 ---------- */
+  async function renderAnalyticsPosts(panel, head) {
+    const fmtDur = sec => { sec = Number(sec) || 0; const m = Math.floor(sec / 60), r = Math.round(sec % 60); return m ? `${m}分${r}秒` : `${r}秒`; };
+    const shortIp = ip => { if (!ip) return "隐藏"; if (!ip.includes(":")) return ip; const s = ip.split(":").filter(Boolean); return s.length > 3 ? s.slice(0,3).join(":")+"…" : ip; };
+    const hostOf = url => { try { return new URL(url).host; } catch { return url || "直接访问"; } };
+    const barList = (title, rows) => {
+      const max = Math.max(1, ...rows.map(r => r.n));
+      return `<div class="an-block"><h4>${title}</h4>${rows.length ? rows.map(r => `
+        <div class="an-barrow"><span class="an-barname" title="${esc(r.name)}">${esc(r.name || "未知")}</span>
+          <span class="an-bartrack"><span class="an-barfill" style="width:${(r.n / max * 100).toFixed(1)}%"></span></span>
+          <span class="an-barnum">${r.n}</span></div>`).join("") : `<p class="an-empty">暂无数据</p>`}</div>`;
+    };
+    let data;
+    try {
+      data = await api(`/api/admin/analytics/posts?days=${analyticsDays}`);
+    } catch (e) { panel.innerHTML = `${head}<p>加载失败：${esc(e.message)}</p>`; return; }
+    const posts = data.posts || [];
+    if (!posts.length) { panel.innerHTML = `${head}<p class="an-empty">近 ${analyticsDays} 天暂无文章访问记录</p>`; return; }
+    panel.innerHTML = `${head}
+      <div class="an-post-list">${posts.map((p, i) => `
+        <div class="an-post-row${p._open ? " open" : ""}" data-apost="${esc(p.path)}">
+          <div class="an-post-main">
+            <span class="an-post-rank">${i + 1}</span>
+            <span class="an-post-title" title="${esc(p.path)}">${esc(p.title || p.path)}</span>
+            <span class="an-post-pv">${p.pv} 次浏览</span>
+            <span class="an-post-uv">${p.uv} 访客</span>
+            <span class="an-post-dur">均 ${fmtDur(p.avg_dur)}</span>
+            <span class="an-post-time">${p.last_visit ? p.last_visit.slice(5, 16).replace("T", " ") : ""}</span>
+            <button type="button" class="an-post-toggle">详情</button>
+          </div>
+          <div class="an-post-detail" ${p._open ? "" : "hidden"} data-apost-detail="${esc(p.path)}"></div>
+        </div>`).join("")}</div>`;
+
+    panel.querySelectorAll("[data-apost]").forEach(row => {
+      row.querySelector(".an-post-toggle").addEventListener("click", async () => {
+        const detail = row.querySelector("[data-apost-detail]");
+        if (row.classList.contains("open")) { row.classList.remove("open"); detail.hidden = true; return; }
+        row.classList.add("open"); detail.hidden = false;
+        if (detail.dataset.loaded) return;
+        detail.innerHTML = `<span class="spinner"></span> 加载中…`;
+        try {
+          const d = await api(`/api/admin/analytics/post?path=${encodeURIComponent(row.dataset.apost)}&days=${analyticsDays}`);
+          const cards = [
+            { label: "浏览量", val: d.pv },
+            { label: "访客数", val: d.uv },
+            { label: "平均停留", val: fmtDur(d.avgDuration) },
+          ];
+          const visitors = (d.visitors || []).slice(0, 30).map(v => {
+            const t = new Date(v.at);
+            return `<div class="an-visitor">
+              <div class="an-vhead">
+                <span class="an-vip" data-copy="${esc(v.ip)}" title="点击复制IP">${esc(shortIp(v.ip))}</span>
+                <span class="an-vloc">${esc(v.loc)}</span>
+                <span class="an-vdev">${esc(v.device)} · ${esc(v.os)} · ${esc(v.browser)}</span>
+                <span class="an-vtime">${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}</span>
+                <span class="an-vdur">${fmtDur(v.dur)}</span>
+                <span class="an-vfrom" title="${esc(v.from)}">${esc(hostOf(v.from))}</span>
+              </div></div>`;
+          }).join("");
+          detail.innerHTML = `
+            <div class="ov-cards">${cards.map(c => `<div class="ov-card"><div class="ov-card-num">${c.val}</div><div class="ov-card-label">${c.label}</div></div>`).join("")}</div>
+            <div class="an-grid">${barList("来源", d.referrers.map(r=>({name:hostOf(r.name),n:r.n})))}${barList("地域", d.regions)}</div>
+            <div class="an-block"><h4>访客明细（${(d.visitors||[]).length} 条）</h4>${visitors || `<p class="an-empty">暂无记录</p>`}</div>`;
+          detail.dataset.loaded = "1";
+        } catch (e) { detail.innerHTML = `<p>加载失败：${esc(e.message)}</p>`; }
+      });
+    });
   }
 
   // 后台列表分页状态（跨重渲染保留）
@@ -4911,10 +4987,15 @@
     panel.innerHTML = `<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
     let list = [];
     let total = 0;
+    let pvMap = {};
     try {
-      const data = await api(`/api/posts?page=${page}&per_page=20`);
+      const [data, stats] = await Promise.all([
+        api(`/api/posts?page=${page}&per_page=20`),
+        api(`/api/admin/analytics/posts?days=90`).catch(() => ({ posts: [] })),
+      ]);
       list = data.list;
       total = data.total ?? list.length;
+      for (const p of stats.posts || []) pvMap[p.path] = p;
     } catch (e) {
       panel.innerHTML = `<div class="essay-empty">${esc(e.message)}</div>`;
       return;
@@ -4940,7 +5021,7 @@
           <label class="admin-check-cell"><input type="checkbox" class="admin-check" value="${p.id}" /></label>
           <div class="row-main">
             <div class="row-title">${esc(p.title)}${p.pinned ? '<span class="tag-mini pinned" style="margin-left:6px">置顶</span>' : ""}${p.status === "draft" ? '<span class="tag-mini draft" style="margin-left:6px">草稿</span>' : ""}</div>
-            <div class="row-sub"><span>${timeAgo(p.created_at)}</span><span>/${esc(p.slug)}</span></div>
+            <div class="row-sub"><span>${timeAgo(p.created_at)}</span><span>/${esc(p.slug)}</span>${pvMap["/post/" + encodeURIComponent(p.slug)] ? `<span class="post-pv-num">${pvMap["/post/" + encodeURIComponent(p.slug)].pv} 次浏览</span>` : ""}</div>
           </div>
           <div class="row-actions">
             <a class="btn" href="/post/${encodeURIComponent(p.slug)}${p.status === "draft" ? "?preview=1" : ""}">查看</a>
