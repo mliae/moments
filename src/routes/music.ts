@@ -1167,6 +1167,18 @@ app.post("/library/fill", requireAdmin, async c => {
   return ok(c, { id: `t${id}`, ...result }, parts.join("，") || "封面和歌词都已存在，无需补全");
 });
 
+/** 手动编辑歌词：POST /api/music/library/edit { id: "tN", lyric: "LRC 原文" }
+ *  用于自动补全失败（纯音乐/冷门歌）时手动粘贴歌词；传空字符串即清除 */
+app.post("/library/edit", requireAdmin, async c => {
+  const body = await c.req.json().catch(() => null);
+  const id = Number(String(body?.id ?? "").replace(/^t/, ""));
+  if (!id) return fail(c, "参数错误", 400);
+  const lyric = String(body?.lyric ?? "").slice(0, 20000);
+  const r = await c.env.DB.prepare("UPDATE music_tracks SET lyric = ? WHERE id = ?").bind(lyric, id).run();
+  if (!r.meta.changes) return fail(c, "曲目不存在", 404);
+  return ok(c, { id: `t${id}`, has_lyric: lyric.trim().length > 0 }, lyric.trim() ? "歌词已保存" : "歌词已清除");
+});
+
 /** 启用/停用：POST /api/music/library/toggle { id: "tN", enabled: bool } */
 app.post("/library/toggle", requireAdmin, async c => {
   const body = await c.req.json().catch(() => null);

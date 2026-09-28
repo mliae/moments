@@ -2890,4 +2890,14 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   font-size: .66rem; font-weight: 400; padding: 1px 7px; border-radius: 999px;
   background: rgba(236, 85, 85, .12); color: #ec5555;
 }
+.mlib-lyric-editor {
+  max-width: 680px; margin: -6px 0 6px; padding: 10px;
+  border-radius: 10px; border: var(--style-border); background: var(--anzhiyu-card-bg);
+}
+.mlib-lyric-editor textarea {
+  width: 100%; font-size: .78rem; font-family: monospace; line-height: 1.6;
+  padding: 8px 10px; border-radius: 8px; resize: vertical;
+  border: var(--style-border); background: var(--anzhiyu-background, transparent); color: var(--anzhiyu-fontcolor);
+}
+.mlib-lyric-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
 

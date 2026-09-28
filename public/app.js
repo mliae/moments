@@ -6055,6 +6055,7 @@
               <div class="mlib-artist">${esc(t.artist)}${t.album ? " · " + esc(t.album) : ""} · ${esc(t.id)}</div>
             </div>
             ${!t.has_cover || !t.has_lyric ? `<button type="button" class="btn sm" data-mlib-fill="${esc(t.id)}">补全</button>` : ""}
+            <button type="button" class="btn sm ghost" data-mlib-lyric="${esc(t.id)}" title="手动编辑歌词（LRC 格式）">歌词</button>
             <label class="toggle" title="${t.enabled ? "停用" : "启用"}"><input type="checkbox" data-mlib-toggle="${esc(t.id)}" ${t.enabled ? "checked" : ""} /><span></span></label>
             <button type="button" class="btn sm ghost" data-mlib-del="${esc(t.id)}">删除</button>
           </div>`;
@@ -6157,6 +6158,48 @@
             fill.disabled = false;
             fill.textContent = "补全";
             toast(err.message || "补全失败");
+          }
+          return;
+        }
+        // 手动编辑歌词：行内展开 LRC 文本框
+        const lyr = e.target.closest("[data-mlib-lyric]");
+        if (lyr) {
+          const item = lyr.closest(".mlib-item");
+          const opened = item.nextElementSibling;
+          if (opened && opened.classList.contains("mlib-lyric-editor")) {
+            opened.remove();
+            return;
+          }
+          lyr.disabled = true;
+          try {
+            const d = await api(`/api/music/track?id=${encodeURIComponent(lyr.dataset.mlibLyric)}`);
+            const editor = document.createElement("div");
+            editor.className = "mlib-lyric-editor";
+            editor.innerHTML = `
+              <textarea rows="8" placeholder="粘贴 LRC 歌词原文，如 [00:01.00]第一句…；留空保存即清除歌词">${esc(d.lyric || "")}</textarea>
+              <div class="mlib-lyric-actions">
+                <button type="button" class="btn sm primary" data-lyric-save>保存</button>
+                <button type="button" class="btn sm ghost" data-lyric-cancel>取消</button>
+              </div>`;
+            item.after(editor);
+            editor.querySelector("[data-lyric-cancel]").addEventListener("click", () => editor.remove());
+            editor.querySelector("[data-lyric-save]").addEventListener("click", async ev => {
+              const btn = ev.currentTarget;
+              btn.disabled = true;
+              try {
+                const lyricVal = editor.querySelector("textarea").value;
+                await api("/api/music/library/edit", { body: { id: lyr.dataset.mlibLyric, lyric: lyricVal } });
+                toast(lyricVal.trim() ? "歌词已保存" : "歌词已清除");
+                loadLibrary();
+              } catch (err) {
+                btn.disabled = false;
+                toast(err.message || "保存失败");
+              }
+            });
+          } catch (err) {
+            toast(err.message || "歌词加载失败");
+          } finally {
+            lyr.disabled = false;
           }
           return;
         }
