@@ -4461,6 +4461,7 @@
     { key: "comments", label: "评论", icon: "message-square" },
     { key: "appearance", label: "外观", icon: "palette" },
     { key: "media", label: "媒体", icon: "folder" },
+    { key: "music", label: "音乐", icon: "music" },
     { key: "ai", label: "AI 助手", icon: "bot" },
     { key: "seo", label: "搜索收录", icon: "search" },
     { key: "security", label: "安全", icon: "shield" },
@@ -4642,6 +4643,7 @@
     if (tab === "comments") return renderAdminComments(panel);
     if (tab === "appearance") return renderAdminAppearance(panel);
     if (tab === "media") return renderAdminMedia(panel);
+    if (tab === "music") return renderAdminMusic(panel);
     if (tab === "ai") return renderAdminAI(panel);
     if (tab === "seo") return renderAdminSeo(panel);
     if (tab === "security") return renderAdminSecurity(panel);
@@ -5912,7 +5914,6 @@
       panel.innerHTML = `<div class="essay-empty">${esc(e.message)}</div>`;
       return;
     }
-    const vol = Math.max(0, Math.min(1, Number(s.music_volume) || 0.7));
     panel.innerHTML = `
       <div class="admin-panel-head"><h3>域名与存储</h3></div>
       <form class="settings-form" data-settings-form>
@@ -5945,9 +5946,56 @@
             <span data-rebuild-thumbs-msg style="font-size:.8rem;color:var(--anzhiyu-secondtext)"></span>
           </div>
         </div>
-      </div>
+      </div>`;
 
-      <div class="admin-panel-head" style="margin-top:1.75rem"><h3>音乐播放器</h3></div>
+    // 视频默认封面上传
+    const vpUploadBtn = panel.querySelector("[data-video-poster-upload]");
+    if (vpUploadBtn) {
+      const vpFileInput = panel.querySelector("[data-video-poster-file]");
+      const vpUrlInput = panel.querySelector('[name="video_default_poster"]');
+      const vpPreview = panel.querySelector("[data-video-poster-preview]");
+      vpUploadBtn.addEventListener("click", () => vpFileInput.click());
+      vpFileInput.addEventListener("change", async () => {
+        const file = vpFileInput.files[0];
+        if (!file) return;
+        vpUploadBtn.disabled = true;
+        vpUploadBtn.textContent = "上传中...";
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("kind", "image");
+          const res = await fetch("/api/admin/upload", { method: "POST", body: fd, credentials: "same-origin" });
+          const json = await res.json();
+          if (!res.ok || !json.data?.src) throw new Error(json.message || "上传失败");
+          const full = /^https?:\/\//i.test(json.data.src) ? json.data.src : location.origin + json.data.src;
+          vpUrlInput.value = full;
+          vpPreview.innerHTML = `<img src="${esc(full)}" alt="" style="max-width:100%;max-height:120px;border-radius:8px;object-fit:cover" referrerpolicy="no-referrer" />`;
+          toast("上传成功，记得点击保存设置");
+        } catch (err) {
+          toast(err.message);
+        } finally {
+          vpUploadBtn.disabled = false;
+          vpUploadBtn.textContent = "上传";
+          vpFileInput.value = "";
+        }
+      });
+    }
+
+  }
+
+  /* ---------- 后台 Tab：音乐（播放器设置 + 站内音乐库） ---------- */
+  async function renderAdminMusic(panel) {
+    panel.innerHTML = `<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
+    let s;
+    try {
+      s = await api("/api/admin/settings");
+    } catch (e) {
+      panel.innerHTML = `<div class="essay-empty">${esc(e.message)}</div>`;
+      return;
+    }
+    const vol = Math.max(0, Math.min(1, Number(s.music_volume) || 0.7));
+    panel.innerHTML = `
+      <div class="admin-panel-head"><h3>音乐播放器</h3></div>
       <form class="settings-form" data-music-settings-form style="max-width:680px">
         <div class="field field-row">
           <label for="m_enable">启用底部音乐播放器</label>
@@ -5996,39 +6044,6 @@
       <div class="admin-panel-head" style="margin-top:1.75rem"><h3>站内音乐库</h3></div>
       <p style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:-.4rem 0 1rem">文章中插入的音乐（<code>[music=tN]</code>）存在站内存储，不依赖第三方接口。停用后前台显示「音乐不可用」，删除会同时移除音频和封面文件。</p>
       <div data-music-library><div class="emp-help"><span class="spinner"></span> 加载中…</div></div>`;
-
-    // 视频默认封面上传
-    const vpUploadBtn = panel.querySelector("[data-video-poster-upload]");
-    if (vpUploadBtn) {
-      const vpFileInput = panel.querySelector("[data-video-poster-file]");
-      const vpUrlInput = panel.querySelector('[name="video_default_poster"]');
-      const vpPreview = panel.querySelector("[data-video-poster-preview]");
-      vpUploadBtn.addEventListener("click", () => vpFileInput.click());
-      vpFileInput.addEventListener("change", async () => {
-        const file = vpFileInput.files[0];
-        if (!file) return;
-        vpUploadBtn.disabled = true;
-        vpUploadBtn.textContent = "上传中...";
-        try {
-          const fd = new FormData();
-          fd.append("file", file);
-          fd.append("kind", "image");
-          const res = await fetch("/api/admin/upload", { method: "POST", body: fd, credentials: "same-origin" });
-          const json = await res.json();
-          if (!res.ok || !json.data?.src) throw new Error(json.message || "上传失败");
-          const full = /^https?:\/\//i.test(json.data.src) ? json.data.src : location.origin + json.data.src;
-          vpUrlInput.value = full;
-          vpPreview.innerHTML = `<img src="${esc(full)}" alt="" style="max-width:100%;max-height:120px;border-radius:8px;object-fit:cover" referrerpolicy="no-referrer" />`;
-          toast("上传成功，记得点击保存设置");
-        } catch (err) {
-          toast(err.message);
-        } finally {
-          vpUploadBtn.disabled = false;
-          vpUploadBtn.textContent = "上传";
-          vpFileInput.value = "";
-        }
-      });
-    }
 
     // 音量滑块实时显示
     const range = panel.querySelector("[data-vol-range]");
@@ -7202,10 +7217,11 @@
     const customUrl = state.settings.music_custom_playlist;
     const cacheKey = `${MUSIC_CACHE_KEY}:${playlistId}:${customUrl}`;
 
-    // 读缓存
+    // 读缓存（自定义歌单可能随曲库变动频繁更新，只缓存 3 分钟；网易云歌单缓存 7 天）
+    const cacheTtl = customUrl && customUrl.trim() ? 3 * 60 * 1000 : MUSIC_CACHE_TTL;
     try {
       const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
-      if (cached && Date.now() - cached.ts < MUSIC_CACHE_TTL && Array.isArray(cached.songs) && cached.songs.length) {
+      if (cached && Date.now() - cached.ts < cacheTtl && Array.isArray(cached.songs) && cached.songs.length) {
         return cached.songs;
       }
     } catch {
