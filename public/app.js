@@ -6180,7 +6180,7 @@
           <div class="admin-fold-body">
             <div class="field">
               <label>网易云歌单 ID（纯数字，如 8152976493）</label>
-              <input name="music_playlist_id" maxlength="32" value="${esc(s.music_playlist_id)}" placeholder="8152976493" />
+              <input name="music_playlist_id" maxlength="32" value="${esc(s.music_playlist_id)}" placeholder="8152976493" autocomplete="off" />
               <div class="field-hint">仅当上方自定义歌单链接为空或拉取失败时，作为兜底直接在线解析该网易云歌单播放（不经过中央音乐库）。</div>
             </div>
           </div>
