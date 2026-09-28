@@ -247,14 +247,9 @@ adminApp.get("/posts", requireAdmin, async c => {
   for (const p of (postRows.results || []) as Array<{ slug: string; title: string }>) {
     titleMap["/post/" + encodeURIComponent(p.slug)] = p.title;
   }
-  const posts = ((pvRows.results || []) as Array<{ path: string; title: string | null; pv: number; uv: number; avg_dur: number | null; last_visit: string }>).map(r => ({
-    path: r.path,
-    title: titleMap[r.path] || (() => { try { return decodeURIComponent(r.path.replace(/^\/post\//, "")); } catch { return r.title || r.path; } })(),
-    pv: r.pv,
-    uv: r.uv,
-    avg_dur: r.avg_dur,
-    last_visit: r.last_visit,
-  }));
+  const posts = ((pvRows.results || []) as Array<{ path: string; title: string | null; pv: number; uv: number; avg_dur: number | null; last_visit: string }>)
+    .map(r => ({ ...r, title: titleMap[r.path] || r.title || r.path }))
+    .filter(r => titleMap[r.path]); // 只显示 posts 表中仍存在的文章
   return ok(c, { days, posts });
 });
 
