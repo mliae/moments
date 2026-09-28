@@ -32,16 +32,14 @@ export async function maybeScheduleAiReply(
   const { type, targetId, comment } = opts;
   const rootId = comment.parent_id || comment.id;
 
-  // 防刷：同一根楼下 5 分钟内已有机器人回复则跳过，避免连续召唤刷屏
-  const recent = await c.env.DB.prepare(
-    `SELECT 1 FROM comments
-     WHERE target_type = ? AND target_id = ? AND parent_id = ? AND is_ai = 1
-       AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 minutes')
-     LIMIT 1`
+  // 防刷：同一根楼下机器人累计最多回复 6 次，超过则跳过，避免无限对话刷屏
+  const cnt = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM comments
+     WHERE target_type = ? AND target_id = ? AND parent_id = ? AND is_ai = 1`
   )
     .bind(type, targetId, rootId)
-    .first();
-  if (recent) return;
+    .first<{ n: number }>();
+  if (Number(cnt?.n ?? 0) >= 6) return;
 
   c.executionCtx.waitUntil(generateAndSave(c, { type, targetId, rootId, comment, botName }));
 }
