@@ -4798,6 +4798,7 @@
       <div class="an-block"><h4>最近访客（${(v.list || []).length} 个会话）</h4>
         ${visitors || `<p class="an-empty">暂无访客记录</p>`}</div>`;
 
+    panel.querySelectorAll("[data-asub]").forEach(b => b.addEventListener("click", () => { analyticsSub = b.dataset.asub; renderAdminAnalytics(panel); }));
     panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); renderAdminAnalytics(panel); }));
   }
 
@@ -4868,6 +4869,9 @@
         } catch (e) { detail.innerHTML = `<p>加载失败：${esc(e.message)}</p>`; }
       });
     });
+    // 子标签和天数切换按钮需要重新绑定（innerHTML 重写后旧事件丢失）
+    panel.querySelectorAll("[data-asub]").forEach(b => b.addEventListener("click", () => { analyticsSub = b.dataset.asub; renderAdminAnalytics(panel); }));
+    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); renderAdminAnalytics(panel); }));
   }
 
   // 后台列表分页状态（跨重渲染保留）
@@ -5021,7 +5025,7 @@
           <label class="admin-check-cell"><input type="checkbox" class="admin-check" value="${p.id}" /></label>
           <div class="row-main">
             <div class="row-title">${esc(p.title)}${p.pinned ? '<span class="tag-mini pinned" style="margin-left:6px">置顶</span>' : ""}${p.status === "draft" ? '<span class="tag-mini draft" style="margin-left:6px">草稿</span>' : ""}</div>
-            <div class="row-sub"><span>${timeAgo(p.created_at)}</span><span>/${esc(p.slug)}</span>${pvMap["/post/" + encodeURIComponent(p.slug)] ? `<span class="post-pv-num">${pvMap["/post/" + encodeURIComponent(p.slug)].pv} 次浏览</span>` : ""}</div>
+            <div class="row-sub"><span>${timeAgo(p.created_at)}</span><span>/${esc(p.slug)}</span>${pvMap["/post/" + encodeURIComponent(p.slug)] ? `<span class="post-pv-num" data-pv-jump="${esc(p.slug)}" style="cursor:pointer">${pvMap["/post/" + encodeURIComponent(p.slug)].pv} 次浏览</span>` : ""}</div>
           </div>
           <div class="row-actions">
             <a class="btn" href="/post/${encodeURIComponent(p.slug)}${p.status === "draft" ? "?preview=1" : ""}">查看</a>
@@ -5037,6 +5041,19 @@
       ${pagerHtml(page, pages)}`;
     panel.querySelectorAll("[data-pager]").forEach(b =>
       b.addEventListener("click", () => renderAdminPosts(panel, b.dataset.pager === "prev" ? page - 1 : page + 1))
+    );
+    panel.querySelectorAll("[data-pv-jump]").forEach(el =>
+      el.addEventListener("click", () => {
+        const slug = el.dataset.pvJump;
+        analyticsSub = "posts";
+        const aTab = document.querySelector('.admin-nav-item[data-admin-tab="analytics"]');
+        if (aTab) aTab.click();
+        // 等统计面板渲染完后自动展开对应文章
+        setTimeout(() => {
+          const row = document.querySelector(`[data-apost="/post/${encodeURIComponent(slug)}"]`);
+          if (row) row.querySelector(".an-post-toggle")?.click();
+        }, 800);
+      })
     );
     wireBatch(panel, { rowSel: ".admin-row", endpoint: "/api/posts/batch-delete", label: "篇文章", onDone: () => renderAdminPosts(panel) });
   }
