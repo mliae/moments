@@ -249,7 +249,7 @@ adminApp.get("/posts", requireAdmin, async c => {
   }
   const posts = ((pvRows.results || []) as Array<{ path: string; title: string | null; pv: number; uv: number; avg_dur: number | null; last_visit: string }>).map(r => ({
     path: r.path,
-    title: titleMap[r.path] || r.title || r.path,
+    title: titleMap[r.path] || (() => { try { return decodeURIComponent(r.path.replace(/^\/post\//, "")); } catch { return r.title || r.path; } })(),
     pv: r.pv,
     uv: r.uv,
     avg_dur: r.avg_dur,
