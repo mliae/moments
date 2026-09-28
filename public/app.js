@@ -43,7 +43,7 @@
     essay_subtitle: "记录生活中的每一个瞬间，图文、视频与心情",
     essay_button_text: "发布即刻",
     music_enable: false,
-    music_playlist_id: "8152976493",
+    music_playlist_id: "",
     music_custom_playlist: "",
     music_autoplay: false,
     music_preload: true,
