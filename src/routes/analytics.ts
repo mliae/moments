@@ -231,19 +231,31 @@ adminApp.get("/summary", requireAdmin, async c => {
 adminApp.get("/posts", requireAdmin, async c => {
   const db = c.env.DB;
   const days = Math.max(1, Math.min(90, Number(c.req.query("days")) || 7));
-  const where = `pv.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${days} days')`;
-  const rows = await db
-    .prepare(
-      `SELECT pv.path, COALESCE(p.title, MIN(pv.title)) AS title, COUNT(*) AS pv, COUNT(DISTINCT pv.ip) AS uv,
-              ROUND(AVG(CASE WHEN pv.duration > 0 THEN pv.duration END), 1) AS avg_dur,
-              MAX(pv.created_at) AS last_visit
-       FROM analytics_pv pv
-       LEFT JOIN posts p ON pv.path = '/post/' || p.slug
-       WHERE ${where} AND pv.path LIKE '/post/%'
-       GROUP BY pv.path ORDER BY pv DESC LIMIT 100`
-    )
-    .all<{ path: string; title: string | null; pv: number; uv: number; avg_dur: number | null; last_visit: string }>();
-  return ok(c, { days, posts: rows.results || [] });
+  const where = `created_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${days} days')`;
+  const [pvRows, postRows] = await db.batch([
+    db.prepare(
+      `SELECT path, MIN(title) AS title, COUNT(*) AS pv, COUNT(DISTINCT ip) AS uv,
+              ROUND(AVG(CASE WHEN duration > 0 THEN duration END), 1) AS avg_dur,
+              MAX(created_at) AS last_visit
+       FROM analytics_pv WHERE ${where} AND path LIKE '/post/%'
+       GROUP BY path ORDER BY pv DESC LIMIT 100`
+    ),
+    db.prepare(`SELECT slug, title FROM posts`),
+  ]);
+  // path 存的是 URL 编码的 slug，posts.slug 存的是原文，用 encodeURIComponent 匹配
+  const titleMap: Record<string, string> = {};
+  for (const p of (postRows.results || []) as Array<{ slug: string; title: string }>) {
+    titleMap["/post/" + encodeURIComponent(p.slug)] = p.title;
+  }
+  const posts = ((pvRows.results || []) as Array<{ path: string; title: string | null; pv: number; uv: number; avg_dur: number | null; last_visit: string }>).map(r => ({
+    path: r.path,
+    title: titleMap[r.path] || r.title || r.path,
+    pv: r.pv,
+    uv: r.uv,
+    avg_dur: r.avg_dur,
+    last_visit: r.last_visit,
+  }));
+  return ok(c, { days, posts });
 });
 
 /* ---------------- 后台：单篇文章统计详情 ---------------- */
