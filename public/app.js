@@ -6222,12 +6222,13 @@
       let libList = [];
       let tagFilter = "";
 
+      const tagsOf = t => (Array.isArray(t.tags) && t.tags.length ? t.tags : t.tag ? [t.tag] : []);
       const rowHtml = t => `
           <div class="mlib-item${t.enabled ? "" : " is-off"}">
             <input type="checkbox" class="mlib-check" data-mlib-check="${esc(t.id)}" title="选择" />
             ${t.cover_url ? `<img class="mlib-cover" src="${esc(t.cover_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="mlib-cover">${svgIcon("music", 18)}</span>`}
             <div class="mlib-info">
-              <div class="mlib-name">${esc(t.title)}${t.vip ? '<span class="emp-vip">VIP</span>' : ""}<span class="emp-src">${SRC_LABEL[t.source] || esc(t.source)}</span>${t.tag ? `<span class="mlib-tag">${esc(t.tag)}</span>` : ""}${!t.has_cover || !t.has_lyric ? `<span class="mlib-miss">缺${[!t.has_cover ? "封面" : "", !t.has_lyric ? "歌词" : ""].filter(Boolean).join("/")}</span>` : ""}</div>
+              <div class="mlib-name"><span class="mlib-title">${esc(t.title)}</span>${t.vip ? '<span class="emp-vip">VIP</span>' : ""}<span class="emp-src">${SRC_LABEL[t.source] || esc(t.source)}</span>${tagsOf(t).map(x => `<span class="mlib-tag">${esc(x)}</span>`).join("")}${!t.has_cover || !t.has_lyric ? `<span class="mlib-miss">缺${[!t.has_cover ? "封面" : "", !t.has_lyric ? "歌词" : ""].filter(Boolean).join("/")}</span>` : ""}</div>
               <div class="mlib-artist">${esc(t.artist)}${t.album ? " · " + esc(t.album) : ""} · ${esc(t.id)}</div>
             </div>
             ${!t.has_cover || !t.has_lyric ? `<button type="button" class="btn sm" data-mlib-fill="${esc(t.id)}">补全</button>` : ""}
@@ -6239,7 +6240,7 @@
       const renderRows = () => {
         const rowsBox = libBox.querySelector("[data-mlib-rows]");
         if (!rowsBox) return;
-        const shown = tagFilter ? libList.filter(t => t.tag === tagFilter) : libList;
+        const shown = tagFilter ? libList.filter(t => tagsOf(t).includes(tagFilter)) : libList;
         rowsBox.innerHTML = shown.length
           ? shown.map(rowHtml).join("")
           : `<div class="emp-help">该标签下暂无曲目。</div>`;
@@ -6253,14 +6254,14 @@
             libBox.innerHTML = `<div class="emp-help">曲库还是空的。在文章/说说编辑器点「插入音乐」即可搜歌入库、上传本地音乐或转存网络音频。</div>`;
             return;
           }
-          const tags = [...new Set(libList.map(t => t.tag).filter(Boolean))];
+          const tags = [...new Set(libList.flatMap(tagsOf))];
           const missing = libList.filter(t => !t.has_cover || !t.has_lyric).length;
           libBox.innerHTML = `
           <div class="mlib-bar">
             <label class="mlib-all"><input type="checkbox" data-mlib-all /> 全选</label>
             <input type="text" data-mlib-tag-input placeholder="标签名，如：最爱" maxlength="30" />
-            <button type="button" class="btn sm" data-mlib-tag-set>打标签</button>
-            <button type="button" class="btn sm ghost" data-mlib-tag-clear>清除标签</button>
+            <button type="button" class="btn sm" data-mlib-tag-set>加入标签</button>
+            <button type="button" class="btn sm ghost" data-mlib-tag-clear>清除全部标签</button>
             <select data-mlib-tag-filter><option value="">全部标签</option>${tags.map(t => `<option value="${esc(t)}"${t === tagFilter ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
             <button type="button" class="btn sm" data-mlib-fill-all>一键补全${missing ? `（缺 ${missing} 首）` : ""}</button>
           </div>
@@ -6388,7 +6389,7 @@
           tagSet.disabled = true;
           try {
             await api("/api/music/library/tag", { body: { ids, tag } });
-            toast(`已给 ${ids.length} 首打上「${tag}」标签`);
+            toast(`已把 ${ids.length} 首加入「${tag}」`);
             loadLibrary();
           } catch (err) {
             tagSet.disabled = false;
@@ -6403,7 +6404,7 @@
           tagClear.disabled = true;
           try {
             await api("/api/music/library/tag", { body: { ids, tag: "" } });
-            toast(`已清除 ${ids.length} 首的标签`);
+            toast(`已清除 ${ids.length} 首的全部标签`);
             loadLibrary();
           } catch (err) {
             tagClear.disabled = false;
@@ -8788,8 +8789,9 @@
     let libCache = [];
     const renderLibRows = () => {
       const q = (libFilter.value || "").trim().toLowerCase();
+      const tagsOf = t => (Array.isArray(t.tags) && t.tags.length ? t.tags : t.tag ? [t.tag] : []);
       const shown = q
-        ? libCache.filter(t => `${t.title} ${t.artist} ${t.album || ""} ${t.tag || ""}`.toLowerCase().includes(q))
+        ? libCache.filter(t => `${t.title} ${t.artist} ${t.album || ""} ${tagsOf(t).join(" ")}`.toLowerCase().includes(q))
         : libCache;
       if (!shown.length) {
         libBox.innerHTML = `<div class="emp-help">${q ? "没有匹配的曲目。" : "曲库还是空的，去「搜歌入库」添加吧。"}</div>`;
@@ -8801,7 +8803,7 @@
         <div class="emp-item">
           ${t.cover_url ? `<img class="emp-cover" src="${esc(t.cover_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="emp-cover emp-cover--ph">${svgIcon("music", 18)}</span>`}
           <div class="emp-info">
-            <div class="emp-name">${esc(t.title)}${t.tag ? `<span class="emp-src">${esc(t.tag)}</span>` : ""}${t.enabled ? "" : '<span class="emp-src">已停用</span>'}</div>
+            <div class="emp-name"><span class="emp-title">${esc(t.title)}</span>${tagsOf(t).map(x => `<span class="emp-src">${esc(x)}</span>`).join("")}${t.enabled ? "" : '<span class="emp-src">已停用</span>'}</div>
             <div class="emp-artist">${esc(t.artist)}${t.album ? " · " + esc(t.album) : ""} · ${esc(t.id)}</div>
           </div>
           <button type="button" class="btn" data-emp-use="${esc(t.id)}">插入</button>
