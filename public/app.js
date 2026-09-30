@@ -3337,6 +3337,7 @@
       if (!link) return;
       if (!link.closest("[data-toc-sidebar], [data-toc-drawer]")) return;
       e.preventDefault();
+      e.stopPropagation(); // 阻止 SPA 链接拦截器等后续 document 监听器重复处理
       const id = link.getAttribute("href").slice(1);
       const card = document.querySelector(".article-card");
       let target = null;
@@ -8699,6 +8700,226 @@
     });
   }
 
+  /* ================= 全局悬浮试听条（说说/文章编辑器共用） =================
+     独立挂在 body 下：关闭音乐面板、甚至关闭编辑器都不影响播放；
+     只有点条上的关闭键才停止。所有行内播放键通过 data-pd-key 与它同步。 */
+  let previewDockEl = null;
+  function getPreviewDock() {
+    if (previewDockEl) return previewDockEl;
+    const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
+    const ICON_LOADING = '<svg class="pd-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 0-9 9"/></svg>';
+    const ICON_NOTE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>';
+    const ICON_HIDE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+    const ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+
+    const dock = document.createElement("div");
+    dock.className = "preview-dock";
+    dock.hidden = true;
+    dock.innerHTML = `
+      <button type="button" class="pd-fab" aria-label="展开试听条" hidden>
+        <img class="pd-fab-cover" alt="" referrerpolicy="no-referrer" hidden />
+        <span class="pd-fab-note">${ICON_NOTE}</span>
+        <span class="pd-fab-ripple"></span>
+      </button>
+      <div class="pd-bar">
+        <div class="pd-cover-wrap">
+          <img class="pd-cover" alt="" referrerpolicy="no-referrer" hidden />
+          <span class="pd-cover-ph">${ICON_NOTE}</span>
+        </div>
+        <div class="pd-meta">
+          <div class="pd-title-row"><span class="pd-title">未播放</span><span class="pd-vip" hidden>VIP</span></div>
+          <div class="pd-artist"></div>
+        </div>
+        <button type="button" class="pd-btn pd-toggle" aria-label="播放/暂停">${ICON_PLAY}</button>
+        <div class="pd-progress">
+          <span class="pd-time pd-cur">0:00</span>
+          <input type="range" class="pd-seek" min="0" max="1000" step="1" value="0" aria-label="播放进度" />
+          <span class="pd-time pd-dur">0:00</span>
+        </div>
+        <button type="button" class="pd-btn pd-hide" aria-label="隐藏播放器">${ICON_HIDE}</button>
+        <button type="button" class="pd-btn pd-close" aria-label="关闭并停止">${ICON_CLOSE}</button>
+      </div>
+      <audio class="pd-audio" preload="metadata"></audio>`;
+    document.body.appendChild(dock);
+
+    const audio = dock.querySelector(".pd-audio");
+    const fab = dock.querySelector(".pd-fab");
+    const cover = dock.querySelector(".pd-cover");
+    const coverPh = dock.querySelector(".pd-cover-ph");
+    const fabCover = dock.querySelector(".pd-fab-cover");
+    const titleEl = dock.querySelector(".pd-title");
+    const vipEl = dock.querySelector(".pd-vip");
+    const artistEl = dock.querySelector(".pd-artist");
+    const toggleBtn = dock.querySelector(".pd-toggle");
+    const seek = dock.querySelector(".pd-seek");
+    const curEl = dock.querySelector(".pd-cur");
+    const durEl = dock.querySelector(".pd-dur");
+    audio.volume = 0.8;
+
+    const fmt = s => {
+      if (!isFinite(s) || s < 0) s = 0;
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return `${m}:${sec < 10 ? "0" : ""}${sec}`;
+    };
+
+    /** 同步所有行内播放键（面板可能已被移除/重建，全局按 data-pd-key 查）+ 悬浮条自身 */
+    const sync = () => {
+      const cur = dock._cur;
+      const playing = !!cur && !audio.paused && !audio.ended;
+      const loading = dock.classList.contains("is-loading");
+      document.querySelectorAll("[data-pd-key]").forEach(btn => {
+        const isCur = cur && btn.dataset.pdKey === cur.key;
+        btn.innerHTML = isCur && loading ? ICON_LOADING : isCur && playing ? ICON_PAUSE : ICON_PLAY;
+        const row = btn.closest(".emp-item");
+        if (row) row.classList.toggle("playing", !!(isCur && (playing || loading)));
+      });
+      toggleBtn.innerHTML = loading ? ICON_LOADING : playing ? ICON_PAUSE : ICON_PLAY;
+      dock.classList.toggle("playing", playing);
+      fab.classList.toggle("playing", playing);
+    };
+    dock._sync = sync;
+
+    const setCover = (url, img, ph) => {
+      if (url) {
+        img.src = url;
+        img.hidden = false;
+        if (ph) ph.style.display = "none";
+      } else {
+        img.removeAttribute("src");
+        img.hidden = true;
+        if (ph) ph.style.display = "";
+      }
+    };
+
+    /** desc: { key, title, artist, cover?, url?, load?() => Promise<url> } */
+    dock.play = desc => {
+      // 同一首：播放/暂停切换
+      if (dock._cur && dock._cur.key === desc.key) {
+        if (audio.paused) {
+          if (audio.ended) audio.currentTime = 0;
+          audio.play().catch(() => toast("播放失败，请重试"));
+        } else {
+          audio.pause();
+        }
+        return;
+      }
+      dock._cur = desc;
+      dock.hidden = false;
+      dock.classList.remove("is-hidden");
+      fab.hidden = true;
+      vipEl.hidden = true;
+      titleEl.textContent = desc.title || "未知歌曲";
+      artistEl.textContent = desc.artist || "";
+      setCover(desc.cover || "", cover, coverPh);
+      setCover(desc.cover || "", fabCover, null);
+      curEl.textContent = "0:00";
+      durEl.textContent = "0:00";
+      seek.value = 0;
+      dock.classList.add("is-loading");
+      // 需要现场解析音源时，artist 行临时显示解析状态，结束后恢复
+      const needResolve = !desc.url && !desc._url;
+      if (needResolve) artistEl.textContent = "正在解析试听地址…";
+      sync();
+      (async () => {
+        try {
+          if (needResolve) {
+            try {
+              const r = await desc.load();
+              if (typeof r === "string") desc._url = r;
+              else { desc._url = r.url; if (r.vip) vipEl.hidden = false; }
+            } catch (err) {
+              if (dock._cur === desc) {
+                artistEl.textContent = "试听地址解析失败，可能暂无音源";
+                toast("试听地址解析失败，可能暂无音源");
+              }
+              return;
+            }
+            if (dock._cur !== desc) return; // 已切到别的歌
+            artistEl.textContent = desc.artist || "";
+            toast("试听地址解析成功");
+          }
+          if (dock._cur !== desc) return;
+          audio.src = desc.url || desc._url;
+          await audio.play();
+        } catch {
+          if (dock._cur === desc) toast("播放失败，请重试");
+        } finally {
+          dock.classList.remove("is-loading");
+          sync();
+        }
+      })();
+    };
+
+    dock.close = () => {
+      dock._cur = null;
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+      seek.value = 0;
+      dock.classList.remove("is-loading", "is-hidden", "playing");
+      fab.hidden = true;
+      dock.hidden = true;
+      sync();
+    };
+
+    audio.addEventListener("playing", sync);
+    audio.addEventListener("pause", sync);
+    audio.addEventListener("ended", sync);
+    audio.addEventListener("loadedmetadata", () => {
+      durEl.textContent = fmt(audio.duration);
+    });
+    let seeking = false;
+    const updateSeekFill = () => {
+      const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+      seek.style.setProperty("--pd-pct", pct.toFixed(2) + "%");
+    };
+    audio.addEventListener("timeupdate", () => {
+      if (!seeking && audio.duration) seek.value = Math.round((audio.currentTime / audio.duration) * 1000);
+      curEl.textContent = fmt(audio.currentTime);
+      updateSeekFill();
+    });
+    seek.addEventListener("input", () => {
+      seeking = true;
+      if (audio.duration) {
+        audio.currentTime = (Number(seek.value) / 1000) * audio.duration;
+        curEl.textContent = fmt(audio.currentTime);
+      }
+      updateSeekFill();
+    });
+    seek.addEventListener("change", () => {
+      seeking = false;
+    });
+
+    toggleBtn.addEventListener("click", () => {
+      if (!dock._cur) return;
+      if (audio.paused) {
+        if (audio.ended) audio.currentTime = 0;
+        audio.play().catch(() => toast("播放失败，请重试"));
+      } else {
+        audio.pause();
+      }
+    });
+    dock.querySelector(".pd-hide").addEventListener("click", () => {
+      dock.classList.add("is-hidden");
+      fab.hidden = false;
+    });
+    fab.addEventListener("click", () => {
+      dock.classList.remove("is-hidden");
+      fab.hidden = true;
+    });
+    dock.querySelector(".pd-close").addEventListener("click", () => dock.close());
+
+    previewDockEl = dock;
+    return dock;
+  }
+
+  /** 供编辑器面板调用：传入曲目描述，交给全局悬浮试听条 */
+  function previewDockPlay(desc) {
+    getPreviewDock().play(desc);
+  }
+
   /** 音乐插入面板（4 Tab：搜歌入库 / 我的曲库 / 本地上传 / 网络地址，入库成功自动插入 [music=tN]） */
   function toggleMusicInsertPanel(container, ta) {
     const exist = container.querySelector("[data-music-panel]");
@@ -8706,8 +8927,8 @@
       exist.remove();
       return;
     }
+    // 播放/暂停/加载图标由全局悬浮试听条的 sync() 按 data-pd-key 统一维护
     const PLAY_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
-    const PAUSE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
     const panel = document.createElement("div");
     panel.className = "editor-music-panel";
     panel.dataset.musicPanel = "";
@@ -8773,14 +8994,13 @@
         return;
       }
       if (e.target.closest("[data-emp-close]")) {
-        previewAudio.pause();
+        // 不暂停试听：悬浮条独立存在，方便边听边写
         panel.remove();
       }
     });
 
     const insertAndClose = id => {
       mdInsertBlock(ta, `[music=${id}]`);
-      previewAudio.pause();
       panel.remove();
     };
 
@@ -8806,6 +9026,7 @@
             <div class="emp-name"><span class="emp-title">${esc(t.title)}</span>${tagsOf(t).map(x => `<span class="emp-src">${esc(x)}</span>`).join("")}${t.enabled ? "" : '<span class="emp-src">已停用</span>'}</div>
             <div class="emp-artist">${esc(t.artist)}${t.album ? " · " + esc(t.album) : ""} · ${esc(t.id)}</div>
           </div>
+          <button type="button" class="emp-play" data-emp-libplay="${esc(t.id)}" data-pd-key="l:${esc(t.id)}" title="试听"${t.audio_url ? "" : " disabled"}>${PLAY_SVG}</button>
           <button type="button" class="btn" data-emp-use="${esc(t.id)}">插入</button>
         </div>`
         )
@@ -8823,46 +9044,47 @@
     };
     libFilter.addEventListener("input", renderLibRows);
     libBox.addEventListener("click", e => {
+      const lp = e.target.closest("[data-emp-libplay]");
+      if (lp) {
+        const t = libCache.find(x => String(x.id) === lp.dataset.empLibplay);
+        if (!t) return;
+        if (!t.audio_url) return toast("该曲目暂无可播放音源");
+        previewDockPlay({
+          key: `l:${t.id}`,
+          title: t.title,
+          artist: t.artist,
+          cover: t.cover_url || "",
+          url: t.audio_url,
+        });
+        return;
+      }
       const use = e.target.closest("[data-emp-use]");
       if (!use) return;
       insertAndClose(use.dataset.empUse);
       toast("已插入音乐块");
     });
 
-    /* ---- 搜歌入库：搜索 + 试听 + 入库 ---- */
-    const previewAudio = new Audio();
-    let previewRow = -1;
-    const setRowIcon = (row, playing) => {
-      const btn = resultsBox.querySelector(`[data-emp-preview="${row}"]`);
-      if (btn) btn.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
-      const item = resultsBox.querySelector(`[data-emp-row="${row}"]`);
-      if (item) item.classList.toggle("playing", playing);
-    };
-    previewAudio.addEventListener("pause", () => setRowIcon(previewRow, false));
-    previewAudio.addEventListener("ended", () => setRowIcon(previewRow, false));
-    const togglePreview = async i => {
-      if (previewRow === i && !previewAudio.paused) {
-        previewAudio.pause();
-        return;
-      }
-      if (previewRow >= 0) setRowIcon(previewRow, false);
+    /* ---- 搜歌入库：搜索 + 试听（走全局悬浮试听条） + 入库 ---- */
+    /** 把 resolve 返回的外站音频 URL 包装成 Worker 代理地址，绕过防盗链 */
+    const wrapStreamUrl = (url) =>
+      url && !url.startsWith(location.origin) && !url.startsWith("/media/")
+        ? `/api/music/stream?url=${encodeURIComponent(url)}`
+        : url;
+    const togglePreview = i => {
       const hit = (resultsBox._hits || [])[i];
       if (!hit) return;
-      try {
-        if (!hit._previewUrl) {
+      previewDockPlay({
+        key: `s:${hit.source}:${hit.songId}`,
+        title: hit.title,
+        artist: hit.artist,
+        cover: hit.cover ? proxyCover(hit.cover) : "",
+        load: async () => {
           const d = await api(
             `/api/music/preview?source=${hit.source}&id=${encodeURIComponent(hit.songId)}&title=${encodeURIComponent(hit.title || "")}&artist=${encodeURIComponent(hit.artist || "")}`
           );
-          hit._previewUrl = d.url;
-        }
-        previewAudio.src = hit._previewUrl;
-        previewAudio.volume = 0.8;
-        await previewAudio.play();
-        previewRow = i;
-        setRowIcon(i, true);
-      } catch {
-        toast("试听加载失败，可能该歌曲暂无音源");
-      }
+          return { url: wrapStreamUrl(d.url), vip: d.vip === true };
+        },
+      });
     };
 
     let searchBusy = false;
@@ -8870,7 +9092,6 @@
       const kw = searchInput.value.trim();
       if (!kw || searchBusy) return;
       searchBusy = true;
-      previewAudio.pause();
       resultsBox.innerHTML = `<div class="emp-help"><span class="spinner"></span> 搜索中…</div>`;
       try {
         const data = await api(`/api/music/search?kw=${encodeURIComponent(kw)}`);
@@ -8890,7 +9111,7 @@
             <div class="emp-name">${esc(h.title)}${h.vip ? '<span class="emp-vip">VIP</span>' : ""}<span class="emp-src">${h.sourceLabel}</span></div>
             <div class="emp-artist">${esc(h.artist)}${h.album ? " · " + esc(h.album) : ""}</div>
           </div>
-          <button type="button" class="emp-play" data-emp-preview="${i}" title="试听">${PLAY_SVG}</button>
+          <button type="button" class="emp-play" data-emp-preview="${i}" data-pd-key="s:${h.source}:${h.songId}" title="试听">${PLAY_SVG}</button>
           <button type="button" class="btn" data-emp-import="${i}">入库</button>
         </div>`
           )
@@ -8910,6 +9131,60 @@
         doSearch();
       }
     });
+    /* ---- 入库进度弹窗：真实五步进度（轮询中央服务任务状态） ---- */
+    const openImportProgress = hit => {
+      const stageNames = ["解析音源", "下载音频", "获取封面与歌词", "上传到存储", "写入曲库"];
+      const mask = document.createElement("div");
+      mask.className = "imp-mask";
+      mask.innerHTML = `
+        <div class="imp-card" role="dialog" aria-label="入库进度">
+          <div class="imp-head">
+            ${hit.cover ? `<img class="imp-cover" src="${esc(proxyCover(hit.cover))}" alt="" referrerpolicy="no-referrer" />` : `<span class="imp-cover imp-cover--ph">${svgIcon("music", 20)}</span>`}
+            <div class="imp-info">
+              <div class="imp-title">${esc(hit.title || "未知歌曲")}${hit.vip ? '<span class="emp-vip">VIP</span>' : ""}</div>
+              <div class="imp-sub">${esc(hit.artist || "未知歌手")} · ${esc(hit.sourceLabel || "")}</div>
+            </div>
+          </div>
+          <ul class="imp-stages">
+            ${stageNames.map(n => `<li class="imp-stage"><span class="imp-dot"></span><span class="imp-sname">${n}</span></li>`).join("")}
+          </ul>
+          <div class="imp-result"></div>
+        </div>`;
+      document.body.appendChild(mask);
+      const rows = [...mask.querySelectorAll(".imp-stage")];
+      const resultEl = mask.querySelector(".imp-result");
+      const close = () => mask.remove();
+      /** cur=当前进行中的步骤下标；terminal: undefined=进行中 / "ok" / "error" */
+      const render = (cur, terminal) => rows.forEach((r, i) => {
+        r.classList.toggle("is-done", terminal === "ok" || (!terminal && i < cur));
+        r.classList.toggle("is-active", !terminal && i === cur);
+        r.classList.toggle("is-failed", terminal === "error" && i === cur);
+      });
+      const showResult = (html, cls) => {
+        resultEl.innerHTML = html;
+        resultEl.classList.remove("is-ok", "is-failed");
+        if (cls) resultEl.classList.add(cls);
+      };
+      render(0);
+      return {
+        stage: i => render(i),
+        succeed: duplicate => {
+          render(0, "ok");
+          showResult(`<span class="imp-ok">${duplicate ? "该歌曲已在曲库中" : "入库成功"}</span>`, "is-ok");
+        },
+        fail: (msg, stageIdx) => {
+          render(stageIdx ?? 0, "error");
+          showResult(
+            `<span class="imp-fail">入库失败：${esc(msg || "未知错误")}</span><button type="button" class="btn imp-close">关 闭</button>`,
+            "is-failed"
+          );
+          resultEl.querySelector(".imp-close").onclick = close;
+        },
+        netHint: txt => showResult(`<span class="imp-net">${esc(txt)}</span>`),
+        close,
+      };
+    };
+
     resultsBox.addEventListener("click", async e => {
       const play = e.target.closest("[data-emp-preview]");
       if (play) {
@@ -8921,17 +9196,55 @@
       const hit = (resultsBox._hits || [])[Number(btn.dataset.empImport)];
       if (!hit) return;
       btn.disabled = true;
-      btn.textContent = "解析中…";
+      btn.textContent = "入库中…";
+      const prog = openImportProgress(hit);
+      let pollTimer = null, netFails = 0;
+      const cleanup = () => { if (pollTimer) clearTimeout(pollTimer); };
+      /** 轮询中央服务任务进度；running 时按 stage 推进，终态收敛 */
+      const poll = id => {
+        pollTimer = setTimeout(async () => {
+          let job;
+          try {
+            job = await api(`/api/music/import/progress/${id}`);
+            netFails = 0;
+          } catch {
+            // 轮询失败 = 浏览器网络问题，任务在中央服务后台不受影响，自动重连
+            netFails++;
+            if (netFails >= 20) {
+              btn.disabled = false;
+              btn.textContent = "入库";
+              prog.fail("网络中断，无法获取进度（任务可能仍在后台执行，重试会自动判重）");
+              return;
+            }
+            prog.netHint(`网络波动，第 ${netFails} 次重连中…`);
+            poll(id);
+            return;
+          }
+          if (job.status === "running") {
+            prog.stage(job.stage || 0);
+            poll(id);
+          } else if (job.status === "done" || job.status === "duplicate") {
+            const dup = job.status === "duplicate";
+            prog.succeed(dup);
+            toast(dup ? "已在音乐库，已插入" : "入库成功，已插入");
+            setTimeout(() => { prog.close(); insertAndClose(`t${job.result_id}`); }, dup ? 700 : 1100);
+          } else {
+            btn.disabled = false;
+            btn.textContent = "入库";
+            prog.fail(job.error || "入库失败", job.stage || 0);
+          }
+        }, 700);
+      };
       try {
-        const data = await api("/api/music/import", {
+        const d = await api("/api/music/import/async", {
           body: { source: hit.source, songId: hit.songId, title: hit.title, artist: hit.artist, album: hit.album, cover: hit.cover, vip: hit.vip },
         });
-        insertAndClose(data.id);
-        toast(data.duplicate ? "已在音乐库，已插入" : "入库成功，已插入");
+        poll(d.job_id);
       } catch (err) {
         btn.disabled = false;
         btn.textContent = "入库";
-        toast(err.message || "入库失败");
+        cleanup();
+        prog.fail(err.message || "提交任务失败");
       }
     });
 
@@ -10130,6 +10443,9 @@
     try { u = new URL(a.href, location.href); } catch { return; }
     if (u.origin !== location.origin) return;
     if (u.pathname.startsWith("/api/") || u.pathname.startsWith("/media/")) return;
+    // 同页 hash 锚点（文章目录 #toc-N 等）：放行给浏览器原生/专门委托处理，
+    // 否则 navigate(同路径) 会 window.scrollTo(0,0) 先回顶部再平滑下滑
+    if (u.hash && u.pathname === location.pathname && u.search === location.search) return;
     e.preventDefault();
     navigate(u.pathname + u.search);
   });
