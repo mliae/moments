@@ -391,17 +391,31 @@
       opts.headers["Content-Type"] = "application/json";
       opts.body = JSON.stringify(options.body);
     }
-    const res = await fetch(path, opts);
-    let json = null;
+    // 15s 超时保护（防止 Workers CPU 超限导致连接挂起）
+    const ac = new AbortController();
+    const tid = setTimeout(() => ac.abort(), 15000);
     try {
-      json = await res.json();
-    } catch (_) {}
-    if (!res.ok || !json || json.code !== 200) {
-      const err = new Error((json && json.message) || t("common.request_error_status", { status: res.status }));
-      err.status = res.status;
-      throw err;
+      const res = await fetch(path, { ...opts, signal: ac.signal });
+      clearTimeout(tid);
+      let json = null;
+      try {
+        json = await res.json();
+      } catch (_) {}
+      if (!res.ok || !json || json.code !== 200) {
+        const err = new Error((json && json.message) || t("common.request_error_status", { status: res.status }));
+        err.status = res.status;
+        throw err;
+      }
+      return json.data;
+    } catch (e) {
+      clearTimeout(tid);
+      if (e.name === "AbortError") {
+        const err = new Error("请求超时（15s），请重试");
+        err.status = 0;
+        throw err;
+      }
+      throw e;
     }
-    return json.data;
   }
 
   /**
@@ -5846,11 +5860,11 @@
           <summary class="admin-fold-summary">语言设置</summary>
           <div class="admin-fold-body">
             <label class="switch-row">
+              <span class="toggle"><input type="checkbox" name="i18n_enabled" ${s.i18n_enabled ? "checked" : ""} /><span></span></span>
               <span>
                 启用多语言
                 <br /><small style="color:var(--anzhiyu-secondtext)">关闭后全站只显示默认语言，顶栏语言切换按钮自动隐藏；访客已保存的语言选择会被保留</small>
               </span>
-              <input type="checkbox" name="i18n_enabled" ${s.i18n_enabled ? "checked" : ""} />
             </label>
             <div class="field">
               <label>默认语言<br /><small style="color:var(--anzhiyu-secondtext)">无法判定访客来源时使用；也对搜索引擎与关闭多语言时生效</small></label>
@@ -5871,18 +5885,18 @@
               </div>
             </div>
             <label class="switch-row">
+              <span class="toggle"><input type="checkbox" name="i18n_auto_detect" ${s.i18n_auto_detect !== false ? "checked" : ""} /><span></span></span>
               <span>
                 按访问地自动判定
                 <br /><small style="color:var(--anzhiyu-secondtext)">首次访问时：大陆→简体，台湾/香港/澳门→繁体，其他地区→英语，浏览器语言作为补充判定。访客手动选择后永远以手动选择为准</small>
               </span>
-              <input type="checkbox" name="i18n_auto_detect" ${s.i18n_auto_detect !== false ? "checked" : ""} />
             </label>
             <label class="switch-row">
+              <span class="toggle"><input type="checkbox" name="i18n_content_translate" ${s.i18n_content_translate !== false ? "checked" : ""} /><span></span></span>
               <span>
                 动态内容自动翻译（即将上线）
                 <br /><small style="color:var(--anzhiyu-secondtext)">说说、文章、评论正文：繁体走本地转换，英语走 Workers AI 翻译并永久缓存，原文修改后自动重译。当前界面文案已完整三语，内容翻译将在下一阶段开放</small>
               </span>
-              <input type="checkbox" name="i18n_content_translate" ${s.i18n_content_translate !== false ? "checked" : ""} />
             </label>
           </div>
         </details>
@@ -6506,13 +6520,28 @@
             <button type="button" class="btn sm ghost" data-mlib-del="${esc(t.id)}">删除</button>
           </div>`;
 
+      let libPage = 1;
+      const PAGE_SIZE = 20;
+
       const renderRows = () => {
         const rowsBox = libBox.querySelector("[data-mlib-rows]");
+        const pagerBox = libBox.querySelector("[data-mlib-pager]");
         if (!rowsBox) return;
         const shown = tagFilter ? libList.filter(t => tagsOf(t).includes(tagFilter)) : libList;
-        rowsBox.innerHTML = shown.length
-          ? shown.map(rowHtml).join("")
+        const totalPages = Math.ceil(shown.length / PAGE_SIZE);
+        if (libPage > totalPages) libPage = Math.max(1, totalPages);
+        const start = (libPage - 1) * PAGE_SIZE;
+        const pageItems = shown.slice(start, start + PAGE_SIZE);
+        rowsBox.innerHTML = pageItems.length
+          ? pageItems.map(rowHtml).join("")
           : `<div class="emp-help">该标签下暂无曲目。</div>`;
+        if (pagerBox) {
+          pagerBox.innerHTML = totalPages > 1
+            ? `<button class="btn sm ghost" data-mlib-page="prev" ${libPage <= 1 ? "disabled" : ""}>‹ 上一页</button>
+               <span class="ops-hint" style="margin:0 .5rem">${libPage} / ${totalPages}</span>
+               <button class="btn sm ghost" data-mlib-page="next" ${libPage >= totalPages ? "disabled" : ""}>下一页 ›</button>`
+            : "";
+        }
       };
 
       const loadLibrary = async () => {
@@ -6535,6 +6564,7 @@
             <button type="button" class="btn sm" data-mlib-fill-all>一键补全${missing ? `（缺 ${missing} 首）` : ""}</button>
           </div>
           <div class="mlib-list" data-mlib-rows></div>
+          <div class="mlib-pager" data-mlib-pager style="display:flex;align-items:center;justify-content:center;margin-top:.8rem;gap:.5rem"></div>
           <div class="emp-help" style="margin-top:.6rem">歌单链接：<code>/api/music/playlist.json</code> = 全部启用曲目；<code>/api/music/playlist.json?tag=最爱</code> = 指定标签的歌单，填入上方「自定义歌单 JSON 链接」即可。</div>`;
           renderRows();
         } catch (e) {
@@ -6578,6 +6608,13 @@
       });
 
       libBox.addEventListener("click", async e => {
+        const pageBtn = e.target.closest("[data-mlib-page]");
+        if (pageBtn) {
+          if (pageBtn.dataset.mlibPage === "prev") libPage--;
+          else libPage++;
+          renderRows();
+          return;
+        }
         const del = e.target.closest("[data-mlib-del]");
         if (del) {
           if (!confirm("删除后音频和封面文件会一并移除，确定删除？")) return;
@@ -7534,6 +7571,8 @@
 
     extractBtn.addEventListener("click", async () => {
       extractBtn.disabled = true;
+      const origText = extractBtn.innerHTML;
+      extractBtn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px"></span> 提取中…';
       try {
         const d = await api("/api/admin/ops/seo/extract-links", { method: "POST" });
         scan.links = d.list || [];
@@ -7546,6 +7585,7 @@
         summaryEl.textContent = "提取失败：" + e.message;
       } finally {
         extractBtn.disabled = false;
+        extractBtn.innerHTML = origText;
       }
     });
 

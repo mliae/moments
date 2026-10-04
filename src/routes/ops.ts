@@ -264,7 +264,10 @@ const LINK_RE = /https?:\/\/[^\s"'<>)\]]+/gi;
 
 function extractLinksFromText(text: string, selfHosts: Set<string>): string[] {
   const out: string[] = [];
-  for (const m of text.matchAll(LINK_RE)) {
+  if (!text || typeof text !== "string") return out;
+  // 截断超长文本防止 CPU 超限（m3u8 清单等超长内容）
+  const truncated = text.length > 30000 ? text.slice(0, 30000) : text;
+  for (const m of truncated.matchAll(LINK_RE)) {
     let raw = m[0];
     // 去掉末尾常见标点
     raw = raw.replace(/[.,;:!?，。；：！？、]+$/, "");
@@ -316,45 +319,50 @@ async function checkOne(url: string): Promise<{ url: string; status: number; ok:
 }
 
 app.post("/seo/extract-links", requireAdmin, async c => {
-  const db = c.env.DB;
-  const s = await import("../settings").then(m => m.getSettings(db));
+  try {
+    const db = c.env.DB;
+    const s = await import("../settings").then(m => m.getSettings(db));
 
-  // 站点自身域名（排除）
-  const selfHosts = new Set<string>();
-  const domains = [s.site_domain, s.r2_domain].filter(Boolean);
-  for (const d of domains) {
-    try { selfHosts.add(new URL(d).hostname.toLowerCase()); } catch { /* 忽略 */ }
-  }
-  const reqUrl = new URL(c.req.url);
-  selfHosts.add(reqUrl.hostname.toLowerCase());
-  selfHosts.add("jxe.me");
+    // 站点自身域名（排除）
+    const selfHosts = new Set<string>();
+    const domains = [s.site_domain, s.r2_domain].filter(Boolean);
+    for (const d of domains) {
+      try { selfHosts.add(new URL(d).hostname.toLowerCase()); } catch { /* 忽略 */ }
+    }
+    const reqUrl = new URL(c.req.url);
+    selfHosts.add(reqUrl.hostname.toLowerCase());
+    selfHosts.add("jxe.me");
 
-  const [posts, moments, friends] = await Promise.all([
-    db.prepare(`SELECT title, content_md, excerpt FROM posts WHERE status = 'published' ORDER BY id DESC LIMIT 100`).all<{ title: string; content_md: string; excerpt: string }>(),
-    db.prepare(`SELECT content FROM moments ORDER BY id DESC LIMIT 200`).all<{ content: string }>(),
-    db.prepare(`SELECT name, url, description FROM friends WHERE status = 'approved' ORDER BY id DESC LIMIT 200`).all<{ name: string; url: string; description: string }>(),
-  ]);
+    const [posts, moments, friends] = await Promise.all([
+      db.prepare(`SELECT title, content_md, excerpt FROM posts WHERE status = 'published' ORDER BY id DESC LIMIT 100`).all<{ title: string; content_md: string; excerpt: string }>(),
+      db.prepare(`SELECT content FROM moments ORDER BY id DESC LIMIT 200`).all<{ content: string }>(),
+      db.prepare(`SELECT name, url, description FROM friends WHERE status = 'approved' ORDER BY id DESC LIMIT 200`).all<{ name: string; url: string; description: string }>(),
+    ]);
 
-  const all: string[] = [];
-  const seen = new Set<string>();
-  const addLinks = (texts: string[], source: string) => {
-    for (const text of texts) {
-      for (const link of extractLinksFromText(text, selfHosts)) {
-        if (seen.has(link)) continue;
-        seen.add(link);
-        all.push(link);
+    const all: string[] = [];
+    const seen = new Set<string>();
+    const addLinks = (texts: (string | null | undefined)[], source: string) => {
+      for (const text of texts) {
+        if (!text || typeof text !== "string") continue;
+        for (const link of extractLinksFromText(text, selfHosts)) {
+          if (seen.has(link)) continue;
+          seen.add(link);
+          all.push(link);
+          if (all.length >= 100) break;
+        }
         if (all.length >= 100) break;
       }
-      if (all.length >= 100) break;
-    }
-    void source;
-  };
+      void source;
+    };
 
-  addLinks((posts.results ?? []).flatMap(p => [p.content_md, p.excerpt]), "posts");
-  addLinks((moments.results ?? []).map(m => m.content), "moments");
-  addLinks((friends.results ?? []).flatMap(f => [f.url, f.description]), "friends");
+    addLinks((posts.results ?? []).flatMap(p => [p.content_md, p.excerpt].filter(Boolean)), "posts");
+    addLinks((moments.results ?? []).map(m => m.content), "moments");
+    addLinks((friends.results ?? []).flatMap(f => [f.url, f.description].filter(Boolean)), "friends");
 
-  return ok(c, { list: all, total: all.length });
+    return ok(c, { list: all, total: all.length });
+  } catch (e) {
+    return fail(c, "提取异常：" + String(e instanceof Error ? e.message : e), 500);
+  }
 });
 
 app.post("/seo/check-links", requireAdmin, async c => {
