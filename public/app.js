@@ -5352,7 +5352,7 @@
             <div class="photo-admin-card" data-id="${p.id}">
               <div class="photo-admin-thumb">
                 <input type="checkbox" class="admin-check photo-admin-check" value="${p.id}" title="选中用于批量操作" />
-                <img src="${esc(p.src)}" alt="" referrerpolicy="no-referrer" loading="lazy" />
+                <img src="${esc(thumbSrc(p.src))}" alt="" referrerpolicy="no-referrer" loading="lazy" data-orig="${esc(p.src)}" />
                 <span class="photo-admin-src-tag">${sourceLabel(p.source_type)}</span>
               </div>
               <div class="photo-admin-fields">
