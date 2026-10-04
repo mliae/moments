@@ -252,6 +252,7 @@
     sunLine: { stroke: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>' },
     sparkles: { stroke: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>' },
     music: { stroke: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>' },
+    "list-music": { stroke: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 9h6"/><path d="M9 13h6"/><path d="M9 17h4"/><circle cx="17.5" cy="17.5" r="1.5" fill="currentColor" stroke="none"/>' },
     dices: { stroke: '<rect width="12" height="12" x="2" y="10" rx="2" ry="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/><path d="M15 6h.01"/><path d="M18 9h.01"/>' },
     lock: { stroke: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>' },
     menu: { stroke: '<line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/>' },
@@ -4672,7 +4673,8 @@
     { key: "appearance", label: "外观", icon: "palette" },
     { key: "i18n", label: "多语言", icon: "globe" },
     { key: "media", label: "媒体", icon: "folder" },
-    { key: "music", label: "音乐", icon: "music" },
+    { key: "music_player", label: "音乐播放器", icon: "music" },
+    { key: "music_library", label: "音乐曲库", icon: "list-music" },
     { key: "ai", label: "AI 助手", icon: "bot" },
     { key: "seo", label: "搜索收录", icon: "search" },
     { key: "security", label: "安全", icon: "shield" },
@@ -4855,7 +4857,8 @@
     if (tab === "appearance") return renderAdminAppearance(panel);
     if (tab === "i18n") return renderAdminI18n(panel);
     if (tab === "media") return renderAdminMedia(panel);
-    if (tab === "music") return renderAdminMusic(panel);
+    if (tab === "music_player") return renderAdminMusicPlayer(panel);
+    if (tab === "music_library") return renderAdminMusicLibrary(panel);
     if (tab === "ai") return renderAdminAI(panel);
     if (tab === "seo") return renderAdminSeo(panel);
     if (tab === "security") return renderAdminSecurity(panel);
@@ -6407,8 +6410,8 @@
 
   }
 
-  /* ---------- 后台 Tab：音乐（播放器设置 + 站内音乐库） ---------- */
-  async function renderAdminMusic(panel) {
+  /* ---------- 后台 Tab：音乐播放器（播放器设置 + 中央音乐服务配置） ---------- */
+  async function renderAdminMusicPlayer(panel) {
     panel.innerHTML = `<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
     let s;
     try {
@@ -6483,11 +6486,7 @@
           <div class="field-hint">搜歌、试听、入库、曲库管理均由中央服务执行，本站不落地存储；服务地址留空时音乐库功能不可用。</div>
         </div>
         <button class="btn primary" type="submit">保存服务配置</button>
-      </form>
-
-      <div class="admin-panel-head" style="margin-top:1.75rem"><h3>音乐曲库</h3></div>
-      <p style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:-.4rem 0 1rem">文章中插入的音乐（<code>[music=tN]</code>）托管在中央音乐服务，停用后前台显示「音乐不可用」，删除会同时移除音频和封面文件。</p>
-      <div data-music-library><div class="emp-help"><span class="spinner"></span> 加载中…</div></div>`;
+      </form>`;
 
     // 音量滑块实时显示
     const range = panel.querySelector("[data-vol-range]");
@@ -6497,6 +6496,14 @@
         out.textContent = Math.round(Number(range.value) * 100) + "%";
       });
     }
+  }
+
+  /* ---------- 后台 Tab：音乐曲库 ---------- */
+  async function renderAdminMusicLibrary(panel) {
+    panel.innerHTML = `
+      <div class="admin-panel-head"><h3>音乐曲库</h3></div>
+      <p style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:-.4rem 0 1rem">文章中插入的音乐（<code>[music=tN]</code>）托管在中央音乐服务，停用后前台显示「音乐不可用」，删除会同时移除音频和封面文件。</p>
+      <div data-music-library><div class="emp-help"><span class="spinner"></span> 加载中…</div></div>`;
 
     // 站内音乐库列表
     const libBox = panel.querySelector("[data-music-library]");
