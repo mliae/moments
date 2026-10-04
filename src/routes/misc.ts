@@ -118,35 +118,61 @@ async function fetchNickFromApi(api: ApiEntry, qq: string): Promise<string> {
 }
 
 /**
- * 通过 apihz「查询QQ基础资料」接口取昵称（需后台配置 id/ckqq/pskey）。
+ * 直连腾讯接口查询 QQ 昵称（需后台配置 ckqq/skey/pskey）。
  * 仅供服务端调用，凭证私密不下发前端。返回 null 表示未配置/失败。
  */
 export async function fetchQqNickDirect(
   s: SiteSettings,
   qq: string
 ): Promise<{ nickname: string } | null> {
-  if (!s.apihz_id || !s.qq_ckqq || !s.qq_pskey) return null;
-  const params = new URLSearchParams({
-    id: s.apihz_id,
-    key: s.apihz_key || "",
-    qq,
-    ckqq: s.qq_ckqq,
-    pskey: s.qq_pskey,
-  });
-  if (s.qq_skey) params.set("skey", s.qq_skey);
-  const url = `https://cn.apihz.cn/api/other/qq.php?${params.toString()}`;
+  if (!s.qq_ckqq || !s.qq_pskey) return null;
+  // 用 Cookie 直接请求腾讯 Qzone 接口获取昵称
+  const cookie = `uin=o${s.qq_ckqq}; skey=${s.qq_skey}; p_skey=${s.qq_pskey}`;
+  const url = `https://user.qzone.qq.com/${encodeURIComponent(qq)}/profile`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const resp = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": UA } });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const d = (await resp.json()) as Record<string, unknown>;
-    if (d.code === 200 && d.Name) {
-      return { nickname: String(d.Name).trim().slice(0, 50) };
+    const resp = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        "User-Agent": UA,
+        "Cookie": cookie,
+        "Referer": "https://qzone.qq.com/",
+      },
+      redirect: "manual", // 302 = Cookie 失效
+    });
+    if (resp.status === 302 || resp.status === 301) {
+      throw new Error("Cookie 已失效（302 重定向）");
     }
-    throw new Error(String(d.msg || d.text || "apihz 未返回昵称"));
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const html = decodeBuf(await resp.arrayBuffer());
+    // 从 Qzone 个人资料页提取昵称
+    const m = html.match(/<title>([^<]+?)的空间/) || html.match(/nickname["\s:=]+["']([^"']+)["']/) || html.match(/"name"\s*:\s*"([^"]+)"/);
+    if (m && m[1]) {
+      return { nickname: m[1].trim().slice(0, 50) };
+    }
+    throw new Error("未从页面提取到昵称");
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** 检测 QQ Cookie 是否有效（用于保活+告警） */
+export async function checkQqCookie(s: SiteSettings): Promise<{ ok: boolean; msg: string }> {
+  if (!s.qq_ckqq || !s.qq_pskey) return { ok: false, msg: "未配置 ckqq/pskey" };
+  const cookie = `uin=o${s.qq_ckqq}; skey=${s.qq_skey}; p_skey=${s.qq_pskey}`;
+  try {
+    const resp = await fetch(`https://user.qzone.qq.com/${s.qq_ckqq}/profile`, {
+      headers: { "User-Agent": UA, "Cookie": cookie, "Referer": "https://qzone.qq.com/" },
+      redirect: "manual",
+    });
+    if (resp.status === 302 || resp.status === 301) {
+      return { ok: false, msg: "Cookie 已失效（302 重定向到登录页）" };
+    }
+    if (!resp.ok) return { ok: false, msg: `HTTP ${resp.status}` };
+    return { ok: true, msg: "Cookie 有效" };
+  } catch (e) {
+    return { ok: false, msg: "请求失败：" + (e instanceof Error ? e.message : String(e)) };
   }
 }
 

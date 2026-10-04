@@ -105,16 +105,29 @@ export interface CommentMailConfig {
   replyNotify: boolean;
 }
 
-export async function handleCommentMailNotifications(opts: {
+export interface CommentNotifyOpts {
   mail: CommentMailConfig;
+  webhookUrl?: string; // 安全告警 Webhook（飞书/钉钉/企业微信），空=不推送
   db: D1Database;
   site: string;
   comment: { id: number; nickname: string; content: string; parent_id: number; email?: string };
   targetTypeLabel: string; // 「说说」或「文章」
   targetLabel: string;
   url: string;
-}): Promise<void> {
-  const { mail, db, site, comment, targetTypeLabel, targetLabel, url } = opts;
+}
+
+export async function handleCommentMailNotifications(opts: CommentNotifyOpts): Promise<void> {
+  const { mail, webhookUrl, db, site, comment, targetTypeLabel, targetLabel, url } = opts;
+
+  // Webhook 新评论通知（不依赖邮件配置，有 webhookUrl 就推）
+  if (webhookUrl) {
+    try {
+      const { sendWebhookAlert } = await import("./security");
+      const excerpt = comment.content.replace(/\n/g, " ").slice(0, 100);
+      void sendWebhookAlert(webhookUrl, `💬 新评论 · ${comment.nickname}`, `${targetTypeLabel}「${targetLabel}」\n${excerpt}\n${url}`);
+    } catch { /* 通知失败不影响主流程 */ }
+  }
+
   if (!mail.enabled || !mail.apiKey || !mail.from) return;
 
   // 1. 管理员新评论通知

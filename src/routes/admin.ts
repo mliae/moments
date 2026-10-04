@@ -20,7 +20,7 @@ import { keyToSrc } from "../db";
 import { getSettings, updateSettings, normalizeAdminPath } from "../settings";
 import { deleteCommentAnywhere, editCommentAnywhere } from "../comment-service";
 import { ensureAvatar } from "../avatar";
-import { fetchQqNickDirect } from "./misc";
+
 import { ATTACK_RULES, banIp, unbanIp, sendWebhookAlert } from "../security";
 
 const app = new Hono<HonoEnv>();
@@ -396,23 +396,17 @@ app.post("/qq/test", requireAdmin, async c => {
   // 允许传入未保存的表单值进行测试，否则用已存配置
   const eff = {
     ...s,
-    apihz_id: typeof body.apihz_id === "string" ? body.apihz_id : s.apihz_id,
-    apihz_key: typeof body.apihz_key === "string" ? body.apihz_key : s.apihz_key,
     qq_ckqq: typeof body.qq_ckqq === "string" ? body.qq_ckqq : s.qq_ckqq,
     qq_skey: typeof body.qq_skey === "string" ? body.qq_skey : s.qq_skey,
     qq_pskey: typeof body.qq_pskey === "string" ? body.qq_pskey : s.qq_pskey,
   };
-  if (!eff.apihz_id || !eff.qq_ckqq || !eff.qq_pskey) {
-    return ok(c, { ok: false, msg: "请先填写 apihz 的 id、系统 QQ(ckqq)、pskey" });
-  }
-  const testQq = (typeof body.qq === "string" && body.qq.trim() ? body.qq : eff.qq_ckqq).trim();
-  if (!/^[1-9]\d{4,11}$/.test(testQq)) {
-    return ok(c, { ok: false, msg: "ckqq 不是合法 QQ 号，或传入的测试 QQ 不合法" });
+  if (!eff.qq_ckqq || !eff.qq_pskey) {
+    return ok(c, { ok: false, msg: "请先填写系统 QQ(ckqq) 和 pskey" });
   }
   try {
-    const r = await fetchQqNickDirect(eff, testQq);
-    if (r?.nickname) return ok(c, { ok: true, qq: testQq, nickname: r.nickname, msg: "连接正常，凭证有效" });
-    return ok(c, { ok: false, msg: "接口未返回昵称（可能 CK 已过期，请重新抓取）" });
+    const { checkQqCookie } = await import("../routes/misc");
+    const r = await checkQqCookie(eff);
+    return ok(c, { ok: r.ok, msg: r.msg });
   } catch (e) {
     return ok(c, { ok: false, msg: "连接失败：" + (e instanceof Error ? e.message : String(e)) });
   }

@@ -203,12 +203,12 @@ app.get("/api/settings", async c => {
   const s = await getSettings(c.env.DB);
   // 私密字段绝不下发：后台入口、apihz 凭证、QQ 登录态、邮件 API Key、告警 Webhook
   const {
-    admin_path: _h1, apihz_id: _h2, apihz_key: _h3, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
+    admin_path: _h1, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
     indexnow_key: _h7, baidu_push_token: _h8, mail_resend_key: _h9, security_webhook_url: _h10,
     music_api_key: _h11,
     ...publicSettings
   } = s;
-  void [_h1, _h2, _h3, _h4, _h5, _h6, _h7, _h8, _h9, _h10, _h11];
+  void [_h1, _h4, _h5, _h6, _h7, _h8, _h9, _h10, _h11];
   const res = ok(c, publicSettings);
   res.headers.set("Cache-Control", "public, max-age=60, s-maxage=300");
   return res;
@@ -694,7 +694,7 @@ async function handleScheduled(env: HonoEnv["Bindings"]): Promise<void> {
       }
     }
 
-    if (!s.apihz_id || !s.qq_ckqq || !s.qq_pskey) return; // 未配置 QQ 凭证，跳过
+    if (!s.qq_ckqq || !s.qq_pskey) return; // 未配置 QQ Cookie，跳过
 
     // 检查上次保活时间，避免过于频繁调用
     const lastKey = "qq_keepalive_last";
@@ -706,10 +706,9 @@ async function handleScheduled(env: HonoEnv["Bindings"]): Promise<void> {
     const intervalMs = intervalHours * 60 * 60 * 1000;
     if (Date.now() - lastTime < intervalMs) return; // 未到间隔时间
 
-    // 调用腾讯接口保活（用 ckqq 自测）
-    const { fetchQqNickDirect } = await import("./routes/misc");
-    const r = await fetchQqNickDirect(s, s.qq_ckqq);
-    const status = r?.nickname ? "ok" : "empty";
+    // 直接请求腾讯 Qzone 接口保活（Cookie 活跃检测）
+    const { checkQqCookie } = await import("./routes/misc");
+    const r = await checkQqCookie(s);
 
     // 记录本次保活时间
     await env.DB.prepare(
@@ -717,7 +716,31 @@ async function handleScheduled(env: HonoEnv["Bindings"]): Promise<void> {
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
     ).bind(lastKey, new Date().toISOString()).run();
 
-    console.log(`[qq-keepalive] ${status} interval=${intervalHours}h`);
+    if (!r.ok) {
+      console.error(`[qq-keepalive] Cookie 失效: ${r.msg}`);
+      // Cookie 失效时发 Webhook 告警（同一轮故障 60 分钟内去重）
+      if (s.security_webhook_url) {
+        const alertKey = "qq_cookie_alert_last";
+        const alertRow = await env.DB.prepare(
+          `SELECT value FROM kv_store WHERE key = ?`
+        ).bind(alertKey).first<{ value: string }>();
+        const alertTime = alertRow?.value ? new Date(alertRow.value).getTime() : 0;
+        if (Date.now() - alertTime >= 60 * 60 * 1000) {
+          const { sendWebhookAlert } = await import("./security");
+          await sendWebhookAlert(
+            s.security_webhook_url,
+            "⚠️ QQ Cookie 已失效",
+            `保活检测失败：${r.msg}\n请重新登录 QQ 获取新 Cookie，否则评论者昵称将无法自动获取。`
+          );
+          await env.DB.prepare(
+            `INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+          ).bind(alertKey, new Date().toISOString()).run();
+        }
+      }
+    } else {
+      console.log(`[qq-keepalive] ok interval=${intervalHours}h`);
+    }
   } catch (e) {
     console.error("[qq-keepalive] error:", e);
   }

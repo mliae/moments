@@ -78,12 +78,14 @@ admin.get("/", requireAdmin, async c => {
   const perPage = Math.min(50, Math.max(1, Number(c.req.query("per_page")) || 24));
   const page = Math.max(1, Number(c.req.query("page")) || 1);
   const s = await getSettings(c.env.DB);
-  const total = (await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM photos`).first<{ n: number }>())?.n ?? 0;
+  const visibleQ = c.req.query("visible");
+  const visibleFilter = visibleQ === "1" ? "visible = 1" : visibleQ === "0" ? "visible = 0" : "1=1";
+  const total = (await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM photos WHERE ${visibleFilter}`).first<{ n: number }>())?.n ?? 0;
   const rows = (
     await c.env.DB
       .prepare(
         `SELECT id, src, title, description, sort_order, visible, source_type, source_id, created_at, updated_at
-         FROM photos ORDER BY sort_order ASC, id DESC LIMIT ? OFFSET ?`
+         FROM photos WHERE ${visibleFilter} ORDER BY sort_order ASC, id DESC LIMIT ? OFFSET ?`
       )
       .bind(perPage, (page - 1) * perPage)
       .all<PhotoRow>()
@@ -110,12 +112,19 @@ admin.post("/", requireAdmin, async c => {
   const source_type = body.source_type === "moment" || body.source_type === "post" ? body.source_type : "upload";
   const source_id = Number(body.source_id) || 0;
 
+  // sort_order 未传时取当前最大值 + 1（保持递增，新图排在后面）
+  let finalSort = sort_order;
+  if (finalSort === 0) {
+    const maxRow = await c.env.DB.prepare(`SELECT MAX(sort_order) as m FROM photos`).first<{ m: number | null }>();
+    finalSort = (maxRow?.m ?? 0) + 1;
+  }
+
   const now = new Date().toISOString();
   const result = await c.env.DB.prepare(
     `INSERT INTO photos (src, title, description, sort_order, visible, source_type, source_id, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
   )
-    .bind(src, title, description, sort_order, visible, source_type, source_id, now, now)
+    .bind(src, title, description, finalSort, visible, source_type, source_id, now, now)
     .first<PhotoRow>();
   const s = await getSettings(c.env.DB);
   return ok(c, serializePhoto(result as PhotoRow, s.r2_domain), "已添加");
@@ -197,10 +206,33 @@ admin.post("/batch-delete", requireAdmin, async c => {
   return ok(c, { deleted: ids.length }, `已删除 ${ids.length} 张图片`);
 });
 
+/** POST /batch-toggle  批量切换显示/隐藏，body: { ids: number[], visible: 0|1 } */
+admin.post("/batch-toggle", requireAdmin, async c => {
+  let ids: number[];
+  let visible: number;
+  try {
+    const body = (await c.req.json()) as { ids?: unknown; visible?: unknown };
+    ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 200);
+    visible = body.visible === 0 || body.visible === "0" || body.visible === false ? 0 : 1;
+  } catch {
+    return fail(c, "请求格式错误", 400);
+  }
+  if (!ids.length) return fail(c, "未选择任何图片", 400);
+
+  const ph = ids.map(() => "?").join(",");
+  await c.env.DB.prepare(
+    `UPDATE photos SET visible = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id IN (${ph})`
+  )
+    .bind(visible, ...ids)
+    .run();
+
+  return ok(c, { updated: ids.length, visible }, `已${visible ? "显示" : "隐藏"} ${ids.length} 张图片`);
+});
+
 /**
  * 同步：扫描 moments.images（JSON 数组）与 posts.cover，
  * 将尚未出现在 photos 表中的图片插入（source_type=moment/post），
- * 默认 sort_order=0、visible=1。
+ * sort_order 自动取当前最大值 + 1（保持递增），visible=1。
  * 返回新增数量。
  */
 admin.post("/sync", requireAdmin, async c => {
@@ -243,11 +275,14 @@ admin.post("/sync", requireAdmin, async c => {
   const now = new Date().toISOString();
   let inserted = 0;
   if (toInsert.length) {
+    // sort_order 取当前最大值 + 1 递增，避免所有新图都是 0
+    const maxRow = await c.env.DB.prepare(`SELECT MAX(sort_order) as m FROM photos`).first<{ m: number | null }>();
+    let nextSort = (maxRow?.m ?? 0) + 1;
     const stmt = c.env.DB.prepare(
       `INSERT INTO photos (src, title, description, sort_order, visible, source_type, source_id, created_at, updated_at)
-       VALUES (?, '', '', 0, 1, ?, ?, ?, ?)`
+       VALUES (?, '', '', ?, 1, ?, ?, ?, ?)`
     );
-    const batch = toInsert.map(item => stmt.bind(item.src, item.source_type, item.source_id, now, now));
+    const batch = toInsert.map(item => stmt.bind(item.src, nextSort++, item.source_type, item.source_id, now, now));
     await c.env.DB.batch(batch);
     inserted = toInsert.length;
   }

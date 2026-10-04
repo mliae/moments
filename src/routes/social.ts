@@ -118,6 +118,7 @@ app.post("/:id/comments", async c => {
         replyNotify: s.mail_reply_notify,
       },
       db: c.env.DB,
+      webhookUrl: s.security_webhook_url || "",
       site: s.site_title || "Moments",
       comment: result.comment,
       targetTypeLabel: "说说",

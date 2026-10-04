@@ -5137,6 +5137,7 @@
   const adminMomCursors = [null]; // adminMomCursors[page-1] = 该页起始游标
   let adminPostsPage = 1;
   let adminPhotosPage = 1;
+  let adminPhotosFilter = "all"; // all | visible | hidden
 
   /** 后台列表多选 + 批量删除通用接线：rowSel 为行/卡片选择器，onDone 为删除成功后的重绘回调 */
   function wireBatch(panel, { rowSel, endpoint, label, onDone }) {
@@ -5322,7 +5323,8 @@
     let list = [];
     let total = 0;
     try {
-      const data = await api(`/api/admin/photos?page=${page}&per_page=24`);
+      const vParam = adminPhotosFilter === "visible" ? "&visible=1" : adminPhotosFilter === "hidden" ? "&visible=0" : "";
+      const data = await api(`/api/admin/photos?page=${page}&per_page=24${vParam}`);
       list = data.list;
       total = data.total ?? list.length;
     } catch (e) {
@@ -5344,7 +5346,15 @@
       <div class="admin-batch-bar">
         <label class="admin-batch-all"><input type="checkbox" data-batch-all /> 全选</label>
         <span class="admin-batch-info">已选 <strong data-batch-count>0</strong> 项</span>
+        <button class="btn" data-batch-show disabled>批量显示</button>
+        <button class="btn" data-batch-hide disabled>批量隐藏</button>
         <button class="btn danger" data-batch-del disabled>批量删除</button>
+      </div>
+      <div style="display:flex;gap:.5rem;margin-bottom:.75rem;align-items:center;flex-wrap:wrap">
+        <span class="ops-hint" style="font-size:.82rem;color:var(--anzhiyu-secondtext)">筛选：</span>
+        <button class="btn sm ${adminPhotosFilter === "all" ? "primary" : ""}" data-photo-filter="all">全部</button>
+        <button class="btn sm ${adminPhotosFilter === "visible" ? "primary" : ""}" data-photo-filter="visible">已显示</button>
+        <button class="btn sm ${adminPhotosFilter === "hidden" ? "primary" : ""}" data-photo-filter="hidden">已隐藏</button>
       </div>
       <input type="file" accept="image/*" data-photo-file hidden multiple />
       ${
@@ -5355,7 +5365,9 @@
             <div class="photo-admin-card" data-id="${p.id}">
               <div class="photo-admin-thumb">
                 <input type="checkbox" class="admin-check photo-admin-check" value="${p.id}" title="选中用于批量操作" />
-                <img src="${esc(thumbSrc(p.src))}" alt="" referrerpolicy="no-referrer" loading="lazy" data-orig="${esc(p.src)}" />
+                <a href="${esc(p.src)}" data-lightbox data-fancybox="admin-photos" style="display:block;width:100%;height:100%">
+                  <img src="${esc(thumbSrc(p.src))}" alt="" referrerpolicy="no-referrer" loading="lazy" data-orig="${esc(p.src)}" />
+                </a>
                 <span class="photo-admin-src-tag">${sourceLabel(p.source_type)}</span>
               </div>
               <div class="photo-admin-fields">
@@ -5365,7 +5377,7 @@
                     <input type="checkbox" class="photo-visible-input" ${p.visible ? "checked" : ""} />
                     <span>显示</span>
                   </label>
-                  <input type="number" class="photo-sort-input" value="${p.sort_order}" style="width:70px" title="排序（升序）" />
+                  <input type="number" class="photo-sort-input" value="${p.sort_order}" style="width:70px" title="排序（小的在前，同值按上传时间倒序）" />
                   <button class="btn photo-save-btn" data-photo-act="save">保存</button>
                   <button class="btn danger" data-photo-act="del">删除</button>
                 </div>
@@ -5380,7 +5392,38 @@
     panel.querySelectorAll("[data-pager]").forEach(b =>
       b.addEventListener("click", () => renderAdminPhotos(panel, b.dataset.pager === "prev" ? page - 1 : page + 1))
     );
+    // 筛选按钮
+    panel.querySelectorAll("[data-photo-filter]").forEach(btn =>
+      btn.addEventListener("click", () => {
+        adminPhotosFilter = btn.dataset.photoFilter;
+        adminPhotosPage = 1;
+        renderAdminPhotos(panel, 1);
+      })
+    );
     wireBatch(panel, { rowSel: ".photo-admin-card", endpoint: "/api/admin/photos/batch-delete", label: "张图片", onDone: () => renderAdminPhotos(panel) });
+    // 批量显示/隐藏
+    const batchToggle = async (visible) => {
+      const ids = [...panel.querySelectorAll(".photo-admin-card input.admin-check:checked")].map(b => Number(b.value));
+      if (!ids.length) return;
+      try {
+        await api("/api/admin/photos/batch-toggle", { method: "POST", body: { ids, visible } });
+        toast(`已${visible ? "显示" : "隐藏"} ${ids.length} 张图片`);
+        renderAdminPhotos(panel);
+      } catch (err) { toast(err.message); }
+    };
+    const showBtn = panel.querySelector("[data-batch-show]");
+    const hideBtn = panel.querySelector("[data-batch-hide]");
+    if (showBtn) showBtn.addEventListener("click", () => batchToggle(1));
+    if (hideBtn) hideBtn.addEventListener("click", () => batchToggle(0));
+    // 同步批量按钮的 disabled 状态（与 wireBatch 的 delBtn 联动）
+    const syncBatchBtns = () => {
+      const checked = panel.querySelectorAll(".photo-admin-card input.admin-check:checked").length;
+      if (showBtn) showBtn.disabled = checked === 0;
+      if (hideBtn) hideBtn.disabled = checked === 0;
+    };
+    panel.querySelectorAll(".photo-admin-card input.admin-check").forEach(b => b.addEventListener("change", syncBatchBtns));
+    const batchAll = panel.querySelector("[data-batch-all]");
+    if (batchAll) batchAll.addEventListener("change", () => setTimeout(syncBatchBtns, 0));
     panel.querySelector('[data-photo-act="sync"]').addEventListener("click", async e => {
       const btn = e.currentTarget;
       btn.disabled = true;
@@ -6127,13 +6170,11 @@
         </details>
 
         <details class="admin-fold">
-          <summary class="admin-fold-summary">QQ 昵称资料（apihz）</summary>
+          <summary class="admin-fold-summary">QQ 昵称资料</summary>
           <div class="admin-fold-body">
         <div class="field" style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc)">
-          <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，用这组凭证查昵称。凭证仅存服务端，绝不下发前台。</div>
+          <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，后台用 Cookie 直连腾讯查询昵称。凭证仅存服务端，绝不下发前台。</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
-            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">apihz 开发者 ID</label><input name="apihz_id" value="${esc(s.apihz_id)}" placeholder="个人资料里的数字 ID" /></div>
-            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">apihz 开发者 KEY</label><input name="apihz_key" value="${esc(s.apihz_key)}" placeholder="通讯秘钥" /></div>
             <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">系统 QQ（ckqq）</label><input name="qq_ckqq" value="${esc(s.qq_ckqq)}" placeholder="你的 QQ 号" /></div>
             <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">skey</label><input name="qq_skey" value="${esc(s.qq_skey)}" placeholder="cookie 里的 skey" /></div>
           </div>
@@ -6284,8 +6325,6 @@
       bmLink.addEventListener("click", e => e.preventDefault());
     }
     const qqFormVals = () => ({
-      apihz_id: panel.querySelector('[name="apihz_id"]')?.value || "",
-      apihz_key: panel.querySelector('[name="apihz_key"]')?.value || "",
       qq_ckqq: panel.querySelector('[name="qq_ckqq"]')?.value || "",
       qq_skey: panel.querySelector('[name="qq_skey"]')?.value || "",
       qq_pskey: panel.querySelector('[name="qq_pskey"]')?.value || "",
@@ -10394,7 +10433,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
