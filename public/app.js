@@ -19,6 +19,8 @@
 
   const GAP = 16;
   const LAYOUT_TIMEOUT = 1000;
+  /** i18n 取词代理（词典与状态在 i18n.js，该脚本先于 app.js 加载） */
+  const t = (key, vars) => (window.I18N ? window.I18N.t(key, vars) : key);
   /** 首页每页条数：读后台设置（1-50），非法回退 20 */
   function feedPageSize() {
     const n = Number(state.settings.feed_page_size);
@@ -28,9 +30,9 @@
   function pagerHtml(page, pages) {
     if (pages <= 1) return "";
     return `<div class="pager">
-      <button type="button" class="btn" data-pager="prev"${page <= 1 ? " disabled" : ""}>上一页</button>
-      <span class="pager-info">第 ${page} / ${pages} 页</span>
-      <button type="button" class="btn" data-pager="next"${page >= pages ? " disabled" : ""}>下一页</button>
+      <button type="button" class="btn" data-pager="prev"${page <= 1 ? " disabled" : ""}>${t("common.prev_page")}</button>
+      <span class="pager-info">${t("common.page_info", { page, pages })}</span>
+      <button type="button" class="btn" data-pager="next"${page >= pages ? " disabled" : ""}>${t("common.next_page")}</button>
     </div>`;
   }
 
@@ -91,7 +93,12 @@
     ai_text_model: "",
     qq_nick_apis: "",
     site_icon: "",
-    comment_emoji_owo_url: "/owo.json",
+  comment_emoji_owo_url: "/owo.json",
+  i18n_enabled: false,
+  i18n_default: "zh-CN",
+  i18n_langs: "zh-CN,zh-TW,en",
+  i18n_auto_detect: true,
+  i18n_content_translate: true,
   };
 
   const state = {
@@ -141,7 +148,7 @@
         },
         renderer(token) {
           const id = String(token.songId || "").replace(/[^t\d]/g, "");
-          return `<div class="music-block-card" data-song-id="${id}"><div class="mcc-skeleton"><span class="spinner"></span>加载音乐…</div></div>`;
+          return `<div class="music-block-card" data-song-id="${id}"><div class="mcc-skeleton"><span class="spinner"></span>${t("music.loading")}</div></div>`;
         },
       },
       {
@@ -221,6 +228,7 @@
     arrowUpRight: { vb: "0 0 24 24", d: "M13.828 7.172a.997.997 0 0 0-1-1h-6a1 1 0 1 0 0 2h3.586l-3.95 3.95a1 1 0 0 0 1.415 1.414l3.95-3.95v3.586a1 1 0 0 0 2 0v-6zM10 20C4.477 20 0 15.523 0 10S4.477 0 10 0s10 4.477 10 10s-4.477 10-10 10" },
     trash: { vb: "0 0 448 512", d: "M135.2 17.7C140.6 6.8 151.7 0 163.8 0h120.4c12.1 0 23.2 6.8 28.6 17.7L320 32h96c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 96 0 81.7 0 64s14.3-32 32-32h96zM32 128h384v320c0 35.3-28.7 64-64 64H96c-35.3 0-64-28.7-64-64zm96 64c-8.8 0-16 7.2-16 16v224c0 8.8 7.2 16 16 16s16-7.2 16-16V208c0-8.8-7.2-16-16-16m96 0c-8.8 0-16 7.2-16 16v224c0 8.8 7.2 16 16 16s16-7.2 16-16V208c0-8.8-7.2-16-16-16m96 0c-8.8 0-16 7.2-16 16v224c0 8.8 7.2 16 16 16s16-7.2 16-16V208c0-8.8-7.2-16-16-16" },
     /* —— 以下为 lucide 线性图标（多元素 path），用 stroke 字段；svgIcon 据此渲染描边风格 —— */
+    globe: { stroke: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>' },
     home: { stroke: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' },
     "layout-dashboard": { stroke: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>' },
     "bar-chart-3": { stroke: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>' },
@@ -327,12 +335,12 @@
     const days = Math.floor(hours / 24);
     const months = Math.floor(days / 30);
     const years = Math.floor(days / 365);
-    if (seconds < 60) return "刚刚";
-    if (minutes < 60) return `${minutes}分钟前`;
-    if (hours < 24) return `${hours}小时前`;
-    if (days < 30) return `${days}天前`;
-    if (months < 12) return `${months}个月前`;
-    return `${years}年前`;
+    if (seconds < 60) return t("common.just_now");
+    if (minutes < 60) return t("common.min_ago", { n: minutes });
+    if (hours < 24) return t("common.hour_ago", { n: hours });
+    if (days < 30) return t("common.day_ago", { n: days });
+    if (months < 12) return t("common.month_ago", { n: months });
+    return t("common.year_ago", { n: years });
   }
 
   /** 精确到分钟：今天显示 HH:mm，否则 MM-DD HH:mm（运维看板用） */
@@ -389,7 +397,7 @@
       json = await res.json();
     } catch (_) {}
     if (!res.ok || !json || json.code !== 200) {
-      const err = new Error((json && json.message) || "请求失败 (" + res.status + ")");
+      const err = new Error((json && json.message) || t("common.request_error_status", { status: res.status }));
       err.status = res.status;
       throw err;
     }
@@ -958,9 +966,9 @@
     try {
       await loadLightboxAssets();
     } catch (e) {
-      showToast("图片查看器加载失败"); return;
+      showToast(t("lightbox.load_failed")); return;
     }
-    if (typeof Fancybox === "undefined") { showToast("图片查看器加载失败"); return; }
+    if (typeof Fancybox === "undefined") { showToast(t("lightbox.load_failed")); return; }
     // 窄屏（手机）精简按钮避免换行；桌面端保留与参考站一致的全按钮
     const isMobile = window.innerWidth < 640;
     const toolbar = isMobile
@@ -1169,8 +1177,8 @@
   function youtubeBlockedNotice(vid) {
     const href = `https://www.youtube.com/watch?v=${encodeURIComponent(vid)}`;
     return `<div class="video-embed-notice">
-      <span>此视频来自 YouTube，当前网络可能无法访问，请科学上网后观看</span>
-      <a href="${esc(href)}" target="_blank" rel="noreferrer">在 YouTube 打开 ↗</a>
+      <span>${t("video.yt_blocked")}</span>
+      <a href="${esc(href)}" target="_blank" rel="noreferrer">${t("video.open_youtube")}</a>
     </div>`;
   }
 
@@ -1249,7 +1257,7 @@
         const btn = document.createElement("span");
         btn.className = "video-play-btn";
         btn.setAttribute("role", "button");
-        btn.setAttribute("aria-label", "播放视频");
+        btn.setAttribute("aria-label", t("common.play_video"));
         btn.tabIndex = 0;
         const tryPlay = () => v.play().catch(() => {});
         btn.addEventListener("click", tryPlay);
@@ -1297,25 +1305,177 @@
     root.querySelectorAll("video.essay-media-video[src]:not(.essay-media-video--hls):not([data-video-attached])").forEach(attachVideoNative);
   }
 
-  /** 给 video 元素挂 HLS 源：Safari 走原生 HLS，其余按需加载 hls.js（约 600KB，首屏不下载） */
+  /** 给 video 元素挂 HLS 源：Safari 走原生 HLS，其余按需加载 hls.js（约 600KB，首屏不下载）。
+   *  很多影视采集站源 CDN 抖动频繁（回源超时/连接重置），hls.js 默认重试很少且 fatal 后
+   *  不会自愈——一次持续 10s 的抖动就永久黑屏。这里做三级恢复：
+   *  startLoad 退避重试 → recoverMediaError/swapAudioCodec → 整体重建实例，
+   *  全部失败才显示"加载失败 + 点击重试"遮罩。 */
   function attachHlsSource(videoEl, url) {
     if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
+      bindNativeHlsErrors(videoEl, url);
       videoEl.src = url; // Safari 原生 HLS
       return;
     }
     ensureHls().then(HlsCtor => {
-      if (!HlsCtor || !HlsCtor.isSupported()) { videoEl.src = url; return; }
-      const hls = new HlsCtor({
+      if (!HlsCtor || !HlsCtor.isSupported()) {
+        bindNativeHlsErrors(videoEl, url); // 库加载失败：退回浏览器原生（Chrome 本就不支持 m3u8，至少能拿到 error 提示）
+        videoEl.src = url;
+        return;
+      }
+      createRecoverableHls(videoEl, url, HlsCtor);
+    });
+  }
+
+  /** Safari / 库缺失走原生 <video src=m3u8>：error 时给失败遮罩 + 重试（原生无自动恢复） */
+  function bindNativeHlsErrors(videoEl, url) {
+    if (videoEl._nativeHlsBound) return;
+    videoEl._nativeHlsBound = true;
+    videoEl.addEventListener("error", () => {
+      if (!videoEl.currentSrc) return; // disposeVideos 主动清 src 触发的 error，忽略
+      showHlsFatal(videoEl, () => {
+        videoEl.removeAttribute("src");
+        videoEl.src = url;
+        videoEl.load();
+        videoEl.play().catch(() => {});
+      });
+    });
+    videoEl.addEventListener("playing", () => hideHlsFatal(videoEl));
+  }
+
+  /** 带自动恢复的 hls.js 实例管理。
+   *  注意：不能依赖"再收到一个 fatal"来升级恢复——master 清单解析失败后调 startLoad()
+   *  不会重新发起请求（无 level 可载），之后也不再有任何事件，链路会静默卡死。
+   *  因此 fatal 后一次性排定整条"定时升级链"，收到健康信号（MANIFEST_PARSED/
+   *  FRAG_BUFFERED）立即撤链：startLoad → 重建实例 ×2 → 失败遮罩。 */
+  function createRecoverableHls(videoEl, url, HlsCtor) {
+    let hls = null;
+    let timers = [];
+    let sessionDead = false;
+    let mediaRecoveries = 0; // swapAudioCodec 决策用
+    let recreates = 0;
+
+    const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+    const healthy = () => {
+      // 链路恢复：撤下所有待执行的升级动作与失败遮罩，计数归零
+      clearTimers();
+      mediaRecoveries = 0;
+      recreates = 0;
+      hideHlsFatal(videoEl);
+    };
+    const build = () => {
+      const h = new HlsCtor({
         enableWorker: true,
         startFragPrefetch: true, // 清单解析时并行预取首片，起播快几百毫秒
-        abrEwmaDefaultEstimate: 2e6, // 初始带宽估计 2Mbps，多码率源直接高档起播
+        abrEwmaDefaultEstimate: 7e5, // 初始带宽估计 0.7Mbps：差网从低档起步由 ABR 爬升，避免一上来高档卡死
         maxBufferLength: 60, // 前向缓冲目标 60s（默认 30s），抗源站抖动
         backBufferLength: 30, // 已播仅保留 30s，控制内存
+        // 采集站源经常回源超时（实测 CDN 节点磁盘满、全部回源），放宽超时与重试，
+        // 把"源抖 10 秒就 fatal"的门槛抬高到 30~60 秒
+        manifestLoadingTimeOut: 20000,
+        manifestLoadingMaxRetry: 6,
+        levelLoadingTimeOut: 20000,
+        levelLoadingMaxRetry: 6,
+        fragLoadingTimeOut: 30000,
+        fragLoadingMaxRetry: 8,
       });
-      hls.loadSource(url);
-      hls.attachMedia(videoEl);
-      videoEl._hls = hls; // 元素被移除时可供 destroy
-    });
+      hls = h;
+      videoEl._hls = h; // 元素被移除时可供 destroy
+      h.on(HlsCtor.Events.ERROR, (_ev, d) => {
+        if (!d.fatal || sessionDead || hls !== h) return; // 非致命 hls.js 内部自动重试；旧实例事件忽略
+        clearTimers();
+        if (d.type === HlsCtor.ErrorTypes.NETWORK_ERROR) {
+          // +1s startLoad（救活分片级错误）；+5s/+12s 整体重建（清单级错误 startLoad 无效）；+20s 遮罩
+          timers = [
+            setTimeout(() => { if (!sessionDead && hls === h) { try { h.startLoad(); } catch { /* 忽略 */ } } }, 1000),
+            setTimeout(() => recreate(), 5000),
+            setTimeout(() => recreate(), 12000),
+            setTimeout(() => { if (!sessionDead) showHlsFatal(videoEl, manualRetry); }, 20000),
+          ];
+        } else if (d.type === HlsCtor.ErrorTypes.MEDIA_ERROR) {
+          // +0.8s recoverMediaError（第 2 次先 swapAudioCodec）；再不行重建；最后遮罩
+          const recover = () => {
+            mediaRecoveries++;
+            if (mediaRecoveries === 2) { try { h.swapAudioCodec(); } catch { /* 忽略 */ } }
+            try { h.recoverMediaError(); } catch { /* 忽略 */ }
+          };
+          timers = [
+            setTimeout(recover, 800),
+            setTimeout(recover, 4000),
+            setTimeout(() => recreate(), 9000),
+            setTimeout(() => recreate(), 16000),
+            setTimeout(() => { if (!sessionDead) showHlsFatal(videoEl, manualRetry); }, 23000),
+          ];
+        } else {
+          // 其他 fatal（MUX_ERROR/KEY_SYSTEM_ERROR 等）：快速重建两次后遮罩
+          timers = [
+            setTimeout(() => recreate(), 500),
+            setTimeout(() => recreate(), 6000),
+            setTimeout(() => { if (!sessionDead) showHlsFatal(videoEl, manualRetry); }, 13000),
+          ];
+        }
+      });
+      // 健康信号：清单重新解析成功 / 任一分片缓冲成功 → 撤掉升级链与遮罩
+      h.on(HlsCtor.Events.MANIFEST_PARSED, () => { if (hls === h) healthy(); });
+      h.on(HlsCtor.Events.FRAG_BUFFERED, () => { if (hls === h) healthy(); });
+      h.loadSource(url);
+      h.attachMedia(videoEl);
+    };
+    const recreate = () => {
+      if (sessionDead) return;
+      clearTimers();
+      if (recreates >= 2) { showHlsFatal(videoEl, manualRetry); return; }
+      recreates++;
+      const resumeAt = videoEl.currentTime || 0;
+      const wasPlaying = !videoEl.paused && !videoEl.ended;
+      try { hls.destroy(); } catch { /* 忽略 */ }
+      build();
+      if (resumeAt > 0) hls.on(HlsCtor.Events.MANIFEST_PARSED, () => { hls.startPosition = resumeAt; });
+      if (wasPlaying) videoEl.play().catch(() => {});
+    };
+    const manualRetry = () => {
+      // 用户点击重试：全新恢复链，并主动起播（点击是用户手势，允许 autoplay）
+      hideHlsFatal(videoEl);
+      mediaRecoveries = 0;
+      recreates = 0;
+      const resumeAt = videoEl.currentTime || 0;
+      clearTimers();
+      try { if (hls) hls.destroy(); } catch { /* 忽略 */ }
+      build();
+      if (resumeAt > 0) hls.on(HlsCtor.Events.MANIFEST_PARSED, () => { hls.startPosition = resumeAt; });
+      videoEl.play().catch(() => {});
+    };
+    build();
+    // disposeVideos 销毁元素时联动：停定时器、标记会话死亡（直接调用）
+    videoEl._hlsDispose = () => {
+      sessionDead = true;
+      clearTimers();
+      videoEl._hlsDispose = null;
+    };
+  }
+
+  /** 失败遮罩宿主：Artplayer 内挂播放器根容器，原生路径挂 .video-stage */
+  function hlsMaskHost(videoEl) {
+    return videoEl.closest && videoEl.closest(".art-video-player") ? videoEl.closest(".art-video-player") : videoEl.parentElement;
+  }
+  function showHlsFatal(videoEl, onRetry) {
+    const host = hlsMaskHost(videoEl);
+    if (!host || host.querySelector(".video-fatal-mask")) return;
+    const mask = document.createElement("div");
+    mask.className = "video-fatal-mask";
+    const text = document.createElement("div");
+    text.className = "video-fatal-text";
+    text.textContent = t("video.load_failed");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "video-fatal-retry";
+    btn.textContent = t("video.retry");
+    mask.append(text, btn);
+    btn.addEventListener("click", e => { e.stopPropagation(); onRetry(); });
+    host.appendChild(mask);
+  }
+  function hideHlsFatal(videoEl) {
+    const host = hlsMaskHost(videoEl);
+    if (host) host.querySelectorAll(".video-fatal-mask").forEach(m => m.remove());
   }
 
   /** 原生挂接（移动端 / Artplayer 加载失败回退）：加载提示 + HLS/直链处理 */
@@ -1384,7 +1544,7 @@
       if (!W || !H) return;
       box.style.aspectRatio = (W / H).toFixed(4);
       box.classList.toggle("video-portrait", H > W);
-      art.resize();
+      if (typeof art.resize === "function") art.resize();
     };
     art.on("video:loadedmetadata", applyRatio);
   }
@@ -1392,13 +1552,23 @@
   /** 停止容器内所有视频：HLS 销毁实例（停止后台拉分片），普通 MP4 暂停。
    *  删除卡片/关弹窗/视图切换/路由切换前调用，防止声音继续、流量空耗 */
   function disposeVideos(root) {
-    // Artplayer 实例销毁（内部 video/事件/解码器），防止切页后后台续播耗流量
+    // Artplayer 实例销毁（内部 video/事件/解码器），防止切页后后台续播耗流量。
+    // 注意：Art 内部的 video.art-video 不匹配下方选择器，hls.js 实例必须在这里显式销毁，
+    // 否则元素随 box 移除后 hls.js 的 worker/分片下载可能仍在后台进行。
     root.querySelectorAll(".essay-media-video--art").forEach(box => {
-      try { if (box._art) { box._art.destroy(true); box._art = null; } } catch { /* 忽略 */ }
+      try {
+        const innerVideo = box._art && box._art.video;
+        if (innerVideo) {
+          if (innerVideo._hlsDispose) innerVideo._hlsDispose();
+          if (innerVideo._hls) { innerVideo._hls.destroy(); innerVideo._hls = null; }
+        }
+        if (box._art) { box._art.destroy(true); box._art = null; }
+      } catch { /* 忽略 */ }
       box.remove();
     });
     root.querySelectorAll("video.essay-media-video--hls").forEach(videoEl => {
       try {
+        if (videoEl._hlsDispose) videoEl._hlsDispose();
         if (videoEl._hls) {
           videoEl._hls.destroy();
           videoEl._hls = null;
@@ -1453,8 +1623,8 @@
           const ts = thumbSrc(src);
           return `
       <a class="bber-content-img" data-lightbox="${esc(src)}" rel="external nofollow noreferrer">
-        <img src="${esc(ts)}" alt="图片" loading="lazy"${ts !== src ? ` data-orig="${esc(src)}"` : ""} />
-        ${ts !== src ? '<span class="img-orig-badge" title="点击查看原图">原图</span>' : ""}
+        <img src="${esc(ts)}" alt="${t("common.image")}" loading="lazy"${ts !== src ? ` data-orig="${esc(src)}"` : ""} />
+        ${ts !== src ? `<span class="img-orig-badge" title="${t("common.view_original")}">${t("common.original_badge")}</span>` : ""}
       </a>`;
         }
       )
@@ -1491,7 +1661,7 @@
             <span class="bber-author-nickname">${esc(s.author_name || "Moments")}</span>
           </span>
         </div>
-        <div class="datacont">${renderContentHtml(m.content)}${videosHtml(m)}</div>
+        <div class="datacont"><div class="m-xlate-content" data-mcontent>${renderContentHtml(m.content)}</div>${videosHtml(m)}</div>
         ${imagesGridHtml(m)}
       </div>
       <hr />
@@ -1504,14 +1674,15 @@
           ${m.location ? `<div class="bber-info-from">${svgIcon("locationDot", 14)}<span>${esc(m.location)}</span></div>` : ""}
         </div>
         <div class="bber-actions">
-          <div class="bber-like ${m.liked ? "is-liked" : ""}" data-act="like" title="${m.liked ? "取消点赞" : "点赞"}">
+          <div class="bber-like ${m.liked ? "is-liked" : ""}" data-act="like" title="${m.liked ? t("feed.unlike") : t("feed.like")}">
             ${svgIcon(m.liked ? "heartFill" : "heartLine", 18)}
             ${m.like_count > 0 ? `<span class="bber-like-count">${m.like_count}</span>` : ""}
           </div>
-          <div class="bber-reply" data-act="reply" title="评论">
+          <div class="bber-reply" data-act="reply" title="${t("feed.comment")}">
             ${svgIcon("chat", 18)}
             ${m.comment_count > 0 ? `<span class="bber-reply-count">${m.comment_count}</span>` : ""}
           </div>
+          ${xlateEnabled() && momentTranslatable(m.content) ? `<div class="bber-reply bber-xlate" data-act="xlate" title="${esc(t("translate.title"))}">${XLATE_GLOBE_SVG}</div>` : ""}
           ${state.admin ? `<div class="bber-reply bber-del" data-act="del" title="删除">${svgIcon("trash", 18)}</div>` : ""}
         </div>
       </div>
@@ -1624,9 +1795,9 @@
   function setLoadMoreText() {
     const el = document.getElementById("loadMore");
     if (!el) return;
-    if (state.feedLoading) el.innerHTML = `<span class="spinner"></span><span>正在加载更多即刻...</span>`;
-    else if (!state.feedDone) el.innerHTML = `<span>下滑继续浏览更多即刻</span>`;
-    else el.innerHTML = state.feed.length ? `<span>— 已经到底啦 —</span>` : "";
+    if (state.feedLoading) el.innerHTML = `<span class="spinner"></span><span>${t("feed.loading_more")}</span>`;
+    else if (!state.feedDone) el.innerHTML = `<span>${t("feed.scroll_more")}</span>`;
+    else el.innerHTML = state.feed.length ? `<span>${t("feed.reached_end")}</span>` : "";
   }
 
   function bannerHtml() {
@@ -1671,7 +1842,10 @@
     const iconLink = document.querySelector('link[rel="icon"]');
     if (iconLink) iconLink.href = iconToHref(s.site_icon);
     document.querySelector(".brand-name").textContent = s.site_title;
-    document.querySelector('[data-route="feed"]').textContent = s.nav_feeds_name;
+    // 首页导航名：开启多语言时走词典；否则用后台自定义名称（桌面 + 移动端两处）
+    document.querySelectorAll('[data-route="feed"]').forEach(a => {
+      a.textContent = window.I18N && s.i18n_enabled ? t("nav.feed") : s.nav_feeds_name;
+    });
     document.title = s.site_title;
     // 「关于」入口：about_enabled 开启时显示（桌面端 + 移动端）
     document.querySelectorAll(".about-nav-link").forEach(a => { a.hidden = !s.about_enabled; });
@@ -1743,7 +1917,7 @@
       const hours = Math.floor((sec % 86400) / 3600);
       const mins = Math.floor((sec % 3600) / 60);
       const secs = sec % 60;
-      runtimeEl.textContent = `网站已运行 ${days} 天 ${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+      runtimeEl.textContent = t("common.footer_runtime", { days, hh: pad(hours), mm: pad(mins), ss: pad(secs) });
       runtimeEl.hidden = false;
     };
     tick();
@@ -1767,11 +1941,11 @@
       <div id="post-comment" class="comment-container">
         <div class="comment-head">
           ${svgIcon("chat", 22)}
-          <span class="comment-title">评论</span>
+          <span class="comment-title">${t("comment.title")}</span>
           <span class="comment-count-tag" data-comment-count>0</span>
         </div>
         <div data-comment-body>
-          <div class="comment-hint">点击即刻卡片右下角的评论图标，可针对该条即刻发表评论</div>
+          <div class="comment-hint">${t("comment.feed_hint")}</div>
         </div>
       </div>
     </div>`;
@@ -1782,7 +1956,7 @@
     const s0 = state.settings;
     const fq = new URLSearchParams(location.search).get("q") || "";
     setSeo({
-      title: fq ? `搜索「${fq}」 · ${s0.site_title}` : s0.site_title,
+      title: fq ? t("feed.search_title", { q: fq, site: s0.site_title }) : s0.site_title,
       description: s0.essay_subtitle,
       path: fq ? "/?q=" + encodeURIComponent(fq) : "/",
       image: s0.banner_bg_mode === "random" ? location.origin + "/api/bg" : s0.banner_bg_image,
@@ -1795,8 +1969,8 @@
     state.commentTarget = null;
     const filterBanner = fq ? `
       <div class="feed-filter-bar">
-        <span>🔍 只显示包含「<b>${esc(fq)}</b>」的说说</span>
-        <a class="feed-filter-clear" href="/" data-route="feed">清除筛选</a>
+        <span>${t("feed.filter_only", { q: "<b>" + esc(fq) + "</b>" })}</span>
+        <a class="feed-filter-clear" href="/" data-route="feed">${t("feed.clear_filter")}</a>
       </div>` : "";
     app.innerHTML = `
       <div class="essay">
@@ -1806,7 +1980,7 @@
           <div class="essay-content-wrapper">
             <div class="layout-loading-placeholder">
               <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;padding:2rem">
-                <span class="spinner"></span><span style="font-size:.875rem;font-weight:500">加载中...</span>
+                <span class="spinner"></span><span style="font-size:.875rem;font-weight:500">${t("common.loading")}</span>
               </div>
             </div>
             <section class="timeline is-hidden">
@@ -1829,11 +2003,11 @@
         <div class="bber-author-row">
           <span class="bber-author">
             ${avatarSpanHtml(state.settings.post_avatar, "", "bber-author-avatar--post", "file-text")}
-            <span class="bber-author-nickname">文章</span>
+            <span class="bber-author-nickname">${t("posts.tag")}</span>
           </span>
           ${p.pinned
-            ? `<span class="bber-post-tag bber-post-tag--pinned">${svgIcon("pin", 12)}<span>置顶</span></span>`
-            : `<span class="bber-post-tag">文章</span>`}
+            ? `<span class="bber-post-tag bber-post-tag--pinned">${svgIcon("pin", 12)}<span>${t("feed.pinned")}</span></span>`
+            : `<span class="bber-post-tag">${t("posts.tag")}</span>`}
         </div>
         ${p.cover ? `<div class="bber-post-cover"><img src="${esc(thumbSrc(p.cover))}" alt="" loading="lazy" referrerpolicy="no-referrer" data-orig="${esc(p.cover)}" /></div>` : ""}
         <div class="bber-post-title">${esc(p.title)}</div>
@@ -1846,7 +2020,7 @@
               <time datetime="${esc(p.created_at)}">${timeAgo(p.created_at)}</time>
             </div>
           </div>
-          <div class="bber-actions"><span class="bber-post-read">阅读全文 →</span></div>
+          <div class="bber-actions"><span class="bber-post-read">${t("feed.read_full")}</span></div>
         </div>
       </a>
     </li>`;
@@ -2074,7 +2248,7 @@
   /** 添加评论图片（本地上传或网络 URL），最多 3 张 */
   async function addCommentImage(form, url) {
     const list = getCommentImages(form);
-    if (list.length >= 3) return toast("最多 3 张图片");
+    if (list.length >= 3) return toast(t("comment.image_max", { n: 3 }));
     list.push(url);
     setCommentImages(form, list);
   }
@@ -2082,15 +2256,15 @@
   /** 评论表单图片上传处理 */
   async function handleCommentImageUpload(form, file) {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return toast("图片不能超过 5MB");
+    if (file.size > 5 * 1024 * 1024) return toast(t("comment.image_size_limit", { size: "5MB" }));
     const btn = form.querySelector("[data-img-upload-btn]");
-    if (btn) { btn.disabled = true; btn.textContent = "上传中..."; }
+    if (btn) { btn.disabled = true; btn.textContent = t("common.uploading"); }
     try {
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/comment-upload", { method: "POST", body: fd });
       const json = await res.json();
-      if (!res.ok || !json.data?.src) throw new Error(json.message || "上传失败");
+      if (!res.ok || !json.data?.src) throw new Error(json.message || t("common.upload_failed"));
       const full = /^https?:\/\//i.test(json.data.src) ? json.data.src : location.origin + json.data.src;
       await addCommentImage(form, full);
     } catch (err) {
@@ -2118,11 +2292,11 @@
       const tb = document.createElement("div");
       tb.className = "comment-toolbar";
       tb.innerHTML = `
-        <button type="button" class="comment-tool-btn" data-emoji-btn title="表情">${svgIcon("smile", 18)}</button>
-        <button type="button" class="comment-tool-btn" data-img-upload-btn title="上传图片">${svgIcon("image", 18)}</button>
+        <button type="button" class="comment-tool-btn" data-emoji-btn title="${t("comment.owo")}">${svgIcon("smile", 18)}</button>
+        <button type="button" class="comment-tool-btn" data-img-upload-btn title="${t("comment.upload_image")}">${svgIcon("image", 18)}</button>
         <input type="file" accept="image/*" data-img-file hidden />
-        <input type="text" class="comment-img-url-input" data-img-url-input placeholder="图片 URL，回车添加" maxlength="500" />
-        <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="随机一句">${svgIcon("dices", 18)}</button>`;
+        <input type="text" class="comment-img-url-input" data-img-url-input placeholder="${t("comment.image_url_ph")}" maxlength="500" />
+        <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="${t("comment.random_one")}">${svgIcon("dices", 18)}</button>`;
       form.insertBefore(tb, ta);
     }
     if (!form.querySelector(".comment-img-preview")) {
@@ -2136,7 +2310,7 @@
     if (!form.querySelector(".comment-notify-row")) {
       const nr = document.createElement("label");
       nr.className = "comment-notify-row";
-      nr.innerHTML = `<input type="checkbox" name="notify_reply" value="1" checked /> 有人回复我的评论时邮件通知我`;
+      nr.innerHTML = `<input type="checkbox" name="notify_reply" value="1" checked /> ${t("comment.notify_mine")}`;
       const foot = form.querySelector(".comment-form-foot");
       if (foot) foot.insertAdjacentElement("beforebegin", nr);
       else form.appendChild(nr);
@@ -2168,7 +2342,7 @@
           e.preventDefault();
           const url = urlInput.value.trim();
           if (!url) return;
-          if (!/^https?:\/\//i.test(url)) return toast("请输入完整的图片 URL");
+          if (!/^https?:\/\//i.test(url)) return toast(t("comment.image_url_invalid"));
           await addCommentImage(form, url);
           urlInput.value = "";
         }
@@ -2214,13 +2388,13 @@
       <div class="comment-body">
         <div>
           <span class="comment-name">${esc(cm.nickname)}</span>
-          ${cm.is_ai ? '<span class="badge-ai">AI</span>' : cm.is_owner ? '<span class="badge-owner">博主</span>' : ""}
+          ${cm.is_ai ? '<span class="badge-ai">AI</span>' : cm.is_owner ? `<span class="badge-owner">${t("comment.owner_badge")}</span>` : ""}
           <span class="comment-time">${timeAgo(cm.created_at)}</span>
         </div>
         <div class="comment-text">${formatCommentContent(cm.content)}</div>
         ${imgs.length ? `<div class="comment-images">${imgs.map(u => `<img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="comment-img" data-lightbox="${esc(u)}" data-comment-img="${esc(u)}" />`).join("")}</div>` : ""}
         <div class="comment-actions">
-          <button type="button" class="comment-reply-btn" data-reply-root="${root}" data-reply-name="${esc(cm.nickname)}">回复</button>
+          <button type="button" class="comment-reply-btn" data-reply-root="${root}" data-reply-name="${esc(cm.nickname)}">${t("common.reply")}</button>
         </div>
       </div>
     </div>`;
@@ -2268,11 +2442,11 @@
     <div class="comment-thread" data-thread-id="${node.id}">
       ${commentItemHtml(node, false, node.id)}
       <div class="comment-replies">
-        ${collapsible && !expanded ? toggleHtml(`展开全部 ${total} 条回复`) : ""}
+        ${collapsible && !expanded ? toggleHtml(t("comment.expand_replies", { n: total })) : ""}
         <div class="comment-replies-list">
           ${visibleReplies.map(cm => commentItemHtml(cm, true, node.id)).join("")}
         </div>
-        ${collapsible && expanded ? toggleHtml("收起回复") : ""}
+        ${collapsible && expanded ? toggleHtml(t("comment.collapse_replies")) : ""}
       </div>
     </div>`;
   }
@@ -2285,9 +2459,9 @@
     const hiddenCount = threads.length - visible.length;
     return visible.map(commentThreadHtml).join("") +
       (hiddenCount > 0
-        ? `<button type="button" class="comments-more-toggle" data-comments-toggle>展开更多评论（剩余 ${hiddenCount} 条）</button>`
+        ? `<button type="button" class="comments-more-toggle" data-comments-toggle>${t("comment.expand_more", { n: hiddenCount })}</button>`
         : commentUi.showAll && threads.length > TOP_COMMENT_PREVIEW
-          ? `<button type="button" class="comments-more-toggle" data-comments-toggle>收起评论</button>`
+          ? `<button type="button" class="comments-more-toggle" data-comments-toggle>${t("comment.hide")}</button>`
           : "");
   }
 
@@ -2297,7 +2471,7 @@
     const list = document.querySelector("[data-comment-list]");
     if (!target || !list) return;
     const html = renderCommentListHtml(target.comments || []);
-    list.innerHTML = html || `<div class="comment-hint">还没有评论，来说第一句吧</div>`;
+    list.innerHTML = html || `<div class="comment-hint">${t("comment.empty_first")}</div>`;
   }
 
   /** 一键回复：记录根评论、文本框自动带入 @昵称、显示回复提示条 */
@@ -2319,7 +2493,7 @@
       bar = document.createElement("div");
       bar.className = "comment-reply-bar";
       bar.setAttribute("data-reply-bar", "");
-      bar.innerHTML = `回复给 <b class="comment-reply-to"></b><button type="button" class="comment-reply-cancel" data-cancel-reply aria-label="取消回复">×</button>`;
+      bar.innerHTML = `${t("comment.reply_giving")} <b class="comment-reply-to"></b><button type="button" class="comment-reply-cancel" data-cancel-reply aria-label="${t("comment.cancel_reply")}">×</button>`;
       form.prepend(bar);
     }
     bar.querySelector(".comment-reply-to").textContent = `@${name}`;
@@ -2366,8 +2540,8 @@
     const bar = document.createElement("div");
     bar.className = "comment-ai-hint";
     bar.setAttribute("data-ai-hint", "");
-    bar.innerHTML = `<span>${svgIcon("message-circle", 16)} 评论中 @<b></b> 可召唤 AI 回复</span><button type="button" class="comment-ai-mention-btn">@<b></b></button>`;
-    bar.querySelectorAll("b").forEach(b => { b.textContent = botName; });
+    bar.innerHTML = `<span>${svgIcon("message-circle", 16)} ${t("comment.ai_hint", { name: botName })}</span><button type="button" class="comment-ai-mention-btn">@<b></b></button>`;
+    bar.querySelector(".comment-ai-mention-btn b").textContent = botName;
     bar.querySelector(".comment-ai-mention-btn").addEventListener("click", () => {
       const prefix = `@${botName} `;
       ta.value = ta.value.includes(`@${botName}`) ? ta.value : prefix + ta.value;
@@ -2496,7 +2670,7 @@
         renderAvatar(info.avatar || avatarFallback, info.nickname || qq);
         localStorage.setItem("moments_qq", qq);
         localStorage.setItem("moments_avatar", info.avatar || avatarFallback);
-        if (!info.nickname) toast("未获取到昵称，请手动填写");
+        if (!info.nickname) toast(t("comment.qq_no_nick"));
       } catch {
         form.dataset.qq = qq;
         form.dataset.avatar = avatarFallback;
@@ -2568,8 +2742,8 @@
    * 供弹窗（说说）和文章内联评论区共用。负责：设置目标、重置楼中楼 UI、
    * 绑定身份输入、拉取评论并渲染、同步计数。
    */
-  async function hydrateCommentSection(t) {
-    state.commentTarget = t;
+  async function hydrateCommentSection(tg) {
+    state.commentTarget = tg;
     commentUi.expandedThreads = new Set();
     commentUi.showAll = false;
     commentUi.replyRoot = 0;
@@ -2580,25 +2754,25 @@
     try {
       let comments;
       let count;
-      if (t.ctype === "post") {
-        const data = await api(`/api/posts/${encodeURIComponent(t.slug)}/comments`);
+      if (tg.ctype === "post") {
+        const data = await api(`/api/posts/${encodeURIComponent(tg.slug)}/comments`);
         comments = data.list || [];
         count = Number(data.count) || comments.length;
       } else {
-        const detail = await api(`/api/moments/${t.cid}?voter_id=${encodeURIComponent(state.voterId)}`);
+        const detail = await api(`/api/moments/${tg.cid}?voter_id=${encodeURIComponent(state.voterId)}`);
         comments = detail.comments || [];
         count = detail.comment_count;
       }
-      t.comments = comments;
-      t.comment_count = count;
+      tg.comments = comments;
+      tg.comment_count = count;
       if (list) {
         const html = renderCommentListHtml(comments);
-        list.innerHTML = html || `<div class="comment-hint">还没有评论，来说第一句吧</div>`;
+        list.innerHTML = html || `<div class="comment-hint">${t("comment.empty_first")}</div>`;
       }
-      if (t.ctype === "moment") {
-        const card = app.querySelector(`.bber-item[data-id="${t.cid}"] .bber-reply`);
+      if (tg.ctype === "moment") {
+        const card = app.querySelector(`.bber-item[data-id="${tg.cid}"] .bber-reply`);
         if (card) updateReplyCount(card, count);
-        const fm = state.feed.find(x => x.id === t.cid);
+        const fm = state.feed.find(x => x.id === tg.cid);
         if (fm) {
           fm.comments = comments;
           fm.comment_count = count;
@@ -2616,43 +2790,43 @@
    * target: { ctype:'moment', cid, quote, comment_count?, comments? }
    */
   async function openCommentModal(target) {
-    const t = normalizeCommentTarget(target);
+    const ct = normalizeCommentTarget(target);
     const modal = openModal(`
       <div class="modal-head">
-        <h3>评论</h3>
-        <button type="button" class="modal-x" data-close aria-label="关闭">×</button>
+        <h3>${t("comment.title")}</h3>
+        <button type="button" class="modal-x" data-close aria-label="${t("common.close")}">×</button>
       </div>
       <div data-comment-body>
         <div class="comment-quote">
-          <span>${esc(t.quote || `#${t.cid}`)}</span>
+          <span>${esc(ct.quote || `#${ct.cid}`)}</span>
         </div>
         <div class="comment-list" data-comment-list><span class="spinner"></span></div>
-        <form class="comment-form-wrap" data-comment-form data-ctype="${t.ctype}" data-cid="${t.cid}" data-slug="${esc(t.slug)}">
+        <form class="comment-form-wrap" data-comment-form data-ctype="${ct.ctype}" data-cid="${ct.cid}" data-slug="${esc(ct.slug)}">
           <div class="comment-form-row comment-user-row">
             <span class="qq-avatar" data-qq-avatar>${esc((localStorage.getItem("moments_nick") || "?").slice(0, 1).toUpperCase())}</span>
-            <input name="nickname" placeholder="昵称或 QQ 号（填 QQ 号自动获取昵称邮箱头像）" maxlength="20" value="${esc(localStorage.getItem("moments_nick") || "")}" required autocomplete="off" />
+            <input name="nickname" placeholder="${t("comment.nick_or_qq_ph")}" maxlength="20" value="${esc(localStorage.getItem("moments_nick") || "")}" required autocomplete="off" />
           </div>
           <div class="comment-form-row">
-            <input name="email" type="email" placeholder="邮箱 *" maxlength="100" value="${esc(localStorage.getItem("moments_email") || "")}" required />
-            <input name="website" placeholder="网址（选填，头像可点击跳转）" maxlength="200" value="${esc(getSavedWebsite())}" />
+            <input name="email" type="email" placeholder="${t("comment.email_ph")}" maxlength="100" value="${esc(localStorage.getItem("moments_email") || "")}" required />
+            <input name="website" placeholder="${t("comment.website_ph")}" maxlength="200" value="${esc(getSavedWebsite())}" />
           </div>
           <div class="comment-toolbar">
-            <button type="button" class="comment-tool-btn" data-emoji-btn title="表情">${svgIcon("smile", 18)}</button>
-            <button type="button" class="comment-tool-btn" data-img-upload-btn title="上传图片">${svgIcon("image", 18)}</button>
+            <button type="button" class="comment-tool-btn" data-emoji-btn title="${t("comment.owo")}">${svgIcon("smile", 18)}</button>
+            <button type="button" class="comment-tool-btn" data-img-upload-btn title="${t("comment.upload_image")}">${svgIcon("image", 18)}</button>
             <input type="file" accept="image/*" data-img-file hidden />
-            <input type="text" class="comment-img-url-input" data-img-url-input placeholder="图片 URL，回车添加" maxlength="500" />
-            <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="随机一句">${svgIcon("dices", 18)}</button>
+            <input type="text" class="comment-img-url-input" data-img-url-input placeholder="${t("comment.image_url_ph")}" maxlength="500" />
+            <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="${t("comment.random_one")}">${svgIcon("dices", 18)}</button>
           </div>
-          <textarea name="content" placeholder="说点什么…（支持 @ 提及他人）" maxlength="500" required style="min-height:80px"></textarea>
+          <textarea name="content" placeholder="${t("comment.placeholder_mention")}" maxlength="500" required style="min-height:80px"></textarea>
           <div class="comment-img-preview" data-comment-img-preview style="display:none"></div>
-          <label class="comment-notify-row"><input type="checkbox" name="notify_reply" value="1" checked /> 有人回复我的评论时邮件通知我</label>
+          <label class="comment-notify-row"><input type="checkbox" name="notify_reply" value="1" checked /> ${t("comment.notify_mine")}</label>
           <div style="margin-top:.5rem;text-align:right">
-            <button class="btn primary" type="submit">发表评论</button>
+            <button class="btn primary" type="submit">${t("comment.submit")}</button>
           </div>
         </form>
       </div>`);
     modal.querySelector("[data-close]").addEventListener("click", closeModal);
-    await hydrateCommentSection(t);
+    await hydrateCommentSection(ct);
   }
 
   /** 更新文章详情页评论入口的数字（无数字时不显示角标） */
@@ -2683,38 +2857,38 @@
     const countTag = app.querySelector("[data-comment-count]");
     if (!body) return;
     if (!m) {
-      body.innerHTML = `<div class="comment-hint">点击即刻卡片右下角的评论图标，可针对该条即刻发表评论</div>`;
+      body.innerHTML = `<div class="comment-hint">${t("comment.feed_hint")}</div>`;
       if (countTag) countTag.textContent = "0";
       return;
     }
     if (countTag) countTag.textContent = String(m.comment_count || 0);
     body.innerHTML = `
       <div class="comment-quote">
-        <span>${esc(plainText(m.content, 60) || `即刻 #${m.id}`)}</span>
-        <button type="button" data-act="clear-target" title="取消定位">×</button>
+        <span>${esc(plainText(m.content, 60) || t("feed.moment_hash", { id: m.id }))}</span>
+        <button type="button" data-act="clear-target" title="${t("comment.cancel_locate")}">×</button>
       </div>
       <div class="comment-list" data-comment-list><span class="spinner"></span></div>
       <form class="comment-form-wrap" data-comment-form>
         <div class="comment-form-row comment-user-row">
           <span class="qq-avatar" data-qq-avatar>${esc((localStorage.getItem("moments_nick") || "?").slice(0, 1).toUpperCase())}</span>
-          <input name="nickname" placeholder="昵称或 QQ 号（填 QQ 号自动获取昵称邮箱头像）" maxlength="20" value="${esc(localStorage.getItem("moments_nick") || "")}" required autocomplete="off" />
+          <input name="nickname" placeholder="${t("comment.nick_or_qq_ph")}" maxlength="20" value="${esc(localStorage.getItem("moments_nick") || "")}" required autocomplete="off" />
         </div>
         <div class="comment-form-row">
-          <input name="email" type="email" placeholder="邮箱 *" maxlength="100" value="${esc(localStorage.getItem("moments_email") || "")}" required />
-          <input name="website" placeholder="网址（选填，头像可点击跳转）" maxlength="200" value="${esc(getSavedWebsite())}" />
+          <input name="email" type="email" placeholder="${t("comment.email_ph")}" maxlength="100" value="${esc(localStorage.getItem("moments_email") || "")}" required />
+          <input name="website" placeholder="${t("comment.website_ph")}" maxlength="200" value="${esc(getSavedWebsite())}" />
         </div>
         <div class="comment-toolbar">
-          <button type="button" class="comment-tool-btn" data-emoji-btn title="表情">${svgIcon("smile", 18)}</button>
-          <button type="button" class="comment-tool-btn" data-img-upload-btn title="上传图片">${svgIcon("image", 18)}</button>
+          <button type="button" class="comment-tool-btn" data-emoji-btn title="${t("comment.owo")}">${svgIcon("smile", 18)}</button>
+          <button type="button" class="comment-tool-btn" data-img-upload-btn title="${t("comment.upload_image")}">${svgIcon("image", 18)}</button>
           <input type="file" accept="image/*" data-img-file hidden />
-          <input type="text" class="comment-img-url-input" data-img-url-input placeholder="图片 URL，回车添加" maxlength="500" />
-          <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="随机一句">${svgIcon("dices", 18)}</button>
+          <input type="text" class="comment-img-url-input" data-img-url-input placeholder="${t("comment.image_url_ph")}" maxlength="500" />
+          <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="${t("comment.random_one")}">${svgIcon("dices", 18)}</button>
         </div>
-        <textarea name="content" placeholder="说点什么…（支持 @ 提及他人）" maxlength="500" required style="min-height:80px"></textarea>
+        <textarea name="content" placeholder="${t("comment.placeholder_mention")}" maxlength="500" required style="min-height:80px"></textarea>
         <div class="comment-img-preview" data-comment-img-preview style="display:none"></div>
-        <label class="comment-notify-row"><input type="checkbox" name="notify_reply" value="1" checked /> 有人回复我的评论时邮件通知我</label>
+        <label class="comment-notify-row"><input type="checkbox" name="notify_reply" value="1" checked /> ${t("comment.notify_mine")}</label>
         <div style="margin-top:.5rem;text-align:right">
-          <button class="btn primary" type="submit">发表评论</button>
+          <button class="btn primary" type="submit">${t("comment.submit")}</button>
         </div>
       </form>`;
     bindCommentIdentity(body.querySelector("[data-comment-form]"));
@@ -2722,7 +2896,7 @@
     try {
       const detail = await api(`/api/moments/${m.id}?voter_id=${encodeURIComponent(state.voterId)}`);
       const list = body.querySelector("[data-comment-list]");
-      if (list) list.innerHTML = detail.comments && detail.comments.length ? detail.comments.map(commentItemHtml).join("") : `<div class="comment-hint">还没有评论，来说第一句吧</div>`;
+      if (list) list.innerHTML = detail.comments && detail.comments.length ? detail.comments.map(commentItemHtml).join("") : `<div class="comment-hint">${t("comment.empty_first")}</div>`;
       if (state.commentTarget && state.commentTarget.id === m.id) {
         state.commentTarget.comments = detail.comments;
         if (countTag) countTag.textContent = String(detail.comment_count || 0);
@@ -2765,7 +2939,7 @@
       layout();
     } catch (e) {
       const el = document.getElementById("loadMore");
-      if (el) el.innerHTML = `<span>${esc(e.message)}，点击重试</span>`;
+      if (el) el.innerHTML = `<span>${t("common.retry_suffix", { msg: esc(e.message) })}</span>`;
       el && (el.style.cursor = "pointer");
     } finally {
       // 必须在 feedLoading 复位后再刷新文案，否则成功时仍显示 spinner
@@ -2778,7 +2952,7 @@
 
   async function renderPostList(page = 1) {
     state.activeView = "posts";
-    app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div></div></div>`;
+    app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-loading"><span class="spinner"></span><span>${t("common.loading")}</span></div></div></div>`;
     try {
       const data = await api(`/api/posts?page=${page}&per_page=20`);
       if (state.activeView !== "posts") return;
@@ -2786,7 +2960,7 @@
       const total = data.total ?? list.length;
       const pages = Math.max(1, Math.ceil(total / 20));
       if (!list.length && page > 1) return renderPostList(pages); // 原页被删空时自动回退
-      setSeo({ title: `文章 · ${state.settings.site_title}`, description: `共 ${total} 篇文章`, path: "/posts" });
+      setSeo({ title: `${t("posts.title")} · ${state.settings.site_title}`, description: t("posts.total", { n: total }), path: "/posts" });
       const adminBtn = state.admin ? `<div style="margin-bottom:1rem;text-align:right"><button class="btn primary" data-act="new-post">＋ 写文章</button></div>` : "";
       app.innerHTML = `
         <div class="essay">
@@ -2801,14 +2975,14 @@
             <a class="post-item${p.pinned ? " post-item--pinned" : ""}" href="/post/${encodeURIComponent(p.slug)}">
               ${p.cover ? `<img class="cover" src="${esc(thumbSrc(p.cover))}" loading="lazy" alt="" data-orig="${esc(p.cover)}" />` : ""}
               <div class="info">
-                <h3>${p.pinned ? `<span class="top-badge">${svgIcon("pin", 12)}<span>置顶</span></span>` : ""}${esc(p.title)}${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h3>
+                <h3>${p.pinned ? `<span class="top-badge">${svgIcon("pin", 12)}<span>${t("feed.pinned")}</span></span>` : ""}${esc(p.title)}${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h3>
                 <p class="excerpt">${esc(p.excerpt || "")}</p>
                 <div class="date">${timeAgo(p.created_at)}</div>
               </div>
             </a>`
                     )
                     .join("")
-                : `<div class="essay-empty"><span class="empty-ico">${svgIcon("file-text", 48)}</span><span>还没有文章</span></div>`
+                : `<div class="essay-empty"><span class="empty-ico">${svgIcon("file-text", 48)}</span><span>${t("posts.empty")}</span></div>`
             }
             ${pagerHtml(page, pages)}
           </div>
@@ -2826,7 +3000,7 @@
 
   async function renderPhotos(page = 1) {
     state.activeView = "photos";
-    app.innerHTML = `<div class="essay"><div class="photos-wrap"><div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div></div></div>`;
+    app.innerHTML = `<div class="essay"><div class="photos-wrap"><div class="essay-loading"><span class="spinner"></span><span>${t("common.loading")}</span></div></div></div>`;
     try {
       const data = await api(`/api/photos?page=${page}&per_page=24`);
       if (state.activeView !== "photos") return;
@@ -2835,7 +3009,7 @@
       const pages = Math.max(1, Math.ceil(total / 24));
       if (!list.length && page > 1) return renderPhotos(pages); // 原页被删空时自动回退
       const s = state.settings;
-      setSeo({ title: `相册 · ${s.site_title}`, description: `共 ${total} 张图片`, path: "/photos" });
+      setSeo({ title: `${t("photos.title")} · ${s.site_title}`, description: t("photos.total", { n: total }), path: "/photos" });
       // 横幅背景图与首页一致（后台「横幅背景图」设置）
       const bg = s.banner_bg_mode === "random" ? "/api/bg" : (/^https?:\/\//i.test(s.banner_bg_image || "") ? s.banner_bg_image : "");
       // 顶部标题卡（与首页横幅风格呼应）
@@ -2845,10 +3019,10 @@
             <div class="banner-content">
               <div>
                 <div class="banner-tips">${esc(s.essay_tips)}</div>
-                <span class="banner-title">相册</span>
+                <span class="banner-title">${t("photos.title")}</span>
               </div>
               <div class="banner-bottom">
-                <div class="banner-desc">共 ${list.length} 张图片 · 记录每一个精彩瞬间</div>
+                <div class="banner-desc">${t("photos.page_desc", { n: list.length })}</div>
               </div>
             </div>
           </div>
@@ -2866,7 +3040,7 @@
               }
             )
             .join("")}</div>`
-        : `<div class="essay-empty"><span class="empty-ico">${svgIcon("images", 48)}</span><span>相册还没有图片</span><span style="font-size:.85rem;color:var(--anzhiyu-secondtext)">在后台「相册管理」上传或从说说/文章同步</span></div>`;
+        : `<div class="essay-empty"><span class="empty-ico">${svgIcon("images", 48)}</span><span>${t("photos.empty_hint")}</span><span style="font-size:.85rem;color:var(--anzhiyu-secondtext)">${t("photos.empty_tip")}</span></div>`;
 
       app.innerHTML = `<div class="essay">${header}<div class="photos-wrap">${grid}${pagerHtml(page, pages)}</div></div>`;
       app.querySelectorAll("[data-pager]").forEach(b =>
@@ -2895,12 +3069,12 @@
     state.activeView = "about";
     const s = state.settings;
     setSeo({
-      title: `关于 · ${s.site_title}`,
+      title: `${t("nav.about")} · ${s.site_title}`,
       description: s.about_signature || s.about_greeting_sub || "",
       path: "/about",
       image: s.about_avatar || s.author_avatar || s.brand_avatar || "",
     });
-    app.innerHTML = `<div class="essay"><div class="about-wrap"><div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div></div></div>`;
+    app.innerHTML = `<div class="essay"><div class="about-wrap"><div class="essay-loading"><span class="spinner"></span><span>${t("common.loading")}</span></div></div></div>`;
     try {
       // 最近文章（设计图「最近写的一些东西」），失败则不显示该区块
       let recentPosts = [];
@@ -2922,7 +3096,7 @@
       const head = `
         <section class="about-card about-head">
           <div class="about-greet">
-            <h1>${esc(s.about_greeting || "关于我")}</h1>
+            <h1>${esc(s.about_greeting || t("about.greeting_default"))}</h1>
             ${s.about_greeting_sub ? `<p class="about-greet-sub">${esc(s.about_greeting_sub)}</p>` : ""}
           </div>
           <div class="about-author">
@@ -2938,7 +3112,7 @@
       const statsRows = parseRows(s.about_stats);
       const statsHtml = statsRows.length
         ? `<aside class="about-card about-stats-aside">
-            <div class="about-card-title">一些数字</div>
+            <div class="about-card-title">${t("about.stats_title")}</div>
             ${statsRows
               .map(
                 r => `<div class="about-stat-mini">
@@ -2953,7 +3127,8 @@
       const bioHtml = `
         <section class="about-card about-bio${statsHtml ? " has-aside" : ""}">
           <div class="about-bio-main">
-            <h2 class="about-card-title">${s.about_bio ? "" : ""}自我介绍</h2>
+            <h2 class="about-card-title">${s.about_bio ? "" : ""}${t("about.bio_title")}</h2>
+            ${xlateEnabled() ? xlateBarHtml("about", "site") : ""}
             <div class="article-body">${sanitizeHtml(marked.parse(s.about_bio || ""))}</div>
           </div>
           ${statsHtml}
@@ -2963,7 +3138,7 @@
       const tlRows = parseRows(s.about_timeline);
       const timelineHtml = tlRows.length
         ? `<section class="about-card about-tl">
-            <h2 class="about-card-title">一路走来的几个坐标</h2>
+            <h2 class="about-card-title">${t("about.timeline_heading")}</h2>
             <div class="about-timeline">
               ${tlRows
                 .map(
@@ -2985,8 +3160,8 @@
       const recentHtml = recentPosts.length
         ? `<section class="about-card about-recent">
             <div class="about-recent-head">
-              <h2 class="about-card-title">最近写的一些东西</h2>
-              <a class="about-more-link" href="/posts">查看全部 ${svgIcon("chevron-right", 14)}</a>
+              <h2 class="about-card-title">${t("about.recent_title")}</h2>
+              <a class="about-more-link" href="/posts">${t("about.view_all")} ${svgIcon("chevron-right", 14)}</a>
             </div>
             <div class="about-post-grid">
               ${recentPosts
@@ -3005,7 +3180,7 @@
       const bigRows = parseRows(s.about_bigstats);
       const bigHtml = bigRows.length
         ? `<section class="about-card about-big">
-            <div class="about-card-title">这段时间，有多少人来过。</div>
+            <div class="about-card-title">${t("about.bigstats_title")}</div>
             <div class="about-big-grid">
               ${bigRows
                 .map(
@@ -3023,7 +3198,7 @@
       const ctRows = parseRows(s.about_contacts);
       const contactHtml = ctRows.length
         ? `<section class="about-card about-contact">
-            <h2 class="about-card-title">想聊点什么，就挂挂我。</h2>
+            <h2 class="about-card-title">${t("about.contact_heading")}</h2>
             <div class="about-contact-list">
               ${ctRows
                 .map(r => {
@@ -3052,20 +3227,20 @@
       const btnHtml = amounts.length
         ? amounts.map((a, i) => `<button type="button" class="about-amt-btn${i === 0 ? " is-active" : ""}" data-qr-src="${esc(a.src)}">${esc(a.label)}</button>`).join("")
         : "";
-      const qrImgHtml = firstSrc ? `<img class="about-qr-pic" src="${esc(firstSrc)}" alt="赞助收款码" loading="lazy" />` : `<div class="about-qr-empty">${svgIcon("coffee", 40)}</div>`;
+      const qrImgHtml = firstSrc ? `<img class="about-qr-pic" src="${esc(firstSrc)}" alt="${t("about.qr_alt")}" loading="lazy" />` : `<div class="about-qr-empty">${svgIcon("coffee", 40)}</div>`;
       const qrHtml = `
         <section class="about-card about-sponsor">
           <div class="about-sponsor-main">
             <div class="about-sponsor-head">
               <span class="about-sponsor-ico">${svgIcon("coffee", 22)}</span>
-              <span class="about-sponsor-title">请我喝杯咖啡</span>
+              <span class="about-sponsor-title">${t("about.coffee_title")}</span>
             </div>
             <div class="about-qr-text">${esc(s.about_qr_text || "")}</div>
-            ${btnHtml ? `<div class="about-amt-group" role="group" aria-label="选择赞助金额">${btnHtml}</div>` : ""}
+            ${btnHtml ? `<div class="about-amt-group" role="group" aria-label="${t("about.select_amount")}">${btnHtml}</div>` : ""}
           </div>
           <div class="about-sponsor-qr">
             ${qrImgHtml}
-            <div class="about-qr-tip">扫码支持，感谢你 ❤</div>
+            <div class="about-qr-tip">${t("about.scan_tip")}</div>
           </div>
         </section>`;
 
@@ -3088,7 +3263,7 @@
           if (pic) { pic.src = src; }
           else {
             const box = app.querySelector(".about-sponsor-qr");
-            if (box) box.innerHTML = `<img class="about-qr-pic" src="${esc(src)}" alt="赞助收款码" loading="lazy" /><div class="about-qr-tip">扫码支持，感谢你 ❤</div>`;
+            if (box) box.innerHTML = `<img class="about-qr-pic" src="${esc(src)}" alt="${t("about.qr_alt")}" loading="lazy" /><div class="about-qr-tip">${t("about.scan_tip")}</div>`;
           }
         });
       });
@@ -3102,15 +3277,15 @@
   /** 相对时间：x 天前 / 刚刚 */
   function timeAgo(iso) {
     if (!iso) return "";
-    const t = new Date(iso).getTime();
-    if (!t) return "";
-    const diff = Date.now() - t;
+    const ts = new Date(iso).getTime();
+    if (!ts) return "";
+    const diff = Date.now() - ts;
     const d = Math.floor(diff / 86400000);
-    if (d <= 0) return "今天";
-    if (d === 1) return "昨天";
-    if (d < 30) return `${d} 天前`;
-    if (d < 365) return `${Math.floor(d / 30)} 个月前`;
-    return `${Math.floor(d / 365)} 年前`;
+    if (d <= 0) return t("common.today");
+    if (d === 1) return t("common.yesterday");
+    if (d < 30) return t("common.day_ago", { n: d });
+    if (d < 365) return t("common.month_ago", { n: Math.floor(d / 30) });
+    return t("common.year_ago", { n: Math.floor(d / 365) });
   }
 
   /** 友站卡片头像：有图显示图片（裂图回退首字），无图直接首字 */
@@ -3125,14 +3300,14 @@
 
   async function renderLinks() {
     const activeCat = new URLSearchParams(location.search).get("category") || "全部";
-    app.innerHTML = `<div class="essay"><div class="links-wrap"><div class="essay-empty">加载中…</div></div></div>`;
+    app.innerHTML = `<div class="essay"><div class="links-wrap"><div class="essay-empty">${t("common.loading")}</div></div></div>`;
     try {
       const res = await api(`/api/friends?category=${encodeURIComponent(activeCat)}`);
       const { list = [], stats = {}, categories = [] } = res;
       const cats = ["全部", ...categories];
       const filterHtml = cats.map(c => {
         const href = c === "全部" ? "/links" : `/links?category=${encodeURIComponent(c)}`;
-        return `<a class="links-cat${c === activeCat ? " is-active" : ""}" href="${href}">${esc(c)}</a>`;
+        return `<a class="links-cat${c === activeCat ? " is-active" : ""}" href="${href}">${c === "全部" ? t("links.category_all") : esc(c)}</a>`;
       }).join("");
 
       const gridHtml = list.length
@@ -3146,38 +3321,38 @@
                 </div>
                 <span class="links-card-arrow">${svgIcon("arrow-up-right", 16)}</span>
               </div>
-              <div class="links-card-desc">${esc(f.description || "这个人很懒，什么都没留下。")}</div>
+              <div class="links-card-desc">${esc(f.description || t("links.no_desc"))}</div>
               <div class="links-card-foot">
                 ${f.category ? `<span class="links-card-cat">${esc(f.category)}</span>` : ""}
-                <span class="links-card-time">${timeAgo(f.last_checked || f.updated_at)}更新</span>
+                <span class="links-card-time">${t("links.updated_at", { time: timeAgo(f.last_checked || f.updated_at) })}</span>
               </div>
             </a>`).join("")
-        : `<div class="essay-empty">还没有友链，去<a href="/links/apply">申请友链</a>吧～</div>`;
+        : `<div class="essay-empty">${t("links.empty_apply_tip")}</div>`;
 
       app.innerHTML = `<div class="essay"><div class="links-wrap">
         <div class="links-page-head">
-          <div class="links-eyebrow">友链 · FRIENDS</div>
-          <h1 class="links-title">友链</h1>
-          <p class="links-subtitle">这里收集了我常去翻阅的独立博客与友站。每一家都有自己的节奏，值得慢下来读一读。</p>
+          <div class="links-eyebrow">${t("links.eyebrow")}</div>
+          <h1 class="links-title">${t("nav.links")}</h1>
+          <p class="links-subtitle">${t("links.subtitle")}</p>
           <div class="links-stats">
-            <div class="links-stat"><b>${stats.total ?? 0}</b><span>友站总数</span></div>
-            <div class="links-stat"><b>${stats.categories ?? 0}</b><span>站点分类</span></div>
-            <div class="links-stat"><b>${stats.newThisMonth ?? 0}</b><span>本月新增</span></div>
+            <div class="links-stat"><b>${stats.total ?? 0}</b><span>${t("links.stat_total")}</span></div>
+            <div class="links-stat"><b>${stats.categories ?? 0}</b><span>${t("links.stat_categories")}</span></div>
+            <div class="links-stat"><b>${stats.newThisMonth ?? 0}</b><span>${t("links.stat_new")}</span></div>
           </div>
         </div>
         <div class="links-cats">${filterHtml}</div>
         <div class="links-grid">${gridHtml}</div>
         <div class="links-apply-banner">
           <div>
-            <div class="links-apply-title">想让你的站点也出现在这里？</div>
-            <div class="links-apply-desc">交换友链只需提交站点信息，或直接发邮件给我。通常 48 小时内回复，通过后就会加入这面友链墙。</div>
+            <div class="links-apply-title">${t("links.apply_banner_title")}</div>
+            <div class="links-apply-desc">${t("links.apply_banner_desc")}</div>
           </div>
-          <a class="links-apply-btn" href="/links/apply">申请友链 ${svgIcon("arrow-right", 16)}</a>
+          <a class="links-apply-btn" href="/links/apply">${t("links.apply")} ${svgIcon("arrow-right", 16)}</a>
         </div>
       </div></div>`;
       // 同步浏览器标签页标题与 SEO
       setSeo({
-        title: `友链 · ${state.settings.site_title}`,
+        title: `${t("nav.links")} · ${state.settings.site_title}`,
         description: state.settings.essay_subtitle || "",
         path: activeCat === "全部" ? "/links" : `/links?category=${encodeURIComponent(activeCat)}`,
       });
@@ -3195,54 +3370,54 @@
 
     app.innerHTML = `<div class="essay"><div class="links-apply-wrap">
       <div class="links-page-head">
-        <div class="links-eyebrow">交换友链 · APPLY</div>
-        <h1 class="links-title">申请友链</h1>
-        <p class="links-subtitle">如果你也在写博客，欢迎交换友链。请先确认自己的站点符合下面的规则，再填写信息提交申请。</p>
+        <div class="links-eyebrow">${t("links.apply_eyebrow")}</div>
+        <h1 class="links-title">${t("links.apply")}</h1>
+        <p class="links-subtitle">${t("links.apply_subtitle")}</p>
       </div>
       <div class="links-apply-grid">
         <div class="links-apply-side">
           <div class="links-info-card">
-            <div class="links-info-title">${svgIcon("scroll-text", 18)} 友链规则</div>
-            <p>为了保证友链墙的阅读感，这里只收录内容原创、长期更新的个人站点。</p>
+            <div class="links-info-title">${svgIcon("scroll-text", 18)} ${t("links.rules_title")}</div>
+            <p>${t("links.rules_intro")}</p>
             <ol class="links-rules">
-              <li>内容以原创为主，无违规、采集与广告信息</li>
-              <li>站点已稳定运行 6 个月以上，并有持续更新</li>
-              <li>站点首页已放置本站链接，且可以正常访问</li>
-              <li>无强制跳转、弹窗与其他干扰性广告</li>
-              <li>站点方向与阅读、摄影、设计或技术相关</li>
+              <li>${t("links.rules_1")}</li>
+              <li>${t("links.rules_2")}</li>
+              <li>${t("links.rules_3")}</li>
+              <li>${t("links.rules_4")}</li>
+              <li>${t("links.rules_5")}</li>
             </ol>
           </div>
           <div class="links-info-card">
-            <div class="links-info-title">${svgIcon("info", 18)} 本站信息</div>
-            <p>复制以下信息，填写到你的友链页面即可。</p>
+            <div class="links-info-title">${svgIcon("info", 18)} ${t("links.site_info_title")}</div>
+            <p>${t("links.site_info_desc")}</p>
             <div class="links-siteinfo">
-              <div><span>站点名称</span><b data-copy="${esc(s.site_title || "")}">${esc(s.site_title || "")}</b></div>
-              <div><span>站点地址</span><b data-copy="${esc(siteUrl)}">${esc(siteUrl)}</b></div>
-              <div><span>站点简介</span><b data-copy="${esc(s.essay_subtitle || "")}">${esc(s.essay_subtitle || "")}</b></div>
+              <div><span>${t("links.apply_site_name")}</span><b data-copy="${esc(s.site_title || "")}">${esc(s.site_title || "")}</b></div>
+              <div><span>${t("links.apply_site_url")}</span><b data-copy="${esc(siteUrl)}">${esc(siteUrl)}</b></div>
+              <div><span>${t("links.apply_site_brief")}</span><b data-copy="${esc(s.essay_subtitle || "")}">${esc(s.essay_subtitle || "")}</b></div>
             </div>
           </div>
         </div>
         <form class="links-info-card links-apply-form" id="linksApplyForm">
-          <div class="links-info-title">${svgIcon("send", 18)} 提交申请</div>
-          <p style="margin:.2rem 0 1rem">填写后我会尽快查看，通过后站点会自动加入友链墙。</p>
-          <div class="field"><label>站点名称 *</label><input name="name" maxlength="60" placeholder="例：云间随笔" required /></div>
+          <div class="links-info-title">${svgIcon("send", 18)} ${t("links.apply_form_title")}</div>
+          <p style="margin:.2rem 0 1rem">${t("links.apply_form_tip")}</p>
+          <div class="field"><label>${t("links.apply_site_name")} *</label><input name="name" maxlength="60" placeholder="${t("links.apply_name_ph")}" required /></div>
           <div class="field">
-            <label>站点地址 *</label>
+            <label>${t("links.apply_site_url")} *</label>
             <div style="display:flex;gap:.5rem">
               <input name="url" placeholder="https://example.com" required style="flex:1" />
-              <button type="button" class="btn" id="linksFetchBtn">自动获取</button>
+              <button type="button" class="btn" id="linksFetchBtn">${t("links.fetch_auto")}</button>
             </div>
           </div>
-          <div class="field"><label>站点简介</label><input name="description" maxlength="300" placeholder="一句话介绍你的站点" /></div>
-          <div class="field"><label>联系邮箱</label><input name="email" type="email" maxlength="120" placeholder="you@example.com" /></div>
-          <div class="field"><label>站点分类</label><select name="category">${catOpts}</select></div>
-          <button class="btn primary" type="submit">提交申请 ${svgIcon("check", 16)}</button>
+          <div class="field"><label>${t("links.apply_desc")}</label><input name="description" maxlength="300" placeholder="${t("links.apply_desc_ph")}" /></div>
+          <div class="field"><label>${t("links.apply_email")}</label><input name="email" type="email" maxlength="120" placeholder="you@example.com" /></div>
+          <div class="field"><label>${t("links.apply_category")}</label><select name="category">${catOpts}</select></div>
+          <button class="btn primary" type="submit">${t("links.apply_submit")} ${svgIcon("check", 16)}</button>
           <div class="links-review">
-            <div class="links-info-title">审核流程</div>
+            <div class="links-info-title">${t("links.review_title")}</div>
             <ol class="links-review-steps">
-              <li class="is-done"><b>已提交申请</b><span>表单提交成功</span></li>
-              <li><b>人工审核</b><span>通常 48 小时内回复，结果会发到你的邮箱</span></li>
-              <li><b>上线展示</b><span>通过后自动加入友链墙</span></li>
+              <li class="is-done"><b>${t("links.review_1_title")}</b><span>${t("links.review_1_desc")}</span></li>
+              <li><b>${t("links.review_2_title")}</b><span>${t("links.review_2_desc")}</span></li>
+              <li><b>${t("links.review_3_title")}</b><span>${t("links.review_3_desc")}</span></li>
             </ol>
           </div>
         </form>
@@ -3251,8 +3426,8 @@
 
     // 同步浏览器标签页标题与 SEO
     setSeo({
-      title: `申请友链 · ${s.site_title}`,
-      description: "提交站点信息，申请加入友链墙。",
+      title: `${t("links.apply")} · ${s.site_title}`,
+      description: t("links.apply_seo_desc"),
       path: "/links/apply",
       noindex: true,
     });
@@ -3263,18 +3438,18 @@
     if (fetchBtn && form) {
       fetchBtn.addEventListener("click", async () => {
         const url = form.querySelector('[name="url"]').value.trim();
-        if (!url) { toast("请先填写站点地址"); return; }
-        fetchBtn.disabled = true; fetchBtn.textContent = "获取中…";
+        if (!url) { toast(t("links.fill_url_first")); return; }
+        fetchBtn.disabled = true; fetchBtn.textContent = t("links.fetching");
         try {
           const info = await api(`/api/friends/info?url=${encodeURIComponent(url)}`);
           if (info.name) form.querySelector('[name="name"]').value = info.name;
           if (info.description) form.querySelector('[name="description"]').value = info.description;
           if (info.url) form.querySelector('[name="url"]').value = info.url;
-          toast("已自动获取站点信息，可再微调");
+          toast(t("links.fetch_auto_ok"));
         } catch (err) {
-          toast(err.message || "获取失败，请手动填写");
+          toast(err.message || t("links.fetch_auto_fail"));
         } finally {
-          fetchBtn.disabled = false; fetchBtn.textContent = "自动获取";
+          fetchBtn.disabled = false; fetchBtn.textContent = t("links.fetch_auto");
         }
       });
       form.addEventListener("submit", async e => {
@@ -3284,10 +3459,10 @@
         btn.disabled = true;
         try {
           await api("/api/friends/apply", { method: "POST", body: Object.fromEntries(fd) });
-          toast("已提交申请，站长审核通过后会出现在友链列表");
+          toast(t("links.apply_toast"));
           navigate("/links");
         } catch (err) {
-          toast(err.message || "提交失败");
+          toast(err.message || t("links.submit_failed"));
         } finally {
           btn.disabled = false;
         }
@@ -3321,8 +3496,8 @@
     const div = document.createElement("div");
     div.className = "reward-card";
     div.innerHTML = `
-      <div class="reward-head">${svgIcon("coffee", 18)} ${esc(state.settings.reward_text || "如果觉得这篇文章不错，欢迎打赏支持一下 ~")}</div>
-      <div class="reward-qr-wrap"><img class="reward-qr" src="${esc(state.settings.reward_qrcode)}" alt="打赏二维码" loading="lazy" referrerpolicy="no-referrer" /></div>`;
+      <div class="reward-head">${svgIcon("coffee", 18)} ${esc(state.settings.reward_text || t("posts.reward_default"))}</div>
+      <div class="reward-qr-wrap"><img class="reward-qr" src="${esc(state.settings.reward_qrcode)}" alt="${t("posts.reward_qr_alt")}" loading="lazy" referrerpolicy="no-referrer" /></div>`;
     body.insertAdjacentElement("afterend", div);
   }
 
@@ -3374,7 +3549,7 @@
       .map((h, i) => {
         const isSub = h.tagName === "H3";
         const text = (h.textContent || "").trim().replace(/[#*`]/g, "").slice(0, 50);
-        return `<li class="post-toc-item ${isSub ? "is-sub" : ""}" data-toc-idx="${i}"><a href="#${h.id}">${esc(text) || "标题"}</a></li>`;
+        return `<li class="post-toc-item ${isSub ? "is-sub" : ""}" data-toc-idx="${i}"><a href="#${h.id}">${esc(text) || t("posts.toc_empty_heading")}</a></li>`;
       })
       .join("");
 
@@ -3384,9 +3559,9 @@
     aside.setAttribute("data-toc-sidebar", "");
     aside.innerHTML = `
       <div class="toc-sidebar-head">
-        <span class="toc-sidebar-title">${svgIcon("list", 14)} 目录</span>
+        <span class="toc-sidebar-title">${svgIcon("list", 14)} ${t("posts.toc")}</span>
         <span class="toc-sidebar-count">${headings.length}</span>
-        <button class="toc-sidebar-fold" data-toc-fold type="button" aria-label="折叠目录">${svgIcon("chevron-right", 16)}</button>
+        <button class="toc-sidebar-fold" data-toc-fold type="button" aria-label="${t("posts.toc_collapse")}">${svgIcon("chevron-right", 16)}</button>
       </div>
       <nav class="toc-sidebar-body"><ul>${listHtml}</ul></nav>`;
     cardEl.insertAdjacentElement("afterend", aside);
@@ -3396,7 +3571,7 @@
     fab.className = "toc-fab";
     fab.setAttribute("data-toc-fab", "");
     fab.type = "button";
-    fab.setAttribute("aria-label", "文章目录");
+    fab.setAttribute("aria-label", t("posts.toc_open"));
     fab.innerHTML = svgIcon("list", 20);
     document.body.appendChild(fab);
 
@@ -3410,8 +3585,8 @@
     drawer.setAttribute("data-toc-drawer", "");
     drawer.innerHTML = `
       <div class="toc-drawer-head">
-        <span>文章目录</span>
-        <button class="toc-drawer-close" data-toc-close type="button" aria-label="关闭目录">${svgIcon("x", 18)}</button>
+        <span>${t("posts.toc_open")}</span>
+        <button class="toc-drawer-close" data-toc-close type="button" aria-label="${t("posts.toc_close")}">${svgIcon("x", 18)}</button>
       </div>
       <nav class="toc-drawer-body"><ul>${listHtml}</ul></nav>`;
     document.body.appendChild(drawer);
@@ -3500,6 +3675,25 @@
       buildArticleToc(card);
       const metaEl = card.querySelector(".article-meta");
       if (metaEl) metaEl.textContent = timeAgo(p.created_at);
+      // P2 内容翻译：SSR 直出卡片没有翻译条/标题包裹，水合时按当前语言补上（原文 HTML 仍保留给爬虫）
+      if (xlateEnabled()) {
+        const h1 = card.querySelector("h1");
+        if (h1 && !h1.querySelector("[data-xlate-title]")) {
+          Array.from(h1.childNodes).forEach(n => {
+            if (n.nodeType === 3 && n.nodeValue.trim()) {
+              const sp = document.createElement("span");
+              sp.setAttribute("data-xlate-title", "");
+              sp.textContent = n.nodeValue;
+              h1.replaceChild(sp, n);
+            }
+          });
+        }
+        if (!card.querySelector("[data-xlate-root]")) {
+          card
+            .querySelector(".article-body")
+            ?.insertAdjacentHTML("beforebegin", xlateBarHtml("post", p.id));
+        }
+      }
       // 评论表单回填本地缓存（SSR 时无法读取访客 localStorage）
       const form = card.querySelector("[data-comment-form]");
       if (form) {
@@ -3544,7 +3738,7 @@
       });
     } catch (e) {
       if (state.activeView !== "post") return;
-      app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-empty"><span class="empty-ico">${svgIcon("search", 56)}</span><span>${esc(e.message)}</span><a class="btn" href="/posts">返回</a></div></div></div>`;
+      app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-empty"><span class="empty-ico">${svgIcon("search", 56)}</span><span>${esc(e.message)}</span><a class="btn" href="/posts">${t("common.back")}</a></div></div></div>`;
     }
   }
 
@@ -3560,7 +3754,7 @@
         return;
       }
     }
-    app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div></div></div>`;
+    app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-loading"><span class="spinner"></span><span>${t("common.loading")}</span></div></div></div>`;
     try {
       const p = await api("/api/posts/" + encodeURIComponent(slug) + (preview ? "?preview=1" : ""));
       if (state.activeView !== "post") return;
@@ -3575,18 +3769,19 @@
       <div class="essay">
         <div class="post-layout">
         <div class="article-card">
-          <a class="article-back" href="/" title="返回首页">
+          <a class="article-back" href="/" title="${t("posts.back_home")}">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
-            返回首页
+            ${t("posts.back_home")}
           </a>
-          <h1>${p.pinned ? `<span class="top-badge">${svgIcon("pin", 13)}<span>置顶</span></span>` : ""}${esc(p.title)}${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h1>
+          <h1>${p.pinned ? `<span class="top-badge">${svgIcon("pin", 13)}<span>${t("feed.pinned")}</span></span>` : ""}<span data-xlate-title>${esc(p.title)}</span>${p.status === "draft" ? '<span class="draft-tag">草稿</span>' : ""}</h1>
           <div class="article-meta">${timeAgo(p.created_at)}</div>
-          <div class="article-body">${sanitizeHtml(marked.parse(p.content_md || ""))}</div>
+          ${xlateEnabled() ? xlateBarHtml("post", p.id) : ""}
+          <div class="article-body" data-xlate-body>${sanitizeHtml(marked.parse(p.content_md || ""))}</div>
           ${
             state.settings.reward_enabled && state.settings.reward_qrcode
               ? `<div class="reward-card">
-                  <div class="reward-head">${svgIcon("coffee", 18)} ${esc(state.settings.reward_text || "如果觉得这篇文章不错，欢迎打赏支持一下 ~")}</div>
-                  <div class="reward-qr-wrap"><img class="reward-qr" src="${esc(state.settings.reward_qrcode)}" alt="打赏二维码" loading="lazy" referrerpolicy="no-referrer" /></div>
+                  <div class="reward-head">${svgIcon("coffee", 18)} ${esc(state.settings.reward_text || t("posts.reward_default"))}</div>
+                  <div class="reward-qr-wrap"><img class="reward-qr" src="${esc(state.settings.reward_qrcode)}" alt="${t("posts.reward_qr_alt")}" loading="lazy" referrerpolicy="no-referrer" /></div>
                 </div>`
               : ""
           }
@@ -3597,32 +3792,32 @@
                   <button class="btn danger" data-act="del-post">删除</button>
                   <a class="btn" href="/posts">返回列表</a>
                 </div>`
-              : `<div class="article-actions"><a class="btn" href="/posts">返回列表</a></div>`
+              : `<div class="article-actions"><a class="btn" href="/posts">${t("posts.back_list_short")}</a></div>`
           }
           <section class="article-comments" data-comment-section>
-            <h3 class="comment-section-title">评论<span class="comment-count-badge" data-article-comments-count></span></h3>
+            <h3 class="comment-section-title">${t("comment.title")}<span class="comment-count-badge" data-article-comments-count></span></h3>
             <div class="comment-list" data-comment-list><span class="spinner"></span></div>
             <form class="comment-form-wrap comment-form-inline" data-comment-form data-ctype="post" data-cid="${p.id}" data-slug="${esc(p.slug)}">
               <div class="comment-form-row comment-user-row">
                 <span class="qq-avatar" data-qq-avatar>${esc((localStorage.getItem("moments_nick") || "?").slice(0, 1).toUpperCase())}</span>
-                <input name="nickname" placeholder="昵称或 QQ 号（填 QQ 号自动获取昵称邮箱头像）" maxlength="20" value="${esc(localStorage.getItem("moments_nick") || "")}" required autocomplete="off" />
+                <input name="nickname" placeholder="${t("comment.nick_or_qq_ph")}" maxlength="20" value="${esc(localStorage.getItem("moments_nick") || "")}" required autocomplete="off" />
               </div>
               <div class="comment-form-row">
-                <input name="email" type="email" placeholder="邮箱 *" maxlength="100" value="${esc(localStorage.getItem("moments_email") || "")}" required />
-                <input name="website" placeholder="网址（选填，头像可点击跳转）" maxlength="200" value="${esc(getSavedWebsite())}" />
+                <input name="email" type="email" placeholder="${t("comment.email_ph")}" maxlength="100" value="${esc(localStorage.getItem("moments_email") || "")}" required />
+                <input name="website" placeholder="${t("comment.website_ph")}" maxlength="200" value="${esc(getSavedWebsite())}" />
               </div>
               <div class="comment-toolbar">
-                <button type="button" class="comment-tool-btn" data-emoji-btn title="表情">${svgIcon("smile", 18)}</button>
-                <button type="button" class="comment-tool-btn" data-img-upload-btn title="上传图片">${svgIcon("image", 18)}</button>
+                <button type="button" class="comment-tool-btn" data-emoji-btn title="${t("comment.owo")}">${svgIcon("smile", 18)}</button>
+                <button type="button" class="comment-tool-btn" data-img-upload-btn title="${t("comment.upload_image")}">${svgIcon("image", 18)}</button>
                 <input type="file" accept="image/*" data-img-file hidden />
-                <input type="text" class="comment-img-url-input" data-img-url-input placeholder="图片 URL，回车添加" maxlength="500" />
-                <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="随机一句">${svgIcon("dices", 18)}</button>
+                <input type="text" class="comment-img-url-input" data-img-url-input placeholder="${t("comment.image_url_ph")}" maxlength="500" />
+                <button type="button" class="comment-tool-btn comment-random-btn" data-random-comment title="${t("comment.random_one")}">${svgIcon("dices", 18)}</button>
               </div>
-              <textarea name="content" placeholder="说点什么…（支持 @ 提及他人）" maxlength="500" required style="min-height:100px"></textarea>
+              <textarea name="content" placeholder="${t("comment.placeholder_mention")}" maxlength="500" required style="min-height:100px"></textarea>
               <div class="comment-img-preview" data-comment-img-preview style="display:none"></div>
-              <label class="comment-notify-row"><input type="checkbox" name="notify_reply" value="1" checked /> 有人回复我的评论时邮件通知我</label>
+              <label class="comment-notify-row"><input type="checkbox" name="notify_reply" value="1" checked /> ${t("comment.notify_mine")}</label>
               <div class="comment-form-foot">
-                <button class="btn primary" type="submit">发表评论</button>
+                <button class="btn primary" type="submit">${t("comment.submit")}</button>
               </div>
             </form>
           </section>
@@ -3653,7 +3848,7 @@
         comment_count: p.comment_count || 0,
       });
     } catch (e) {
-      app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-empty"><span class="empty-ico">${svgIcon("search", 56)}</span><span>${esc(e.message)}</span><a class="btn" href="/posts">返回</a></div></div></div>`;
+      app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-empty"><span class="empty-ico">${svgIcon("search", 56)}</span><span>${esc(e.message)}</span><a class="btn" href="/posts">${t("common.back")}</a></div></div></div>`;
     }
   }
 
@@ -4461,6 +4656,7 @@
     { key: "about", label: "关于我", icon: "circle-user" },
     { key: "comments", label: "评论", icon: "message-square" },
     { key: "appearance", label: "外观", icon: "palette" },
+    { key: "i18n", label: "多语言", icon: "globe" },
     { key: "media", label: "媒体", icon: "folder" },
     { key: "music", label: "音乐", icon: "music" },
     { key: "ai", label: "AI 助手", icon: "bot" },
@@ -4643,6 +4839,7 @@
     if (tab === "about") return renderAdminAbout(panel);
     if (tab === "comments") return renderAdminComments(panel);
     if (tab === "appearance") return renderAdminAppearance(panel);
+    if (tab === "i18n") return renderAdminI18n(panel);
     if (tab === "media") return renderAdminMedia(panel);
     if (tab === "music") return renderAdminMusic(panel);
     if (tab === "ai") return renderAdminAI(panel);
@@ -5622,6 +5819,77 @@
 
   /** 后台：音乐播放器设置面板 */
   /* ---------- 后台 Tab：外观 ---------- */
+  /* ---------- 后台 Tab：多语言 ---------- */
+  async function renderAdminI18n(panel) {
+    panel.innerHTML = `<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
+    let s;
+    try {
+      s = await api("/api/admin/settings");
+    } catch (e) {
+      panel.innerHTML = `<div class="essay-empty">${esc(e.message)}</div>`;
+      return;
+    }
+    const enabledLangs = String(s.i18n_langs || "zh-CN,zh-TW,en")
+      .split(",")
+      .map(x => x.trim())
+      .filter(Boolean);
+    const has = l => enabledLangs.indexOf(l) >= 0;
+    const LANG_OPTS = [
+      { v: "zh-CN", name: "简体中文", desc: "默认" },
+      { v: "zh-TW", name: "繁體中文", desc: "台港澳访客自动使用" },
+      { v: "en", name: "English", desc: "海外访客自动使用" },
+    ];
+    panel.innerHTML = `
+      <div class="admin-panel-head"><h3>多语言</h3></div>
+      <form class="settings-form" data-i18n-form>
+        <details class="admin-fold" open>
+          <summary class="admin-fold-summary">语言设置</summary>
+          <div class="admin-fold-body">
+            <label class="switch-row">
+              <span>
+                启用多语言
+                <br /><small style="color:var(--anzhiyu-secondtext)">关闭后全站只显示默认语言，顶栏语言切换按钮自动隐藏；访客已保存的语言选择会被保留</small>
+              </span>
+              <input type="checkbox" name="i18n_enabled" ${s.i18n_enabled ? "checked" : ""} />
+            </label>
+            <div class="field">
+              <label>默认语言<br /><small style="color:var(--anzhiyu-secondtext)">无法判定访客来源时使用；也对搜索引擎与关闭多语言时生效</small></label>
+              <select name="i18n_default" style="max-width:240px">
+                ${LANG_OPTS.map(o => `<option value="${o.v}"${s.i18n_default === o.v ? " selected" : ""}>${o.name}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field">
+              <label>开放语言<br /><small style="color:var(--anzhiyu-secondtext)">勾选的语言才会出现在顶栏切换器并允许自动切换；默认语言始终包含在内</small></label>
+              <div class="i18n-lang-grid">
+                ${LANG_OPTS.map(
+                  o => `
+                  <label class="i18n-lang-opt">
+                    <input type="checkbox" name="i18n_langs" value="${o.v}" ${has(o.v) ? "checked" : ""} />
+                    <span><b>${o.name}</b><small>${o.desc}</small></span>
+                  </label>`
+                ).join("")}
+              </div>
+            </div>
+            <label class="switch-row">
+              <span>
+                按访问地自动判定
+                <br /><small style="color:var(--anzhiyu-secondtext)">首次访问时：大陆→简体，台湾/香港/澳门→繁体，其他地区→英语，浏览器语言作为补充判定。访客手动选择后永远以手动选择为准</small>
+              </span>
+              <input type="checkbox" name="i18n_auto_detect" ${s.i18n_auto_detect !== false ? "checked" : ""} />
+            </label>
+            <label class="switch-row">
+              <span>
+                动态内容自动翻译（即将上线）
+                <br /><small style="color:var(--anzhiyu-secondtext)">说说、文章、评论正文：繁体走本地转换，英语走 Workers AI 翻译并永久缓存，原文修改后自动重译。当前界面文案已完整三语，内容翻译将在下一阶段开放</small>
+              </span>
+              <input type="checkbox" name="i18n_content_translate" ${s.i18n_content_translate !== false ? "checked" : ""} />
+            </label>
+          </div>
+        </details>
+        <button class="btn primary" type="submit">保存设置</button>
+      </form>`;
+  }
+
   async function renderAdminAppearance(panel) {
     panel.innerHTML = `<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
     let s;
@@ -7350,7 +7618,7 @@
 
   function renderMusicPlaylist() {
     if (!state.music.playlist.length) {
-      musicPlaylistList.innerHTML = `<div class="music-playlist-item" style="justify-content:center;color:var(--anzhiyu-secondtext)">歌单为空</div>`;
+      musicPlaylistList.innerHTML = `<div class="music-playlist-item" style="justify-content:center;color:var(--anzhiyu-secondtext)">${t("music.playlist_empty")}</div>`;
       return;
     }
     musicPlaylistList.innerHTML = state.music.playlist
@@ -7400,8 +7668,8 @@
           if (Array.isArray(data)) {
             const songs = data.map((it, i) => ({
               id: String(it.id || `custom-${i}`),
-              name: it.name || it.title || `歌曲 ${i + 1}`,
-              artist: it.artist || "未知歌手",
+              name: it.name || it.title || t("music.song_n", { n: i + 1 }),
+              artist: it.artist || t("music.unknown_artist"),
               url: it.url || "",
               pic: it.cover || it.pic || "",
               lrc: it.lrc || "",
@@ -7420,8 +7688,8 @@
       const data = await api(`/api/music/163/playlist?id=${encodeURIComponent(playlistId)}`);
       const songs = (data.songs || []).map(s => ({
         id: String(s.id),
-        name: s.name || "未知歌曲",
-        artist: s.artist || "未知歌手",
+        name: s.name || t("music.unknown_song"),
+        artist: s.artist || t("music.unknown_artist"),
         pic: s.pic ? ensureHttps(s.pic) : "",
         url: "",
         lrc: "",
@@ -7532,10 +7800,10 @@
           consecutiveFailCount = 0;
           state.music.isLoading = false;
           setMusicPlayIcon("play");
-          toast("连续多首歌曲无可用音源，已停止播放");
+          toast(t("music.no_source_stop"));
           return;
         }
-        toast(`「${song.name}」暂无可用音源，自动下一首`);
+        toast(t("music.no_source_next", { name: song.name }));
         nextSong();
         return;
       }
@@ -7562,7 +7830,7 @@
       console.error("[music] 加载歌曲失败", e);
       state.music.isLoading = false;
       setMusicPlayIcon("play");
-      toast("歌曲加载失败");
+      toast(t("music.load_failed"));
     }
   }
 
@@ -7613,7 +7881,7 @@
   function renderLyric() {
     if (!musicLyric) return;
     if (!lyricState.lines.length) {
-      musicLyric.innerHTML = `<div class="music-lyric-empty">暂无歌词</div>`;
+      musicLyric.innerHTML = `<div class="music-lyric-empty">${t("music.no_lyric")}</div>`;
       return;
     }
     musicLyric.innerHTML = lyricState.lines
@@ -7678,7 +7946,8 @@
     }
   }
 
-  const PLAY_MODE_LABEL = { list: "列表循环", random: "随机播放", one: "单曲循环" };
+  // 播放模式名实时取词（避免语言切换后仍显示旧语言）
+  const playModeLabel = m => (m === "random" ? t("music.mode_random") : m === "one" ? t("music.mode_one") : t("music.mode_list"));
 
   /** 选下一曲索引：随机模式排除当前曲，列表/单曲循环（手动切歌）走相邻曲 */
   function pickNextIndex(dir) {
@@ -7711,7 +7980,7 @@
     btn.classList.toggle("mode-one", state.music.playMode === "one");
     // 非列表循环模式常亮提示
     btn.classList.toggle("on", state.music.playMode !== "list");
-    btn.title = `播放模式：${PLAY_MODE_LABEL[state.music.playMode]}（点击切换）`;
+    btn.title = t("music.mode_title", { mode: playModeLabel(state.music.playMode) });
   }
 
   /** 循环切换播放模式：列表循环 → 随机播放 → 单曲循环（localStorage 持久化） */
@@ -7721,7 +7990,7 @@
     state.music.playMode = next;
     localStorage.setItem("moments_playmode", next);
     applyPlayModeBtn();
-    toast(`播放模式：${PLAY_MODE_LABEL[next]}`);
+    toast(t("music.mode_toast", { mode: playModeLabel(next) }));
   }
 
   function setMusicVolume(v) {
@@ -7746,6 +8015,7 @@
   }
 
   function updateVolumeIcon() {
+    if (!musicPlayBtn || !musicPlayBtn.parentElement) return; // 音乐播放器未渲染（音乐功能关闭）
     const on = musicPlayBtn.parentElement.querySelector(".icon-vol-on");
     const off = musicPlayBtn.parentElement.querySelector(".icon-vol-off");
     if (!on || !off) return;
@@ -7784,11 +8054,11 @@
     consecutiveFailCount++;
     if (consecutiveFailCount >= 3) {
       consecutiveFailCount = 0;
-      toast("连续多首歌曲无可用音源，已停止播放");
+      toast(t("music.no_source_stop"));
       return;
     }
     const cur = state.music.playlist[state.music.currentIndex];
-    toast(`「${cur?.name || "歌曲"}」暂无可用音源，自动下一首`);
+    toast(t("music.no_source_next", { name: cur?.name || t("music.song_fallback") }));
     setTimeout(() => nextSong(), 800);
   });
 
@@ -7883,8 +8153,8 @@
     // 刷新后默认显示第一首歌的信息（标题/歌手/封面），避免封面空白
     if (state.music.playlist.length && state.music.currentIndex < 0) {
       const first = state.music.playlist[0];
-      musicTitle.textContent = first.name || "未播放";
-      musicArtist.textContent = first.artist || "点击播放";
+      musicTitle.textContent = first.name || t("music.not_playing");
+      musicArtist.textContent = first.artist || t("music.click_play");
       setCover(first.pic);
       state.music.currentIndex = 0;
       renderMusicPlaylist();
@@ -7959,7 +8229,7 @@
         await audio.play();
         markPlaying();
         updateVolumeIcon();
-        toast("已静音自动播放，点击页面任意处开启声音");
+        toast(t("music.muted_autoplay_tip"));
         const restore = () => {
           window.removeEventListener("pointerdown", restore);
           window.removeEventListener("keydown", restore);
@@ -8093,7 +8363,7 @@
           });
         }
       })
-      .catch(() => toast("播放失败"));
+      .catch(() => toast(t("music.play_failed")));
   }
 
   /** 播放时后台加载歌词到内存，内联显示当前行（不自动弹出完整面板）
@@ -8153,7 +8423,7 @@
       renderCardLyric(panel);
       return;
     }
-    panel.innerHTML = `<div class="mcc-lyric-empty">加载歌词中…</div>`;
+    panel.innerHTML = `<div class="mcc-lyric-empty">${t("music.lyric_loading")}</div>`;
     try {
       let lrc = "";
       if (/^t\d+$/.test(id)) {
@@ -8167,13 +8437,13 @@
       if (lrc) cardLyricCache.set(id, cardLyricState.lines);
       renderCardLyric(panel);
     } catch {
-      panel.innerHTML = `<div class="mcc-lyric-empty">歌词加载失败</div>`;
+      panel.innerHTML = `<div class="mcc-lyric-empty">${t("music.lyric_failed")}</div>`;
     }
   }
 
   function renderCardLyric(panel) {
     if (!cardLyricState.lines.length) {
-      panel.innerHTML = `<div class="mcc-lyric-empty">暂无歌词</div>`;
+      panel.innerHTML = `<div class="mcc-lyric-empty">${t("music.no_lyric")}</div>`;
       return;
     }
     panel.innerHTML = cardLyricState.lines
@@ -8234,15 +8504,15 @@
           }
         }
         if (!meta || meta.available === false) {
-          card.innerHTML = `<div class="mcc-err">${svgIcon("music", 16)} 音乐不可用（已下架或版权限制）</div>`;
+          card.innerHTML = `<div class="mcc-err">${svgIcon("music", 16)} ${t("music.unavailable")}</div>`;
           return;
         }
         if (!meta.title && !meta.url) {
-          card.innerHTML = `<div class="mcc-err">${svgIcon("music", 16)} 音乐加载失败</div>`;
+          card.innerHTML = `<div class="mcc-err">${svgIcon("music", 16)} ${t("music.load_failed")}</div>`;
           return;
         }
         card.innerHTML = `
-          <button type="button" class="mcc-cover-wrap" aria-label="播放/暂停" title="播放/暂停">
+          <button type="button" class="mcc-cover-wrap" aria-label="${t("music.play_pause")}" title="${t("music.play_pause")}">
             ${meta.cover ? `<img class="mcc-cover" src="${proxyCover(meta.cover)}" alt="" referrerpolicy="no-referrer" />` : `<span class="mcc-cover mcc-cover--ph">${svgIcon("music", 20)}</span>`}
             <span class="mcc-cover-ring"></span>
             <span class="mcc-cover-hint">
@@ -8255,11 +8525,11 @@
             <div class="mcc-artist" data-mcc-artist>${esc(meta.artist)}</div>
             <div class="mcc-now-lyric is-empty" data-mcc-now-lyric></div>
           </div>
-          <button type="button" class="mcc-lyric-btn" data-mcc-lyric aria-label="歌词" title="歌词">
+          <button type="button" class="mcc-lyric-btn" data-mcc-lyric aria-label="${t("music.lyric")}" title="${t("music.lyric")}">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zm14-10v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
           </button>
           <div class="mcc-bar" aria-hidden="true"><i></i></div>
-          <div class="mcc-lyric" data-mcc-lyric-panel><div class="mcc-lyric-empty">暂无歌词</div></div>`;
+          <div class="mcc-lyric" data-mcc-lyric-panel><div class="mcc-lyric-empty">${t("music.no_lyric")}</div></div>`;
         // 封面即播放键：常驻的播放角标是可点提示，转起来的黑胶本身就是播放状态
         card.querySelector(".mcc-cover-wrap").addEventListener("click", () => toggleMusicCard(card, id, meta));
         // 歌词按钮（展开完整歌词面板，可选）
@@ -8799,7 +9069,7 @@
       if (dock._cur && dock._cur.key === desc.key) {
         if (audio.paused) {
           if (audio.ended) audio.currentTime = 0;
-          audio.play().catch(() => toast("播放失败，请重试"));
+          audio.play().catch(() => toast(t("music.play_fail_retry")));
         } else {
           audio.pause();
         }
@@ -8810,7 +9080,7 @@
       dock.classList.remove("is-hidden");
       fab.hidden = true;
       vipEl.hidden = true;
-      titleEl.textContent = desc.title || "未知歌曲";
+      titleEl.textContent = desc.title || t("music.unknown_song");
       artistEl.textContent = desc.artist || "";
       setCover(desc.cover || "", cover, coverPh);
       setCover(desc.cover || "", fabCover, null);
@@ -8820,7 +9090,7 @@
       dock.classList.add("is-loading");
       // 需要现场解析音源时，artist 行临时显示解析状态，结束后恢复
       const needResolve = !desc.url && !desc._url;
-      if (needResolve) artistEl.textContent = "正在解析试听地址…";
+      if (needResolve) artistEl.textContent = t("music.resolving");
       sync();
       (async () => {
         try {
@@ -8831,20 +9101,20 @@
               else { desc._url = r.url; if (r.vip) vipEl.hidden = false; }
             } catch (err) {
               if (dock._cur === desc) {
-                artistEl.textContent = "试听地址解析失败，可能暂无音源";
-                toast("试听地址解析失败，可能暂无音源");
+                artistEl.textContent = t("music.resolve_no_source");
+                toast(t("music.resolve_no_source"));
               }
               return;
             }
             if (dock._cur !== desc) return; // 已切到别的歌
             artistEl.textContent = desc.artist || "";
-            toast("试听地址解析成功");
+            toast(t("music.resolve_success"));
           }
           if (dock._cur !== desc) return;
           audio.src = desc.url || desc._url;
           await audio.play();
         } catch {
-          if (dock._cur === desc) toast("播放失败，请重试");
+          if (dock._cur === desc) toast(t("music.play_fail_retry"));
         } finally {
           dock.classList.remove("is-loading");
           sync();
@@ -8896,7 +9166,7 @@
       if (!dock._cur) return;
       if (audio.paused) {
         if (audio.ended) audio.currentTime = 0;
-        audio.play().catch(() => toast("播放失败，请重试"));
+        audio.play().catch(() => toast(t("music.play_fail_retry")));
       } else {
         audio.pause();
       }
@@ -9607,7 +9877,7 @@
   function renderThemeBtn() {
     const cur = document.documentElement.dataset.theme;
     themeToggle.innerHTML = svgIcon(cur === "dark" ? "sun" : "moon", 18);
-    themeToggle.title = cur === "dark" ? "切换浅色模式" : "切换深色模式";
+    themeToggle.title = cur === "dark" ? t("common.theme_light") : t("common.theme_dark");
   }
   themeToggle.addEventListener("click", () => {
     const cur = document.documentElement.dataset.theme;
@@ -9648,25 +9918,25 @@
   }
   function renderSearchEmpty() {
     searchItems = []; searchActive = -1;
-    searchResults.innerHTML = `<div class="search-empty">输入关键词，搜索文章、说说、友链</div>`;
+    searchResults.innerHTML = `<div class="search-empty">${t("search.input_hint")}</div>`;
   }
   function renderSearchLoading() {
-    searchResults.innerHTML = `<div class="search-empty">搜索中…</div>`;
+    searchResults.innerHTML = `<div class="search-empty">${t("search.loading")}</div>`;
   }
   function renderSearchResults(data) {
     const q = data.query || "";
     const feedHref = "/?q=" + encodeURIComponent(q);
     const groups = [
-      { key: "posts", label: "文章", icon: "file-text", more: !!data.posts_more, moreHref: "/posts",
+      { key: "posts", label: t("search.tab_posts"), icon: "file-text", more: !!data.posts_more, moreHref: "/posts",
         list: (data.posts || []).map(p => ({ title: p.title, sub: p.excerpt, href: "/post/" + encodeURIComponent(p.slug) })) },
-      { key: "moments", label: "说说", icon: "message-circle", more: !!data.moments_more, moreHref: feedHref,
-        list: (data.moments || []).map(m => ({ title: m.content || "（无文字）", sub: m.location ? "📍 " + m.location : m.created_at?.slice(0, 10) || "", href: feedHref })) },
-      { key: "friends", label: "友链", icon: "link", more: !!data.friends_more, moreHref: "/links",
+      { key: "moments", label: t("search.tab_moments"), icon: "message-circle", more: !!data.moments_more, moreHref: feedHref,
+        list: (data.moments || []).map(m => ({ title: m.content || t("search.no_text"), sub: m.location ? "📍 " + m.location : m.created_at?.slice(0, 10) || "", href: feedHref })) },
+      { key: "friends", label: t("search.tab_friends"), icon: "link", more: !!data.friends_more, moreHref: "/links",
         list: (data.friends || []).map(f => ({ title: f.name, sub: f.description || f.url, href: f.url || "/links", external: !!f.url })) },
     ].filter(g => g.list.length || g.more);
     if (!groups.length) {
       searchItems = []; searchActive = -1;
-      searchResults.innerHTML = `<div class="search-empty">没有找到与「${esc(q)}」相关的内容</div>`;
+      searchResults.innerHTML = `<div class="search-empty">${t("search.no_result", { q: esc(q) })}</div>`;
       return;
     }
     searchItems = [];
@@ -9683,11 +9953,11 @@
         </a>`;
       }
       if (g.more) {
-        html += `<a class="search-more" href="${esc(g.moreHref)}" data-search-more>查看更多「${esc(g.label)}」结果 →</a>`;
+        html += `<a class="search-more" href="${esc(g.moreHref)}" data-search-more>${t("search.more", { name: esc(g.label) })}</a>`;
       }
       html += `</div>`;
     }
-    html += `<div class="search-total">共 ${data.total} 条结果</div>`;
+    html += `<div class="search-total">${t("search.total", { n: data.total })}</div>`;
     searchResults.innerHTML = html;
     searchActive = -1;
   }
@@ -9703,7 +9973,7 @@
         if (searchOverlay.hidden || searchInput.value.trim() !== q) return; // 已关闭或又改了词
         renderSearchResults(data);
       } catch (e) {
-        if (!searchOverlay.hidden) searchResults.innerHTML = `<div class="search-empty">${esc(e.message || "搜索失败")}</div>`;
+        if (!searchOverlay.hidden) searchResults.innerHTML = `<div class="search-empty">${esc(e.message || t("search.failed"))}</div>`;
       }
     }, 220);
   }
@@ -9763,12 +10033,12 @@
     if (!topbarEl.classList.contains("menu-open")) return;
     topbarEl.classList.remove("menu-open");
     menuToggle?.setAttribute("aria-expanded", "false");
-    menuToggle?.setAttribute("aria-label", "打开菜单");
+    menuToggle?.setAttribute("aria-label", t("common.open_menu"));
   }
   function openMobileMenu() {
     topbarEl.classList.add("menu-open");
     menuToggle?.setAttribute("aria-expanded", "true");
-    menuToggle?.setAttribute("aria-label", "关闭菜单");
+    menuToggle?.setAttribute("aria-label", t("common.close_menu"));
   }
 
   menuToggle.addEventListener("click", e => {
@@ -10039,7 +10309,7 @@
         openCommentModal({
           ctype: "moment",
           cid: m.id,
-          quote: plainText(m.content, 80) || `即刻 #${m.id}`,
+          quote: plainText(m.content, 80) || t("feed.moment_hash", { id: m.id }),
           comment_count: m.comment_count,
           comments: m.comments,
         });
@@ -10140,6 +10410,41 @@
       } catch (err) {
         msg.textContent = err.message;
         msg.style.color = "#f56c6c";
+      } finally {
+        btn.disabled = false;
+      }
+      return;
+    }
+
+    /* ---------- 后台：多语言设置 ---------- */
+    const i18nForm = e.target.closest("[data-i18n-form]");
+    if (i18nForm) {
+      e.preventDefault();
+      const langs = [...i18nForm.querySelectorAll('[name="i18n_langs"]:checked')].map(el => el.value);
+      const def = i18nForm.querySelector('[name="i18n_default"]').value;
+      // 默认语言必须在开放列表中（服务端也会兜底，前端提前保证）
+      if (langs.indexOf(def) < 0) langs.unshift(def);
+      const patch = {
+        i18n_enabled: i18nForm.querySelector('[name="i18n_enabled"]').checked,
+        i18n_default: def,
+        i18n_langs: langs.join(","),
+        i18n_auto_detect: i18nForm.querySelector('[name="i18n_auto_detect"]').checked,
+        i18n_content_translate: i18nForm.querySelector('[name="i18n_content_translate"]').checked,
+      };
+      const btn = i18nForm.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      try {
+        const s = await api("/api/admin/settings", { method: "PUT", body: patch });
+        state.settings = s;
+        applySettings();
+        if (window.I18N) {
+          window.I18N.configure(s);
+          window.I18N.applyStatic(document);
+          renderLangSwitcher();
+        }
+        toast("设置已保存");
+      } catch (err) {
+        toast(err.message);
       } finally {
         btn.disabled = false;
       }
@@ -10291,7 +10596,7 @@
         nativeVideo.play().catch(() => {});
         nativeVideo.scrollIntoView({ behavior: "smooth", block: "center" });
       } else {
-        toast("当前页面没有视频");
+        toast(t("common.video_not_found"));
       }
       return;
     }
@@ -10335,16 +10640,16 @@
     if (!form) return;
     e.preventDefault();
     const target = state.commentTarget;
-    if (!target) return toast("请先选择评论对象");
+    if (!target) return toast(t("comment.select_target_first"));
     const ctype = target.ctype === "post" ? "post" : "moment";
     const cid = Number(target.cid);
     const nickname = form.nickname.value.trim();
     const email = form.email?.value.trim() || "";
     const content = form.content.value.trim();
     const website = form.website?.value.trim() || "";
-    if (!nickname) return toast("请填写昵称");
-    if (!email) return toast("请填写邮箱");
-    if (!content) return toast("评论内容不能为空");
+    if (!nickname) return toast(t("comment.nickname_required"));
+    if (!email) return toast(t("comment.email_required"));
+    if (!content) return toast(t("comment.empty_tip"));
     const qq = (form.dataset.qq || "").trim();
     const parentId = Number(form.dataset.parentId) || 0;
     const btn = form.querySelector('button[type="submit"]');
@@ -10398,8 +10703,9 @@
         updateArticleCommentCount(target.comment_count);
       }
       // @机器人：提示并轻量轮询异步生成的 AI 回复
-      if (state.settings?.ai_reply_enabled && content.includes(`@${state.settings.ai_bot_name || "小J"}`)) {
-        toast(`已召唤 ${state.settings.ai_bot_name || "小J"}，回复稍后自动出现`);
+      const botName = state.settings.ai_bot_name || "小J";
+      if (state.settings?.ai_reply_enabled && content.includes(`@${botName}`)) {
+        toast(t("comment.ai_called", { name: botName }));
         pollAiReplies(target);
       }
     } catch (err) {
@@ -10455,11 +10761,11 @@
     const el = e.target.closest && e.target.closest("[data-copy]");
     if (!el) return;
     const text = el.getAttribute("data-copy") || el.textContent || "";
-    const done = () => toast("已复制到剪贴板");
+    const done = () => toast(t("common.link_copied"));
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(done).catch(() => {
         const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta);
-        ta.select(); try { document.execCommand("copy"); done(); } catch { toast("复制失败"); } ta.remove();
+        ta.select(); try { document.execCommand("copy"); done(); } catch { toast(t("common.copy_failed")); } ta.remove();
       });
     }
   });
@@ -10512,10 +10818,10 @@
   /** 404 空状态（访问已废弃的 /admin 等地址时显示，不暴露后台存在） */
   function renderNotFound() {
     state.activeView = "404";
-    setSeo({ title: `页面不存在 · ${state.settings.site_title}`, path: location.pathname, noindex: true });
+    setSeo({ title: `${t("404.title")} · ${state.settings.site_title}`, path: location.pathname, noindex: true });
     app.innerHTML = `<div class="essay"><div class="posts-wrap"><div class="essay-empty">
-      <span class="empty-ico">${svgIcon("search", 56)}</span><span>页面不存在</span>
-      <a class="btn" href="/">返回首页</a></div></div></div>`;
+      <span class="empty-ico">${svgIcon("search", 56)}</span><span>${t("404.title")}</span>
+      <a class="btn" href="/">${t("404.back_home")}</a></div></div></div>`;
   }
 
   /* ================= 访问统计埋点（后台/管理员不计，由后端再兜底排除） ================= */
@@ -10678,6 +10984,330 @@
     if (event.persisted) applyMusicSettings();
   });
 
+  /* ================= 多语言（i18n） ================= */
+  const I18N_LANGS_OK = ["zh-CN", "zh-TW", "en"];
+
+  /** 顶栏语言切换器：地球按钮 + 下拉菜单（仅后台开启且开放语言≥2 时显示） */
+  function renderLangSwitcher() {
+    const box = document.getElementById("langSwitch");
+    if (!box || !window.I18N) return;
+    const enabled = !!(state.settings.i18n_enabled && window.I18N.enabled);
+    const langs = String(state.settings.i18n_langs || "")
+      .split(",")
+      .map(s => s.trim())
+      .filter(l => I18N_LANGS_OK.indexOf(l) >= 0);
+    if (!enabled || langs.length < 2) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+    box.hidden = false;
+    const cur = window.I18N.lang;
+    const checkSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+    box.innerHTML = `
+      <button class="topbar-btn lang-switch-btn" id="langSwitchBtn" type="button"
+        title="${esc(t("lang.switch"))}" aria-label="${esc(t("lang.switch"))}"
+        aria-haspopup="menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span class="lang-switch-code">${esc(window.I18N.shortOf(cur))}</span>
+      </button>
+      <div class="lang-menu" id="langMenu" role="menu" hidden>
+        ${langs
+          .map(
+            l =>
+              `<button class="lang-menu-item ${l === cur ? "is-active" : ""}" role="menuitemradio" data-lang="${l}" type="button">
+                 <span>${esc(window.I18N.labelOf(l))}</span>${l === cur ? checkSvg : ""}
+               </button>`
+          )
+          .join("")}
+      </div>`;
+    const btn = box.querySelector("#langSwitchBtn");
+    const menu = box.querySelector("#langMenu");
+    const setOpen = open => {
+      menu.hidden = !open;
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      setOpen(menu.hidden);
+    });
+    menu.addEventListener("click", e => {
+      const item = e.target.closest("[data-lang]");
+      if (!item) return;
+      window.I18N.setLang(item.dataset.lang);
+      setOpen(false);
+    });
+    // 外部点击 / Esc 关闭（只绑一次）
+    if (!renderLangSwitcher._bound) {
+      renderLangSwitcher._bound = true;
+      document.addEventListener("click", e => {
+        const b = document.getElementById("langSwitch");
+        if (b && !b.contains(e.target)) {
+          const m = b.querySelector("#langMenu");
+          const bt = b.querySelector("#langSwitchBtn");
+          if (m && !m.hidden) {
+            m.hidden = true;
+            if (bt) bt.setAttribute("aria-expanded", "false");
+          }
+        }
+      });
+      document.addEventListener("keydown", e => {
+        if (e.key !== "Escape") return;
+        const b = document.getElementById("langSwitch");
+        if (!b) return;
+        const m = b.querySelector("#langMenu");
+        if (m) m.hidden = true;
+      });
+    }
+  }
+
+  /** 语言切换后：刷新静态文案 + 重绘访客视图（后台页保持中文不重绘） */
+  if (window.I18N) {
+    window.I18N.on(() => {
+      renderLangSwitcher();
+      window.I18N.applyStatic(document);
+      applySettings();
+      const p = location.pathname || "/";
+      const isAdmin = p === state.adminPath || p === "/admin";
+      if (!isAdmin) route();
+    });
+  }
+
+  /* ================= 内容按需翻译（P2：文章 / 说说 / 关于页） ================= */
+  // 设计：不自动翻译，访客点按钮按需译；译文仅当前页有效，切页/切语言即还原（不记忆）
+  const xlateStore = new Map(); // `${type}:${id}` -> { engine, showing, show(which) }
+  const XLATE_GLOBE_SVG =
+    '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
+
+  function xlateEnabled() {
+    const I = window.I18N;
+    return !!(
+      state.settings.i18n_enabled &&
+      state.settings.i18n_content_translate &&
+      I &&
+      I.enabled &&
+      (I.lang === "en" || I.lang === "zh-TW")
+    );
+  }
+
+  function xlateRequest(type, id) {
+    return api("/api/translate", { body: { type, id: String(id), lang: window.I18N.lang } });
+  }
+
+  /** 说说是否值得翻译：含汉字且 ≥2 字（纯表情/图片动态不显示按钮） */
+  function momentTranslatable(text) {
+    const s = String(text || "").trim();
+    return s.length >= 2 && /[㐀-鿿]/.test(s);
+  }
+
+  /** 文章/关于页正文上方的翻译工具条（初始态） */
+  function xlateBarHtml(type, id) {
+    const labelKey = window.I18N.lang === "en" ? "translate.btn_en" : "translate.btn_zh_tw";
+    return `<div class="xlate-bar" data-xlate-root data-xlate-type="${type}" data-xlate-id="${esc(String(id))}">
+      <button type="button" class="xlate-btn" data-xlate-act="go">${XLATE_GLOBE_SVG}<span>${esc(t(labelKey))}</span></button>
+    </div>`;
+  }
+
+  function paintBarLoading(root) {
+    root.innerHTML = `<span class="xlate-spin"></span><span>${esc(t("translate.loading"))}</span>`;
+  }
+
+  function paintBarIdle(root) {
+    const labelKey = window.I18N.lang === "en" ? "translate.btn_en" : "translate.btn_zh_tw";
+    root.innerHTML = `<button type="button" class="xlate-btn" data-xlate-act="go">${XLATE_GLOBE_SVG}<span>${esc(t(labelKey))}</span></button>`;
+  }
+
+  function paintBarDone(root, entry) {
+    const note = t(entry.engine === "ai" ? "translate.note_ai" : "translate.note_local");
+    const link = t(entry.showing === "trans" ? "translate.view_original" : "translate.view_translation");
+    root.innerHTML =
+      `<span class="xlate-bar-ico">${XLATE_GLOBE_SVG}</span>` +
+      `<span class="xlate-note-text">${esc(note)}</span><span aria-hidden="true">·</span>` +
+      `<button type="button" class="xlate-link" data-xlate-act="toggle">${esc(link)}</button>`;
+  }
+
+  /** 文章译文条目：抓原文 → 请求 → 返回可在原文/译文间切换的 entry */
+  async function buildPostEntry(root) {
+    const id = root.dataset.xlateId;
+    const card = root.closest(".article-card") || app;
+    const titleEl = card.querySelector("[data-xlate-title]");
+    const bodyEl = card.querySelector(".article-body");
+    const origTitle = titleEl ? titleEl.textContent : "";
+    const origBody = bodyEl ? bodyEl.innerHTML : "";
+    const res = await xlateRequest("post", id);
+    const transTitle = res.title || origTitle;
+    const transBody = sanitizeHtml(marked.parse(res.content || ""));
+    const entry = {
+      engine: res.engine || "ai",
+      showing: "orig",
+      show(which) {
+        if (titleEl) titleEl.textContent = which === "trans" ? transTitle : origTitle;
+        if (bodyEl) bodyEl.innerHTML = which === "trans" ? transBody : origBody;
+        hydrateMusicCards(card);
+        hydrateVideos(card);
+        buildArticleToc(card); // 译文标题层级变了，目录同步重建
+        this.showing = which;
+      },
+    };
+    xlateStore.set("post:" + id, entry);
+    return entry;
+  }
+
+  /** 关于页译文条目：问候/副标题/签名走纯文本，bio 走 Markdown */
+  async function buildAboutEntry() {
+    const greetingEl = app.querySelector(".about-greet h1");
+    const subEl = app.querySelector(".about-greet-sub");
+    const signEl = app.querySelector(".about-author-sign");
+    const bioEl = app.querySelector(".about-bio .article-body");
+    const orig = {
+      greeting: greetingEl ? greetingEl.textContent : "",
+      sub: subEl ? subEl.textContent : "",
+      sign: signEl ? signEl.textContent : "",
+      bio: bioEl ? bioEl.innerHTML : "",
+    };
+    const res = await xlateRequest("about", "site");
+    const f = res.fields || {};
+    const transBio = sanitizeHtml(marked.parse(f.bio || ""));
+    const entry = {
+      engine: res.engine || "ai",
+      showing: "orig",
+      show(which) {
+        if (which === "trans") {
+          if (greetingEl) greetingEl.textContent = f.greeting || orig.greeting;
+          if (subEl) subEl.textContent = f.greeting_sub || orig.sub;
+          if (signEl) signEl.textContent = f.signature || orig.sign;
+          if (bioEl) bioEl.innerHTML = transBio;
+        } else {
+          if (greetingEl) greetingEl.textContent = orig.greeting;
+          if (subEl) subEl.textContent = orig.sub;
+          if (signEl) signEl.textContent = orig.sign;
+          if (bioEl) bioEl.innerHTML = orig.bio;
+        }
+        this.showing = which;
+      },
+    };
+    xlateStore.set("about:site", entry);
+    return entry;
+  }
+
+  async function handleXlateGo(root) {
+    const type = root.dataset.xlateType;
+    const key = type + ":" + root.dataset.xlateId;
+    paintBarLoading(root);
+    try {
+      let entry = xlateStore.get(key);
+      if (!entry) entry = type === "post" ? await buildPostEntry(root) : await buildAboutEntry(root);
+      entry.show("trans");
+      paintBarDone(root, entry);
+    } catch (err) {
+      paintBarIdle(root);
+      toast(err.message || t("translate.error"));
+    }
+  }
+
+  function handleXlateToggle(root) {
+    const entry = xlateStore.get(root.dataset.xlateType + ":" + root.dataset.xlateId);
+    if (!entry) return;
+    entry.show(entry.showing === "trans" ? "orig" : "trans");
+    paintBarDone(root, entry);
+  }
+
+  /* ---------- 说说卡片：操作行地球按钮 + 译文声明 ---------- */
+  function setMomentBtnPending(btn, pending) {
+    btn.classList.toggle("is-pending", pending);
+    btn.innerHTML = pending ? '<span class="xlate-spin"></span>' : XLATE_GLOBE_SVG;
+  }
+
+  function paintMomentNote(card, entry, btn) {
+    let note = card.querySelector("[data-mnote]");
+    const contentEl = card.querySelector("[data-mcontent]");
+    if (!note && contentEl) {
+      contentEl.insertAdjacentHTML(
+        "afterend",
+        `<div class="m-xlate-note" data-mnote><span class="m-xlate-note-text"></span><span>·</span><button type="button" class="xlate-link" data-act="xlate-toggle"></button></div>`
+      );
+      note = card.querySelector("[data-mnote]");
+    }
+    if (!note) return;
+    note.querySelector(".m-xlate-note-text").textContent =
+      t(entry.engine === "ai" ? "translate.note_ai" : "translate.note_local");
+    note.querySelector("[data-act='xlate-toggle']").textContent =
+      t(entry.showing === "trans" ? "translate.view_original" : "translate.view_translation");
+    if (btn) {
+      setMomentBtnPending(btn, false);
+      btn.title = t(entry.showing === "trans" ? "translate.view_original" : "translate.title");
+    }
+  }
+
+  async function handleMomentXlate(btn) {
+    const card = btn.closest(".bber-item");
+    if (!card) return;
+    const id = Number(card.dataset.id);
+    const key = "moment:" + id;
+    const existed = xlateStore.get(key);
+    if (existed) {
+      existed.show(existed.showing === "trans" ? "orig" : "trans");
+      paintMomentNote(card, existed, btn);
+      return;
+    }
+    const contentEl = card.querySelector("[data-mcontent]");
+    if (!contentEl) return;
+    setMomentBtnPending(btn, true);
+    try {
+      const res = await xlateRequest("moment", id);
+      const origHtml = contentEl.innerHTML;
+      const transHtml = renderContentHtml(res.content || "");
+      const entry = {
+        engine: res.engine || "ai",
+        showing: "orig",
+        show(which) {
+          contentEl.innerHTML = which === "trans" ? transHtml : origHtml;
+          hydrateMusicCards(card);
+          hydrateVideos(card);
+          this.showing = which;
+        },
+      };
+      xlateStore.set(key, entry);
+      entry.show("trans");
+      btn.classList.add("is-active");
+      paintMomentNote(card, entry, btn);
+    } catch (err) {
+      setMomentBtnPending(btn, false);
+      toast(err.message || t("translate.error"));
+    }
+  }
+
+  document.addEventListener("click", e => {
+    if (!xlateEnabled()) return;
+    const mToggle = e.target.closest("[data-act='xlate-toggle']");
+    if (mToggle) {
+      const card = mToggle.closest(".bber-item");
+      const entry = card ? xlateStore.get("moment:" + Number(card.dataset.id)) : null;
+      if (entry && card) {
+        entry.show(entry.showing === "trans" ? "orig" : "trans");
+        paintMomentNote(card, entry, card.querySelector("[data-act='xlate']"));
+      }
+      return;
+    }
+    const go = e.target.closest("[data-xlate-act='go']");
+    if (go) {
+      const root = go.closest("[data-xlate-root]");
+      if (root) handleXlateGo(root);
+      return;
+    }
+    const toggle = e.target.closest("[data-xlate-act='toggle']");
+    if (toggle) {
+      const root = toggle.closest("[data-xlate-root]");
+      if (root) handleXlateToggle(root);
+      return;
+    }
+    const mBtn = e.target.closest("[data-act='xlate']");
+    if (mBtn) {
+      handleMomentXlate(mBtn);
+      return;
+    }
+  });
+
   /* ================= 启动 ================= */
   // 旧 workers.dev 域名迁移：把缓存/接口设置中的旧绝对地址改成相对路径，
   // 资源随当前域名（e.jxe.me）走，避免老用户 localStorage 缓存继续引用旧域名
@@ -10707,6 +11337,18 @@
       /* 后端不可用时使用兜底默认值 */
     }
     applySettings();
+    // i18n：同步后台开关/语言集合；首次访问且无 SSR 注入（深链直连静态页）时调检测接口
+    if (window.I18N) {
+      window.I18N.configure(state.settings);
+      if (state.settings.i18n_enabled && !window.I18N.manual && !window.__I18N_BOOT__) {
+        try {
+          const d = await api("/api/i18n/detect");
+          window.I18N.applyDetected(d.lang);
+        } catch (_) {}
+      }
+      window.I18N.applyStatic(document);
+      renderLangSwitcher();
+    }
     await loadOwoPacks(); // 预加载表情包，确保首屏评论里的 ::(slug): 能渲染成图片
     await refreshAdmin();
     route();
