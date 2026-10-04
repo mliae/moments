@@ -406,7 +406,7 @@ app.post("/qq/test", requireAdmin, async c => {
   try {
     const { checkQqCookie } = await import("../routes/misc");
     const r = await checkQqCookie(eff);
-    return ok(c, { ok: r.ok, msg: r.msg });
+    return ok(c, { ok: r.ok, msg: r.msg, debug: r.debug });
   } catch (e) {
     return ok(c, { ok: false, msg: "连接失败：" + (e instanceof Error ? e.message : String(e)) });
   }

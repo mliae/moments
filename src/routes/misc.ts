@@ -120,60 +120,124 @@ async function fetchNickFromApi(api: ApiEntry, qq: string): Promise<string> {
 /**
  * 直连腾讯接口查询 QQ 昵称（需后台配置 ckqq/skey/pskey）。
  * 仅供服务端调用，凭证私密不下发前端。返回 null 表示未配置/失败。
+ * 多接口轮试：先试不需要 Cookie 的公开接口，再试需要 Cookie 的接口。
  */
 export async function fetchQqNickDirect(
   s: SiteSettings,
   qq: string
 ): Promise<{ nickname: string } | null> {
-  if (!s.qq_ckqq || !s.qq_pskey) return null;
-  // 用 Cookie 直接请求腾讯 Qzone 接口获取昵称
-  const cookie = `uin=o${s.qq_ckqq}; skey=${s.qq_skey}; p_skey=${s.qq_pskey}`;
-  const url = `https://user.qzone.qq.com/${encodeURIComponent(qq)}/profile`;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 8000);
+  // 1. 先尝试不需要 Cookie 的公开接口
   try {
-    const resp = await fetch(url, {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const resp = await fetch(`https://users.qzone.qq.com/fcg-bin/cgi_get_portrait.fcg?uins=${encodeURIComponent(qq)}`, {
       signal: ctrl.signal,
-      headers: {
-        "User-Agent": UA,
-        "Cookie": cookie,
-        "Referer": "https://qzone.qq.com/",
-      },
-      redirect: "manual", // 302 = Cookie 失效
+      headers: { "Referer": "https://qzone.qq.com/", "User-Agent": UA },
     });
-    if (resp.status === 302 || resp.status === 301) {
-      throw new Error("Cookie 已失效（302 重定向）");
-    }
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const html = decodeBuf(await resp.arrayBuffer());
-    // 从 Qzone 个人资料页提取昵称
-    const m = html.match(/<title>([^<]+?)的空间/) || html.match(/nickname["\s:=]+["']([^"']+)["']/) || html.match(/"name"\s*:\s*"([^"]+)"/);
-    if (m && m[1]) {
-      return { nickname: m[1].trim().slice(0, 50) };
-    }
-    throw new Error("未从页面提取到昵称");
-  } finally {
     clearTimeout(timer);
+    if (resp.ok) {
+      const text = await resp.text();
+      // JSONP 格式：_Callback({"237333536":["url",...,0,0,0,"nickname"]});
+      const m = text.match(/\["([^"]+)"\]\s*\)\s*;?\s*$/);
+      if (m && m[1] && m[1] !== "") return { nickname: m[1].trim().slice(0, 50) };
+      // 旧格式：{"qq":["url",...,"nickname"]}
+      const jm = text.match(new RegExp(`"${qq}"\\s*:\\s*\\[[^\\]]*"([^"\\]]+)"\\s*\\]`));
+      if (jm && jm[1]) return { nickname: jm[1].trim().slice(0, 50) };
+    }
+  } catch { /* 继续下一个 */ }
+
+  // 2. 再试需要 Cookie 的接口（qzone 主页接口，对 IP 风控更宽松）
+  if (s.qq_ckqq && s.qq_pskey) {
+    const cookie = `uin=o${s.qq_ckqq}; skey=${s.qq_skey}; p_skey=${s.qq_pskey}`;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const resp = await fetch(`https://h5.qzone.qq.com/proxy/domain/g.qzone.qq.com/cgi-bin/cgi_get_qzone_index?uin=${s.qq_ckqq}&g_tk=5381`, {
+        signal: ctrl.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+          "Cookie": cookie,
+          "Referer": "https://qzone.qq.com/",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        redirect: "manual",
+      });
+      clearTimeout(timer);
+      if (resp.ok) {
+        const html = await resp.text();
+        if (!html.includes("ptlogin") && !html.includes("login.qq.com")) {
+          const m = html.match(/<title>([^<]+?)的空间/) || html.match(/nickname["\s:=]+["']([^"']+)["']/);
+          if (m && m[1]) return { nickname: m[1].trim().slice(0, 50) };
+        }
+      }
+    } catch { /* 继续下一个 */ }
   }
+
+  // 3. 兜底：尝试 profile 页
+  if (s.qq_ckqq && s.qq_pskey) {
+    const cookie = `uin=o${s.qq_ckqq}; skey=${s.qq_skey}; p_skey=${s.qq_pskey}`;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const resp = await fetch(`https://user.qzone.qq.com/${encodeURIComponent(qq)}/profile`, {
+        signal: ctrl.signal,
+        headers: { "User-Agent": UA, "Cookie": cookie, "Referer": "https://qzone.qq.com/" },
+        redirect: "manual",
+      });
+      clearTimeout(timer);
+      if (resp.ok) {
+        const html = decodeBuf(await resp.arrayBuffer());
+        const m = html.match(/<title>([^<]+?)的空间/) || html.match(/nickname["\s:=]+["']([^"']+)["']/) || html.match(/"name"\s*:\s*"([^"]+)"/);
+        if (m && m[1]) return { nickname: m[1].trim().slice(0, 50) };
+      }
+    } catch { /* 忽略 */ }
+  }
+
+  return null;
 }
 
 /** 检测 QQ Cookie 是否有效（用于保活+告警） */
-export async function checkQqCookie(s: SiteSettings): Promise<{ ok: boolean; msg: string }> {
+export async function checkQqCookie(s: SiteSettings): Promise<{ ok: boolean; msg: string; debug?: Record<string, unknown> }> {
   if (!s.qq_ckqq || !s.qq_pskey) return { ok: false, msg: "未配置 ckqq/pskey" };
   const cookie = `uin=o${s.qq_ckqq}; skey=${s.qq_skey}; p_skey=${s.qq_pskey}`;
-  try {
-    const resp = await fetch(`https://user.qzone.qq.com/${s.qq_ckqq}/profile`, {
-      headers: { "User-Agent": UA, "Cookie": cookie, "Referer": "https://qzone.qq.com/" },
-      redirect: "manual",
-    });
-    if (resp.status === 302 || resp.status === 301) {
-      return { ok: false, msg: "Cookie 已失效（302 重定向到登录页）" };
+  // 先试轻量接口（qzone 主页头像接口），对 IP 风控更宽松
+  const endpoints = [
+    { name: "qzone-home", url: `https://h5.qzone.qq.com/proxy/domain/g.qzone.qq.com/cgi-bin/cgi_get_qzone_index?uin=${s.qq_ckqq}&g_tk=5381` },
+    { name: "qzone-profile", url: `https://user.qzone.qq.com/${s.qq_ckqq}/profile` },
+  ];
+  for (const ep of endpoints) {
+    try {
+      const resp = await fetch(ep.url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+          "Cookie": cookie,
+          "Referer": "https://qzone.qq.com/",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "zh-CN,zh;q=0.9",
+        },
+        redirect: "manual",
+      });
+      const debug = { endpoint: ep.name, status: resp.status, headers: Object.fromEntries(resp.headers.entries()) };
+      if (resp.status === 302 || resp.status === 301) {
+        const location = resp.headers.get("location") || "";
+        if (location.includes("login") || location.includes("xui.ptlogin2")) {
+          continue; // Cookie 失效，试下一个接口
+        }
+        // 非登录重定向（如正常跳转），视为有效
+        return { ok: true, msg: "Cookie 有效", debug };
+      }
+      if (!resp.ok) continue;
+      // 200 但需检查内容是否是登录页
+      const html = await resp.text();
+      if (html.includes("ptlogin") || html.includes("login.qq.com") || html.includes("xui.ptlogin2")) {
+        continue;
+      }
+      return { ok: true, msg: "Cookie 有效", debug };
+    } catch {
+      continue;
     }
-    if (!resp.ok) return { ok: false, msg: `HTTP ${resp.status}` };
-    return { ok: true, msg: "Cookie 有效" };
-  } catch (e) {
-    return { ok: false, msg: "请求失败：" + (e instanceof Error ? e.message : String(e)) };
   }
+  return { ok: false, msg: "Cookie 已失效（所有检测接口均返回登录页或 302）" };
 }
 
 app.get("/qq-info", async c => {
