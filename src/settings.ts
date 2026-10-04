@@ -112,6 +112,12 @@ export interface SiteSettings {
   comment_rate_limit: string; // 同 IP 每分钟评论上限（1-100，默认 5）
   // 运维监控
   uptime_check_interval: string; // 可用性检测间隔（分钟，1-720，默认 5）
+  // 多语言（i18n）
+  i18n_enabled: boolean; // 是否启用多语言（关闭后全站仅默认语言，顶栏切换器隐藏）
+  i18n_default: string; // 默认语言：zh-CN | zh-TW | en
+  i18n_langs: string; // 开放语言，逗号分隔（如 zh-CN,zh-TW,en）；至少包含默认语言
+  i18n_auto_detect: boolean; // 首次访问是否按访问地/浏览器语言自动判定
+  i18n_content_translate: boolean; // 是否自动翻译说说/文章等动态内容（P2，预留开关）
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -216,6 +222,11 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   mail_reply_notify: true,
   comment_rate_limit: "5",
   uptime_check_interval: "5",
+  i18n_enabled: false,
+  i18n_default: "zh-CN",
+  i18n_langs: "zh-CN,zh-TW,en",
+  i18n_auto_detect: true,
+  i18n_content_translate: true,
 };
 
 /** 字符串字段约束：最大长度 */
@@ -289,6 +300,8 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   reward_qrcode: 500,
   reward_text: 300,
   uptime_check_interval: 3,
+  i18n_default: 10,
+  i18n_langs: 40,
 };
 
 /**
@@ -322,6 +335,9 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "mail_notify_admin",
   "mail_reply_notify",
   "reward_enabled",
+  "i18n_enabled",
+  "i18n_auto_detect",
+  "i18n_content_translate",
 ];
 
 export function clampSetting(value: unknown, max: number): string {
@@ -390,6 +406,16 @@ export function normalizeSettings(raw: Record<string, unknown> | null | undefine
     ? String(Math.max(1, Math.min(720, ui)))
     : DEFAULT_SETTINGS.uptime_check_interval;
   if (out.banner_bg_mode !== "static" && out.banner_bg_mode !== "random") out.banner_bg_mode = DEFAULT_SETTINGS.banner_bg_mode;
+  // 多语言：默认语言/开放语言白名单校验，非法回退默认；保证默认语言一定在开放列表中
+  const I18N_SUPPORTED = ["zh-CN", "zh-TW", "en"];
+  if (!I18N_SUPPORTED.includes(out.i18n_default)) out.i18n_default = DEFAULT_SETTINGS.i18n_default;
+  const langs = out.i18n_langs
+    .split(",")
+    .map(x => x.trim())
+    .filter(x => I18N_SUPPORTED.includes(x));
+  const langSet = Array.from(new Set(langs.length ? langs : [DEFAULT_SETTINGS.i18n_default]));
+  if (!langSet.includes(out.i18n_default)) langSet.unshift(out.i18n_default);
+  out.i18n_langs = langSet.join(",");
   return out;
 }
 

@@ -390,12 +390,46 @@ app.get("/preview", requireAdmin, c => {
   return proxyMusicJson(c, `/api/resolve?${q.toString()}`);
 });
 
+/** 试听音频代理（管理端）：GET /api/music/stream?url=xxx
+ *  汽水等平台直链有防盗链，浏览器 <audio> 直接请求 403，
+ *  通过 Worker 代理 fetch 绕过（入库也走 Worker fetch 所以没问题） */
+app.get("/stream", requireAdmin, async c => {
+  const url = c.req.query("url") || "";
+  if (!/^https?:\/\//i.test(url)) return fail(c, "参数错误", 400);
+  const resp = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+  });
+  if (!resp.ok) return fail(c, `音频获取失败 HTTP ${resp.status}`, 502);
+  const ct = resp.headers.get("Content-Type") || "audio/mpeg";
+  const cl = resp.headers.get("Content-Length") || "";
+  return new Response(resp.body, {
+    headers: {
+      "Content-Type": ct,
+      "Cache-Control": "no-store",
+      ...(cl ? { "Content-Length": cl } : {}),
+      "Accept-Ranges": "bytes",
+    },
+  });
+});
+
 /** 搜索结果入库（管理端）：POST /api/music/import { source, songId, ... } */
 app.post("/import", requireAdmin, async c => {
   const body = await c.req.json().catch(() => null);
   if (!body) return fail(c, "参数错误", 400);
   return proxyMusicJson(c, "/api/ingest", { method: "POST", json: body }, prefixTrackId);
 });
+
+/** 异步入库提交（管理端）：POST /api/music/import/async → 立即返回 { job_id } */
+app.post("/import/async", requireAdmin, async c => {
+  const body = await c.req.json().catch(() => null);
+  if (!body) return fail(c, "参数错误", 400);
+  return proxyMusicJson(c, "/api/ingest/async", { method: "POST", json: body });
+});
+
+/** 入库任务进度（管理端）：GET /api/music/import/progress/:jobId */
+app.get("/import/progress/:jobId", requireAdmin, c =>
+  proxyMusicJson(c, `/api/ingest/progress/${c.req.param("jobId")}`)
+);
 
 /** 本地上传入库（管理端）：POST /api/music/upload（multipart 直通） */
 app.post("/upload", requireAdmin, async c => {

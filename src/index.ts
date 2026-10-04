@@ -16,6 +16,7 @@ import momentRoutes from "./routes/moments";
 import socialRoutes from "./routes/social";
 import postRoutes from "./routes/posts";
 import feedRoutes from "./routes/feed";
+import translateRoutes from "./routes/translate";
 import musicRoutes from "./routes/music";
 import miscRoutes from "./routes/misc";
 import photoRoutes, { adminPhotoRoutes } from "./routes/photos";
@@ -27,6 +28,7 @@ import bgRoutes from "./routes/bg";
 import { analyticsPublicRoutes, analyticsAdminRoutes } from "./routes/analytics";
 import opsRoutes, { runUptimeCheck, recordPerf } from "./routes/ops";
 import { getSettings } from "./settings";
+import { detectLang, parseLangs } from "./i18n";
 import { keyToSrc, ensureSchema, type PostRow } from "./db";
 import { isAdmin, hasAdminPassword, ADMIN_COOKIE } from "./auth";
 import { detectAttack, isBlocked, recordAttack, recordError } from "./security";
@@ -81,6 +83,8 @@ app.use("*", async (c, next) => {
 app.use("*", async (c, next) => {
   const url = new URL(c.req.url);
   const host = url.host.toLowerCase();
+  // 本地 wrangler dev 回环地址不做 http→https 规范化跳转
+  if (host.startsWith("127.0.0.1:") || host.startsWith("localhost:") || host === "localhost" || host.startsWith("[::1]")) return next();
   if (url.protocol === "https:" && !host.startsWith("www.")) return next();
   const s = await getSettings(c.env.DB);
   let canonical: string | null = null;
@@ -210,6 +214,25 @@ app.get("/api/settings", async c => {
   return res;
 });
 
+// 当前语言判定（访客侧）：cookie > 访问地 > Accept-Language > 默认语言。
+// 结果因人而异（cookie/地理），严禁边缘缓存。
+app.get("/api/i18n/detect", async c => {
+  const s = await getSettings(c.env.DB);
+  const lang = detectLang(s, {
+    cookie: c.req.header("cookie") || "",
+    country: c.req.header("cf-ipcountry") || "",
+    acceptLanguage: c.req.header("accept-language") || "",
+  });
+  const res = ok(c, {
+    enabled: s.i18n_enabled,
+    lang,
+    default: s.i18n_default,
+    langs: parseLangs(s),
+  });
+  res.headers.set("Cache-Control", "no-store");
+  return res;
+});
+
 app.route("/api/photos", photoRoutes);
 app.route("/api/admin/photos", adminPhotoRoutes);
 app.route("/api/friends", friendRoutes);
@@ -220,6 +243,7 @@ app.route("/api/moments", momentRoutes);
 app.route("/api/moments", socialRoutes);
 app.route("/api/posts", postRoutes);
 app.route("/api/feed", feedRoutes);
+app.route("/api/translate", translateRoutes);
 app.route("/api/music", musicRoutes);
 app.route("/api", miscRoutes);
 app.route("/api/search", searchRoutes);
@@ -388,6 +412,7 @@ const TITLE_TAG = "<title>Moments</title>";
 const DESC_TAG = '<meta name="description" content="朋友圈式轻博客：图文动态与文章" />';
 const ICON_TAG = `<link rel="icon" href="${iconToHref("")}" />`;
 const HEAD_MARK = "<!--SSR_HEAD-->";
+const I18N_MARK = "<!--I18N_BOOT-->";
 const APP_MARK = '<main id="app" class="page-main"></main>';
 
 /** 站点图标值 → favicon href：URL 直接用；空=默认 lucide pen-nib SVG（不再用 emoji） */
@@ -405,11 +430,24 @@ async function serveSsr(
 ) {
   // 首屏无闪烁：SSR 时把 favicon 替换为后台配置的站点图标
   const s = await getSettings(c.env.DB);
+  // 首屏语言判定：注入内联启动数据，index.html 内联脚本在渲染前据此设置 <html lang>
+  const bootLang = detectLang(s, {
+    cookie: c.req.header("cookie") || "",
+    country: c.req.header("cf-ipcountry") || "",
+    acceptLanguage: c.req.header("accept-language") || "",
+  });
+  const i18nBoot = `<script>window.__I18N_BOOT__=${JSON.stringify({
+    enabled: s.i18n_enabled,
+    lang: bootLang,
+    default: s.i18n_default,
+    langs: parseLangs(s),
+  })};<\/script>`;
   const out = html
     .replace(TITLE_TAG, () => `<title>${opts.title}</title>`)
     .replace(DESC_TAG, () => `<meta name="description" content="${opts.description}" />`)
     .replace(ICON_TAG, () => `<link rel="icon" href="${iconToHref(s.site_icon)}" />`)
     .replace(HEAD_MARK, () => opts.head)
+    .replace(I18N_MARK, () => i18nBoot)
     .replace(APP_MARK, () => `<main id="app" class="page-main">${opts.body ?? ""}</main>`);
   return c.html(out, (opts.status ?? 200) as 200, {
     "cache-control": "public, max-age=0, must-revalidate",

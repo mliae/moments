@@ -242,6 +242,28 @@ CREATE TABLE IF NOT EXISTS music_tracks (
 );
 CREATE INDEX IF NOT EXISTS idx_music_tracks_enabled ON music_tracks (enabled, id);
 CREATE INDEX IF NOT EXISTS idx_music_tracks_tag ON music_tracks (tag);
+
+CREATE TABLE IF NOT EXISTS content_translations (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  content_type TEXT NOT NULL,
+  content_id   TEXT NOT NULL,
+  lang         TEXT NOT NULL,
+  src_hash     TEXT NOT NULL,
+  title        TEXT,
+  content      TEXT NOT NULL DEFAULT '',
+  engine       TEXT NOT NULL DEFAULT 'local',
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(content_type, content_id, lang)
+);
+CREATE INDEX IF NOT EXISTS idx_xlate_hash ON content_translations (content_type, content_id, lang, src_hash);
+
+CREATE TABLE IF NOT EXISTS translate_rate (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip         TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_translate_rate_ip_time ON translate_rate (ip, created_at);
 `;
 
 let schemaPromise: Promise<void> | null = null;
