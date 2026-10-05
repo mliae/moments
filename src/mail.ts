@@ -124,7 +124,8 @@ export async function handleCommentMailNotifications(opts: CommentNotifyOpts): P
     try {
       const { notify } = await import("./security");
       const excerpt = comment.content.replace(/\n/g, " ").slice(0, 100);
-      void notify(notifySettings, "comment", `💬 新评论 · ${comment.nickname}`, `${targetTypeLabel}「${targetLabel}」\n${excerpt}\n${url}`);
+      // 必须 await：本函数由 waitUntil 调用，丢弃 Promise 会导致 fetch 在上下文终止时被取消
+      await notify(notifySettings, "comment", `💬 新评论 · ${comment.nickname}`, `${targetTypeLabel}「${targetLabel}」\n${excerpt}\n${url}`);
     } catch { /* 通知失败不影响主流程 */ }
   }
 
@@ -132,7 +133,7 @@ export async function handleCommentMailNotifications(opts: CommentNotifyOpts): P
 
   // 1. 管理员新评论通知
   if (mail.notifyAdmin && mail.adminTo && comment.email !== mail.adminTo) {
-    void sendMail({
+    await sendMail({
       apiKey: mail.apiKey,
       from: mail.from,
       to: mail.adminTo,
@@ -149,7 +150,7 @@ export async function handleCommentMailNotifications(opts: CommentNotifyOpts): P
         .bind(comment.parent_id)
         .first<{ nickname: string; email: string }>();
       if (root?.email && root.email !== comment.email) {
-        void sendMail({
+        await sendMail({
           apiKey: mail.apiKey,
           from: mail.from,
           to: root.email,

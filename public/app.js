@@ -1013,7 +1013,7 @@
     const trigger = e.target.closest?.("[data-lightbox]");
     if (trigger) {
       e.preventDefault();
-      const wrap = trigger.closest(".bber-container-img") || trigger.parentElement;
+      const wrap = trigger.closest(".bber-container-img") || trigger.closest(".photos-grid") || trigger.closest(".photo-admin-grid") || trigger.parentElement;
       const group = [...wrap.querySelectorAll("[data-lightbox]")].map(a => a.getAttribute("data-lightbox"));
       openLightbox(trigger.getAttribute("data-lightbox"), group);
     }
@@ -5408,7 +5408,7 @@
             <div class="photo-admin-card" data-id="${p.id}">
               <div class="photo-admin-thumb">
                 <input type="checkbox" class="admin-check photo-admin-check" value="${p.id}" title="选中用于批量操作" />
-                <a href="${esc(p.src)}" data-lightbox data-fancybox="admin-photos" style="display:block;width:100%;height:100%">
+                <a href="${esc(p.src)}" data-lightbox="${esc(p.src)}" data-fancybox="admin-photos" style="display:block;width:100%;height:100%">
                   <img src="${esc(thumbSrc(p.src))}" alt="" referrerpolicy="no-referrer" loading="lazy" data-orig="${esc(p.src)}" />
                 </a>
                 <span class="photo-admin-src-tag">${sourceLabel(p.source_type)}</span>

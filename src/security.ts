@@ -194,9 +194,9 @@ export async function recordAttack(
             durationHours: opts.durationHours,
           });
           banned = true;
-          // 触发封禁时推送告警
+          // 触发封禁时推送告警（必须 await：recordAttack 由 waitUntil 调用，丢弃 Promise 会导致 fetch 被取消）
           if (webhookUrl) {
-            void sendWebhookAlert(
+            await sendWebhookAlert(
               webhookUrl,
               "🚨 自动封禁",
               `IP ${info.ip}${country ? `（${country}）` : ""} 因 ${hit.label} 被自动封禁 ${opts.durationHours} 小时`
