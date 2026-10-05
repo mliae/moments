@@ -348,7 +348,7 @@ app.post("/:slug/comments", async c => {
         notifyAdmin: ps.mail_notify_admin,
         replyNotify: ps.mail_reply_notify,
       },
-      webhookUrl: ps.security_webhook_url || "",
+      notifySettings: ps,
       db: c.env.DB,
       site: ps.site_title || "Moments",
       comment: result.comment,

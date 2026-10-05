@@ -96,7 +96,10 @@ export interface SiteSettings {
   // 访问统计
   analytics_enabled: boolean; // 是否启用访客访问统计（后台不计入）
   // 安全中心
-  security_webhook_url: string; // 告警 webhook（飞书/钉钉/企业微信兼容），空=不推送
+  security_webhook_url: string; // 通知 webhook（飞书/钉钉/企业微信兼容），空=全部不推送
+  notify_security: boolean; // Webhook 推送安全告警（攻击拦截、自动封禁）
+  notify_comment: boolean; // Webhook 推送新评论
+  notify_system: boolean; // Webhook 推送系统事件（宕机、QQ Cookie 失效等）
   auto_ban_enabled: boolean; // 是否启用自动封禁
   ban_threshold: string; // 同 IP 10 分钟高危命中 N 次触发封禁（1-100）
   ban_duration_hours: string; // 封禁时长（小时，1-720）
@@ -208,6 +211,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   reward_qrcode: "",
   reward_text: "如果觉得这篇文章不错，欢迎打赏支持一下 ~",
   security_webhook_url: "",
+  notify_security: true,
+  notify_comment: true,
+  notify_system: true,
   auto_ban_enabled: true,
   ban_threshold: "5",
   ban_duration_hours: "24",
@@ -326,6 +332,9 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "baidu_push_enabled",
   "analytics_enabled",
   "auto_ban_enabled",
+  "notify_security",
+  "notify_comment",
+  "notify_system",
   "mail_enabled",
   "mail_notify_admin",
   "mail_reply_notify",

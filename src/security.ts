@@ -213,6 +213,34 @@ export async function recordAttack(
 
 /* ==================== 告警通知 ==================== */
 
+/** 通知事件分类（对应后台三个推送开关） */
+export type NotifyCategory = "security" | "comment" | "system";
+
+export interface NotifySettings {
+  security_webhook_url: string;
+  notify_security: boolean;
+  notify_comment: boolean;
+  notify_system: boolean;
+}
+
+/**
+ * 全站统一 Webhook 通知入口：地址为空或对应分类开关关闭时静默跳过。
+ * 所有业务事件（安全/评论/系统）都应走这里，不要直接调 sendWebhookAlert。
+ */
+export async function notify(
+  s: NotifySettings,
+  category: NotifyCategory,
+  title: string,
+  text: string
+): Promise<void> {
+  const url = s.security_webhook_url;
+  if (!url) return;
+  if (category === "security" && !s.notify_security) return;
+  if (category === "comment" && !s.notify_comment) return;
+  if (category === "system" && !s.notify_system) return;
+  await sendWebhookAlert(url, title, text);
+}
+
 /** 发送 text 类型 webhook 告警：自动适配飞书 / 钉钉 / 企业微信 / 通用 JSON */
 export async function sendWebhookAlert(webhookUrl: string, title: string, text: string): Promise<void> {
   if (!webhookUrl) return;

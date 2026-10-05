@@ -183,11 +183,11 @@ app.use("*", async (c, next) => {
       };
       // 高危规则：异步记录（含封禁判断）并拦截
       if (hit.block) {
-        c.executionCtx.waitUntil(recordAttack(c.env.DB, s.security_webhook_url, hit, info, opts));
+        c.executionCtx.waitUntil(recordAttack(c.env.DB, s.notify_security ? s.security_webhook_url : "", hit, info, opts));
         return c.text("Forbidden", 403, { "cache-control": "no-store" });
       }
       // 中危规则：仅记录，不拦截（自动封禁只统计高危，传完整 opts 无害）
-      c.executionCtx.waitUntil(recordAttack(c.env.DB, s.security_webhook_url, hit, info, opts));
+      c.executionCtx.waitUntil(recordAttack(c.env.DB, s.notify_security ? s.security_webhook_url : "", hit, info, opts));
     }
   } catch {
     // 安全模块自身异常绝不影响主请求
@@ -687,7 +687,7 @@ async function handleScheduled(env: HonoEnv["Bindings"]): Promise<void> {
       const lastTs = last?.created_at ? new Date(last.created_at).getTime() : 0;
       if (!lastTs || Date.now() - lastTs >= intervalMin * 60_000) {
         try {
-          await runUptimeCheck(env.DB, siteUrl, s.security_webhook_url);
+          await runUptimeCheck(env.DB, siteUrl, s.notify_system ? s.security_webhook_url : "");
         } catch (e) {
           console.error("[uptime] check failed:", e);
         }
@@ -718,17 +718,18 @@ async function handleScheduled(env: HonoEnv["Bindings"]): Promise<void> {
 
     if (!r.ok) {
       console.error(`[qq-keepalive] Cookie 失效: ${r.msg}`);
-      // Cookie 失效时发 Webhook 告警（同一轮故障 60 分钟内去重）
-      if (s.security_webhook_url) {
+      // Cookie 失效时发 Webhook 告警（同一轮故障 60 分钟内去重；走「系统事件」开关）
+      if (s.security_webhook_url && s.notify_system) {
         const alertKey = "qq_cookie_alert_last";
         const alertRow = await env.DB.prepare(
           `SELECT value FROM kv_store WHERE key = ?`
         ).bind(alertKey).first<{ value: string }>();
         const alertTime = alertRow?.value ? new Date(alertRow.value).getTime() : 0;
         if (Date.now() - alertTime >= 60 * 60 * 1000) {
-          const { sendWebhookAlert } = await import("./security");
-          await sendWebhookAlert(
-            s.security_webhook_url,
+          const { notify } = await import("./security");
+          await notify(
+            s,
+            "system",
             "⚠️ QQ Cookie 已失效",
             `保活检测失败：${r.msg}\n请重新登录 QQ 获取新 Cookie，否则评论者昵称将无法自动获取。`
           );

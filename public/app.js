@@ -289,6 +289,7 @@
     upload: { stroke: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>' },
     "rotate-ccw": { stroke: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>' },
     x: { stroke: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>' },
+    settings: { stroke: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>' },
   };
 
   function svgIcon(name, size) {
@@ -4661,25 +4662,39 @@
 
   /* ================= 后台管理页 ================= */
 
-  const ADMIN_TABS = [
-    { key: "overview", label: "概览", icon: "layout-dashboard" },
-    { key: "analytics", label: "访问统计", icon: "bar-chart-3" },
+  // 一级导航：subs 存在时为分组（页内渲染二级子 tab），key 为默认（首个）叶子
+  const ADMIN_NAV = [
+    { key: "overview", label: "概览", icon: "layout-dashboard", subs: [
+      { key: "overview", label: "概览" },
+      { key: "analytics", label: "访问统计" },
+    ]},
     { key: "moments", label: "说说", icon: "message-circle" },
     { key: "posts", label: "文章", icon: "file-text" },
     { key: "photos", label: "相册", icon: "image" },
-    { key: "friends", label: "友链", icon: "link" },
-    { key: "about", label: "关于我", icon: "circle-user" },
     { key: "comments", label: "评论", icon: "message-square" },
-    { key: "appearance", label: "外观", icon: "palette" },
-    { key: "i18n", label: "多语言", icon: "globe" },
     { key: "media", label: "媒体", icon: "folder" },
-    { key: "music_player", label: "音乐播放器", icon: "music" },
-    { key: "music_library", label: "音乐曲库", icon: "list-music" },
-    { key: "ai", label: "AI 助手", icon: "bot" },
-    { key: "seo", label: "搜索收录", icon: "search" },
-    { key: "security", label: "安全", icon: "shield" },
-    { key: "ops", label: "运维", icon: "activity" },
+    { key: "music_player", label: "音乐", icon: "music", subs: [
+      { key: "music_player", label: "播放器" },
+      { key: "music_library", label: "曲库" },
+    ]},
+    { key: "appearance", label: "站点设置", icon: "settings", subs: [
+      { key: "appearance", label: "外观" },
+      { key: "i18n", label: "多语言" },
+      { key: "about", label: "关于我" },
+      { key: "friends", label: "友链" },
+      { key: "ai", label: "AI 助手" },
+    ]},
+    { key: "security", label: "系统", icon: "shield", subs: [
+      { key: "security", label: "安全与通知" },
+      { key: "ops", label: "运维监控" },
+      { key: "seo", label: "搜索收录" },
+    ]},
   ];
+  // 叶子 tab 扁平表（校验/标题用）
+  const ADMIN_TABS = ADMIN_NAV.flatMap(n =>
+    (n.subs ? n.subs.map(s => ({ key: s.key, label: s.label })) : [{ key: n.key, label: n.label }])
+  );
+  const findAdminNav = key => ADMIN_NAV.find(n => n.key === key || (n.subs && n.subs.some(s => s.key === key)));
 
   /**
    * 首次部署设初始密码：D1 无 password_hash 且环境变量 ADMIN_PASSWORD 未设置时，
@@ -4794,11 +4809,14 @@
             <div class="admin-brand-name"><b>${esc(state.settings.site_title || "moments")}</b><small>管理后台</small></div>
           </div>
           <nav class="admin-nav">
-            ${ADMIN_TABS.map(t => `
-              <button class="admin-nav-item ${state.adminTab === t.key ? "is-active" : ""}" data-admin-tab="${t.key}">
-                <span class="admin-nav-ico">${svgIcon(t.icon, 18)}</span>
-                <span class="admin-nav-label">${t.label}</span>
-              </button>`).join("")}
+            ${ADMIN_NAV.map(n => {
+              const active = n.key === state.adminTab || (n.subs && n.subs.some(s => s.key === state.adminTab));
+              return `
+              <button class="admin-nav-item ${active ? "is-active" : ""}" data-admin-tab="${n.key}">
+                <span class="admin-nav-ico">${svgIcon(n.icon, 18)}</span>
+                <span class="admin-nav-label">${n.label}</span>
+              </button>`;
+            }).join("")}
           </nav>
           <div class="admin-side-foot">
             <button class="btn ghost sm" data-nav="logout" title="退出登录">退出</button>
@@ -4843,26 +4861,51 @@
     }
   }
 
+  const ADMIN_RENDERERS = {
+    overview: renderAdminOverview,
+    analytics: renderAdminAnalytics,
+    moments: renderAdminMoments,
+    posts: renderAdminPosts,
+    photos: renderAdminPhotos,
+    friends: renderAdminFriends,
+    about: renderAdminAbout,
+    comments: renderAdminComments,
+    appearance: renderAdminAppearance,
+    i18n: renderAdminI18n,
+    media: renderAdminMedia,
+    music_player: renderAdminMusicPlayer,
+    music_library: renderAdminMusicLibrary,
+    ai: renderAdminAI,
+    seo: renderAdminSeo,
+    security: renderAdminSecurity,
+    ops: renderAdminOps,
+  };
+
   function loadAdminTab(tab) {
     const panel = document.getElementById("adminPanel");
     if (!panel) return;
-    if (tab === "overview") return renderAdminOverview(panel);
-    if (tab === "analytics") return renderAdminAnalytics(panel);
-    if (tab === "moments") return renderAdminMoments(panel);
-    if (tab === "posts") return renderAdminPosts(panel);
-    if (tab === "photos") return renderAdminPhotos(panel);
-    if (tab === "friends") return renderAdminFriends(panel);
-    if (tab === "about") return renderAdminAbout(panel);
-    if (tab === "comments") return renderAdminComments(panel);
-    if (tab === "appearance") return renderAdminAppearance(panel);
-    if (tab === "i18n") return renderAdminI18n(panel);
-    if (tab === "media") return renderAdminMedia(panel);
-    if (tab === "music_player") return renderAdminMusicPlayer(panel);
-    if (tab === "music_library") return renderAdminMusicLibrary(panel);
-    if (tab === "ai") return renderAdminAI(panel);
-    if (tab === "seo") return renderAdminSeo(panel);
-    if (tab === "security") return renderAdminSecurity(panel);
-    if (tab === "ops") return renderAdminOps(panel);
+    const renderer = ADMIN_RENDERERS[tab];
+    if (!renderer) return;
+    const nav = findAdminNav(tab);
+    if (nav && nav.subs) {
+      // 分组：顶部二级子 tab + 子面板，渲染函数只负责子面板内容
+      panel.innerHTML = `
+        <div class="admin-subtabs">
+          ${nav.subs.map(s => `
+            <button class="admin-subtab ${s.key === tab ? "is-active" : ""}" data-admin-subtab="${s.key}">${s.label}</button>
+          `).join("")}
+        </div>
+        <div class="admin-subpanel" id="adminSubPanel"></div>`;
+      panel.querySelectorAll("[data-admin-subtab]").forEach(b => {
+        b.addEventListener("click", () => {
+          state.adminTab = b.dataset.adminSubtab;
+          renderAdmin();
+        });
+      });
+      renderer(document.getElementById("adminSubPanel"));
+    } else {
+      renderer(panel);
+    }
   }
 
   /* ---------- 后台 Tab：概览仪表盘 ---------- */
@@ -5305,8 +5348,8 @@
       el.addEventListener("click", () => {
         const slug = el.dataset.pvJump;
         analyticsSub = "posts";
-        const aTab = document.querySelector('.admin-nav-item[data-admin-tab="analytics"]');
-        if (aTab) aTab.click();
+        state.adminTab = "analytics";
+        renderAdmin();
         // 等统计面板渲染完后自动展开对应文章
         setTimeout(() => {
           const row = document.querySelector(`[data-apost="/post/${encodeURIComponent(slug)}"]`);
@@ -7042,16 +7085,39 @@
     };
 
     panel.innerHTML = `
+      <div class="admin-panel-head"><h3>消息推送</h3></div>
+      <form class="settings-form" data-notify-form style="max-width:700px;margin-bottom:1.6rem">
+        <div class="field">
+          <label>Webhook 地址（飞书 / 钉钉 / 企业微信机器人，留空=全部不推送）</label>
+          <input name="security_webhook_url" maxlength="500" value="${escA(s.security_webhook_url)}" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxx" style="font-family:monospace" />
+        </div>
+        <div class="notify-toggles">
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="notify_security" ${s.notify_security !== false ? "checked" : ""} /><span></span></span>
+            <span><b>安全告警</b><small>攻击拦截、自动封禁</small></span>
+          </label>
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="notify_comment" ${s.notify_comment !== false ? "checked" : ""} /><span></span></span>
+            <span><b>新评论</b><small>文章 / 说说有新评论时</small></span>
+          </label>
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="notify_system" ${s.notify_system !== false ? "checked" : ""} /><span></span></span>
+            <span><b>系统事件</b><small>宕机检测、QQ Cookie 失效</small></span>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:.6rem">
+          <button class="btn primary" type="submit">保存推送设置</button>
+          <button class="btn" type="button" data-test-alert>发送测试</button>
+          <span data-notify-msg style="font-size:.85rem;color:var(--anzhiyu-secondtext)"></span>
+        </div>
+      </form>
+
       <div class="sec-summary" data-sec-summary>
         ${[0, 1, 2, 3].map(() => `<div class="sec-card"><div class="sec-num">-</div><div class="sec-label">…</div></div>`).join("")}
       </div>
 
       <div class="admin-panel-head"><h3>安全设置</h3></div>
       <form class="settings-form" data-security-form style="max-width:700px">
-        <div class="field">
-          <label>告警 Webhook（飞书 / 钉钉 / 企业微信机器人地址，留空=不推送告警）</label>
-          <input name="security_webhook_url" maxlength="500" value="${escA(s.security_webhook_url)}" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxx" style="font-family:monospace" />
-        </div>
         <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
           <div class="field" style="flex:1;min-width:150px">
             <label>封禁阈值（同 IP 10 分钟命中高危次数）</label>
@@ -7072,7 +7138,6 @@
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:.6rem">
           <button class="btn primary" type="submit">保存安全设置</button>
-          <button class="btn" type="button" data-test-alert>测试告警</button>
           <span data-security-msg style="font-size:.85rem;color:var(--anzhiyu-secondtext)"></span>
         </div>
       </form>
@@ -7245,6 +7310,52 @@
     await loadAll();
     await loadAttacks();
 
+    /* ---------- 消息推送表单 ---------- */
+    const notifyForm = panel.querySelector("[data-notify-form]");
+    const notifyMsg = panel.querySelector("[data-notify-msg]");
+    const saveNotify = async () => {
+      const updated = await api("/api/admin/settings", {
+        method: "PUT",
+        body: {
+          security_webhook_url: notifyForm.security_webhook_url.value.trim(),
+          notify_security: notifyForm.notify_security.checked,
+          notify_comment: notifyForm.notify_comment.checked,
+          notify_system: notifyForm.notify_system.checked,
+        },
+      });
+      state.settings = { ...state.settings, ...updated };
+      return updated;
+    };
+    notifyForm.addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = notifyForm.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      try {
+        await saveNotify();
+        if (notifyMsg) { notifyMsg.style.color = "#23b26d"; notifyMsg.textContent = "✓ 已保存"; }
+        toast("推送设置已保存");
+      } catch (err) {
+        if (notifyMsg) { notifyMsg.style.color = "#f56c6c"; notifyMsg.textContent = "✗ " + err.message; }
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    const testBtn = panel.querySelector("[data-test-alert]");
+    testBtn.addEventListener("click", async () => {
+      testBtn.disabled = true;
+      if (notifyMsg) { notifyMsg.style.color = ""; notifyMsg.textContent = "保存并推送中…"; }
+      try {
+        await saveNotify(); // 先保存，保证测试的是当前填写的地址
+        await api("/api/admin/security/test-alert", { method: "POST" });
+        if (notifyMsg) { notifyMsg.style.color = "#23b26d"; notifyMsg.textContent = "✓ 已推送，请检查机器人"; }
+      } catch (e) {
+        if (notifyMsg) { notifyMsg.style.color = "#f56c6c"; notifyMsg.textContent = "✗ " + e.message; }
+      } finally {
+        testBtn.disabled = false;
+      }
+    });
+
     /* ---------- 安全设置表单 ---------- */
     const secForm = panel.querySelector("[data-security-form]");
     const secMsg = panel.querySelector("[data-security-msg]");
@@ -7254,7 +7365,6 @@
       btn.disabled = true;
       try {
         const patch = {
-          security_webhook_url: secForm.security_webhook_url.value.trim(),
           auto_ban_enabled: secForm.auto_ban_enabled.checked,
           ban_threshold: secForm.ban_threshold.value,
           ban_duration_hours: secForm.ban_duration_hours.value,
@@ -7271,20 +7381,6 @@
         if (secMsg) { secMsg.style.color = "#f56c6c"; secMsg.textContent = "✗ " + err.message; }
       } finally {
         btn.disabled = false;
-      }
-    });
-
-    const testBtn = panel.querySelector("[data-test-alert]");
-    testBtn.addEventListener("click", async () => {
-      testBtn.disabled = true;
-      if (secMsg) { secMsg.style.color = ""; secMsg.textContent = "推送中…"; }
-      try {
-        await api("/api/admin/security/test-alert", { method: "POST" });
-        if (secMsg) { secMsg.style.color = "#23b26d"; secMsg.textContent = "✓ 已推送，请检查机器人"; }
-      } catch (e) {
-        if (secMsg) { secMsg.style.color = "#f56c6c"; secMsg.textContent = "✗ " + e.message; }
-      } finally {
-        testBtn.disabled = false;
       }
     });
 

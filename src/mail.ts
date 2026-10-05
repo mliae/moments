@@ -107,7 +107,7 @@ export interface CommentMailConfig {
 
 export interface CommentNotifyOpts {
   mail: CommentMailConfig;
-  webhookUrl?: string; // 安全告警 Webhook（飞书/钉钉/企业微信），空=不推送
+  notifySettings?: import("./security").NotifySettings; // Webhook 通知配置（含地址 + 分类开关）
   db: D1Database;
   site: string;
   comment: { id: number; nickname: string; content: string; parent_id: number; email?: string };
@@ -117,14 +117,14 @@ export interface CommentNotifyOpts {
 }
 
 export async function handleCommentMailNotifications(opts: CommentNotifyOpts): Promise<void> {
-  const { mail, webhookUrl, db, site, comment, targetTypeLabel, targetLabel, url } = opts;
+  const { mail, notifySettings, db, site, comment, targetTypeLabel, targetLabel, url } = opts;
 
-  // Webhook 新评论通知（不依赖邮件配置，有 webhookUrl 就推）
-  if (webhookUrl) {
+  // Webhook 新评论通知（走统一入口，受「新评论」开关控制）
+  if (notifySettings) {
     try {
-      const { sendWebhookAlert } = await import("./security");
+      const { notify } = await import("./security");
       const excerpt = comment.content.replace(/\n/g, " ").slice(0, 100);
-      void sendWebhookAlert(webhookUrl, `💬 新评论 · ${comment.nickname}`, `${targetTypeLabel}「${targetLabel}」\n${excerpt}\n${url}`);
+      void notify(notifySettings, "comment", `💬 新评论 · ${comment.nickname}`, `${targetTypeLabel}「${targetLabel}」\n${excerpt}\n${url}`);
     } catch { /* 通知失败不影响主流程 */ }
   }
 
