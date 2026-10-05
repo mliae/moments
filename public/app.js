@@ -5826,7 +5826,7 @@
         </div>
         <div class="field">
           <label>Resend API Key（<a href="https://resend.com/api-keys" target="_blank" rel="noopener">获取</a>）</label>
-          <input name="mail_resend_key" type="password" maxlength="128" value="${escA(s.mail_resend_key)}" placeholder="re_xxxxxxxx" autocomplete="off" style="font-family:monospace" />
+          <input name="mail_resend_key" type="password" maxlength="128" value="${escA(s.mail_resend_key)}" placeholder="re_xxxxxxxx" autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" style="font-family:monospace" />
         </div>
         <div style="display:flex;gap:16px;flex-wrap:wrap">
           <div class="field" style="flex:1;min-width:200px">
@@ -6219,9 +6219,9 @@
           <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，后台用 Cookie 直连腾讯查询昵称。凭证仅存服务端，绝不下发前台。</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
             <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">系统 QQ（ckqq）</label><input name="qq_ckqq" value="${esc(s.qq_ckqq)}" placeholder="你的 QQ 号" /></div>
-            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">skey</label><input name="qq_skey" value="${esc(s.qq_skey)}" placeholder="cookie 里的 skey" /></div>
+            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">skey</label><input name="qq_skey" value="${esc(s.qq_skey)}" placeholder="cookie 里的 skey" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
           </div>
-          <div style="margin-top:.4rem"><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">pskey（p_skey）</label><input name="qq_pskey" value="${esc(s.qq_pskey)}" placeholder="cookie 里的 p_skey" style="width:100%" /></div>
+          <div style="margin-top:.4rem"><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">pskey（p_skey）</label><input name="qq_pskey" value="${esc(s.qq_pskey)}" placeholder="cookie 里的 p_skey" style="width:100%" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
           <div style="margin-top:.4rem"><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">Cookie 保活间隔（小时）</label><input name="qq_keepalive_interval" type="number" min="1" max="72" value="${esc(s.qq_keepalive_interval)}" placeholder="6" style="width:100%" /></div>
           <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.6rem">
             <a data-qq-bookmarklet class="btn" href="#" style="text-decoration:none">拖拽到书签栏：一键抓取</a>
@@ -6566,7 +6566,7 @@
         </div>
         <div class="field">
           <label>ApiKey（在中央服务后台「授权」页生成）</label>
-          <input name="music_api_key" maxlength="64" value="${esc(s.music_api_key || "")}" placeholder="mk_..." autocomplete="off" />
+          <input name="music_api_key" maxlength="64" value="${esc(s.music_api_key || "")}" placeholder="mk_..." autocomplete="off" data-lpignore="true" data-1p-ignore="true" />
           <div class="field-hint">搜歌、试听、入库、曲库管理均由中央服务执行，本站不落地存储；服务地址留空时音乐库功能不可用。</div>
         </div>
         <button class="btn primary" type="submit">保存服务配置</button>
@@ -6923,7 +6923,7 @@
       <form class="settings-form" data-indexnow-form style="max-width:640px;display:flex;flex-direction:column;gap:.75rem">
         <div class="field">
           <label>IndexNow Key</label>
-          <input name="indexnow_key" value="${esc(cfg.indexnow_key || "")}" placeholder="粘贴 Bing 生成的 key" maxlength="128" />
+          <input name="indexnow_key" value="${esc(cfg.indexnow_key || "")}" placeholder="粘贴 Bing 生成的 key" maxlength="128" autocomplete="off" data-lpignore="true" data-1p-ignore="true" />
           <small style="color:var(--anzhiyu-secondtext)">保存后可访问 <a href="${origin}/indexnow-key.txt" target="_blank" rel="noopener" style="color:var(--anzhiyu-main)">${origin}/indexnow-key.txt</a> 验证是否返回该 key。</small>
         </div>
         <div class="field">
@@ -6959,7 +6959,7 @@
         </div>
         <div class="field">
           <label>推送 token</label>
-          <input name="baidu_push_token" value="${esc(cfg.baidu_push_token || "")}" placeholder="百度平台给出的 token" maxlength="64" />
+          <input name="baidu_push_token" value="${esc(cfg.baidu_push_token || "")}" placeholder="百度平台给出的 token" maxlength="64" autocomplete="off" data-lpignore="true" data-1p-ignore="true" />
         </div>
         <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
           <button class="btn primary" type="submit">保存配置</button>
