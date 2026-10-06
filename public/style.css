@@ -3316,3 +3316,72 @@ html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .site-footer {
 .sitebg-range-row b { font-weight: 600; color: var(--anzhiyu-main); font-variant-numeric: tabular-nums; text-align: right; }
 .sitebg-range-row input[type="range"] { width: 100%; accent-color: var(--anzhiyu-main); cursor: pointer; }
 
+/* 玻璃参数区展开/收起过渡 */
+.sitebg-controls {
+  overflow: hidden;
+  transition: max-height .35s ease, opacity .28s ease, padding .28s ease;
+  max-height: 620px;
+  opacity: 1;
+}
+.sitebg-controls.is-collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  /* margin 不变以保持与上方开关的间距，只折叠内部 */
+}
+
+/* 后台实时预览条：用当前横幅图铺底，上面浮一层遮罩 + 顶栏/卡片/页脚示意 */
+.sitebg-preview {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 120px;
+  margin-top: .9rem;
+  display: flex; flex-direction: column; gap: .45rem;
+  padding: .6rem .7rem;
+  background-size: cover; background-position: center;
+  border: 1px solid var(--anzhiyu-card-border,#e3e8ef);
+  isolation: isolate;
+}
+.sitebg-preview-mask {
+  position: absolute; inset: 0; z-index: 0;
+  background: rgb(243 241 234 / var(--sitebg-mask-a, 68%));
+}
+html[data-theme="dark"] .sitebg-preview-mask {
+  background: rgb(18 21 18 / var(--sitebg-mask-a-dark, 55%));
+}
+.sitebg-preview-topbar {
+  position: relative; z-index: 1;
+  height: 26px; border-radius: 6px; display: flex; align-items: center; padding: 0 .5rem;
+  font-size: .72rem; color: var(--anzhiyu-secondtext);
+  background: rgb(255 255 255 / var(--sitebg-bar-a, 62%));
+  backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+  -webkit-backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+}
+html[data-theme="dark"] .sitebg-preview-topbar {
+  background: rgb(32 35 31 / var(--sitebg-bar-a-dark, 58%));
+}
+.sitebg-preview-card {
+  position: relative; z-index: 1; flex: 1;
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-size: .78rem; color: var(--anzhiyu-fontcolor);
+  background: rgb(255 255 255 / var(--sitebg-card-a, 72%));
+  backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+  -webkit-backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+}
+html[data-theme="dark"] .sitebg-preview-card {
+  background: rgb(32 35 31 / var(--sitebg-card-a-dark, 66%));
+}
+.sitebg-preview-footer {
+  position: relative; z-index: 1;
+  height: 26px; border-radius: 6px; display: flex; align-items: center; padding: 0 .5rem;
+  font-size: .72rem; color: var(--anzhiyu-secondtext);
+  background: rgb(255 255 255 / var(--sitebg-footer-a, 20%));
+  backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+  -webkit-backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+}
+html[data-theme="dark"] .sitebg-preview-footer {
+  background: rgb(32 35 31 / var(--sitebg-footer-a, 20%));
+}
+

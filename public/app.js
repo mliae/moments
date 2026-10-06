@@ -1936,10 +1936,19 @@
     r.setProperty("--sitebg-blur", blur + "px");
   }
 
-  /** 全站背景图（site_bg_enabled）：取图方式跟随横幅设置——
-   *  random 模式：/api/bg 时间桶代理缓存（同周期同一张）；
-   *  static 模式：直连横幅背景 URL（动态随机接口则每次刷新随横幅一起变化）。
-   *  固定全屏图层 + 玻璃卡片由 CSS 处理，这里只负责把图按对应 key 预载进图层 */
+  /** 解析全站背景当前应使用的图片 URL（前台背景层与后台预览条共用同一逻辑） */
+  function resolveSiteBgUrl(s) {
+    if (s.banner_bg_mode === "random") {
+      const h = Math.max(1, parseInt(s.banner_bg_interval, 10) || 24);
+      const bucket = String(Math.floor(Date.now() / (h * 3600000)));
+      return { url: `/api/bg?b=${bucket}`, key: "bucket:" + bucket };
+    }
+    if (/^https?:\/\//i.test(s.banner_bg_image || "")) {
+      return { url: s.banner_bg_image, key: "direct:" + s.banner_bg_image }; // 整页刷新后 DOM 重建，自然重新请求动态接口
+    }
+    return null;
+  }
+
   const siteBgEl = document.getElementById("siteBg");
   function applySiteBg(s) {
     if (!siteBgEl) return;
@@ -1953,19 +1962,12 @@
       reset();
       return;
     }
-    let url, key;
-    if (s.banner_bg_mode === "random") {
-      const h = Math.max(1, parseInt(s.banner_bg_interval, 10) || 24);
-      const bucket = String(Math.floor(Date.now() / (h * 3600000)));
-      url = `/api/bg?b=${bucket}`;
-      key = "bucket:" + bucket;
-    } else if (/^https?:\/\//i.test(s.banner_bg_image || "")) {
-      url = s.banner_bg_image;
-      key = "direct:" + url; // 整页刷新后 DOM 重建，自然重新请求动态接口
-    } else {
+    const bg = resolveSiteBgUrl(s);
+    if (!bg) {
       reset(); // 横幅既非随机也无直链图片：无背景可显示
       return;
     }
+    const { url, key } = bg;
     if (siteBgEl.dataset.key === key && siteBgEl.classList.contains("ready")) return;
     siteBgEl.dataset.key = key;
     const safeUrl = url.replace(/["\\]/g, encodeURIComponent);
@@ -6213,8 +6215,9 @@
           </label>
           <div class="field-hint">背景取图跟随上方横幅模式：「固定图片」填动态随机接口 URL 时，每次刷新随横幅一起换图；「随机图片（本站代理缓存）」时走 R2 时间桶，全站同周期一张、更快更稳。文章正文、评论弹窗、灯箱与后台保持纯色。</div>
         </div>
-        <div class="field" data-sitebg-controls ${s.site_bg_enabled ? "" : 'style="display:none"'}>
-          <label>玻璃效果微调（保存后返回前台查看）</label>
+        <div class="field sitebg-controls ${s.site_bg_enabled ? "" : "is-collapsed"}" data-sitebg-controls>
+          <div class="sitebg-controls-inner">
+          <label>玻璃效果微调（拖动即时预览，保存后对访客生效）</label>
           <div class="sitebg-range-row">
             <span>遮罩浓度</span>
             <input type="range" name="site_bg_mask" min="0" max="100" step="1" value="${esc(s.site_bg_mask)}" data-sitebg-live data-sitebg-unit="%" />
@@ -6235,7 +6238,14 @@
             <input type="range" name="site_bg_blur" min="0" max="40" step="1" value="${esc(s.site_bg_blur)}" data-sitebg-live data-sitebg-unit="px" />
             <b data-sitebg-val>${esc(s.site_bg_blur)}px</b>
           </div>
-          <div class="field-hint">遮罩越大文字越清晰、背景越淡；卡片/页脚数值越小越透；模糊 0 = 无玻璃化（仅半透明）。</div>
+          <div class="sitebg-preview" data-sitebg-preview>
+            <div class="sitebg-preview-mask"></div>
+            <div class="sitebg-preview-topbar">顶部导航</div>
+            <div class="sitebg-preview-card">卡片玻璃效果</div>
+            <div class="sitebg-preview-footer">页脚效果</div>
+          </div>
+          <div class="field-hint">预览条实时反映当前滑块值（未保存时仅自己可见）。遮罩越大文字越清晰、背景越淡；卡片/页脚数值越小越透；模糊 0 = 无玻璃化。</div>
+          </div>
         </div>
           </div>
         </details>
@@ -6399,21 +6409,31 @@
       })
     );
 
-    // 全站背景玻璃滑块：数值标签即时更新；后台不显示背景，保存后回前台查看效果
+    // 全站背景玻璃滑块：数值标签即时更新 + 实时换算 CSS 变量驱动预览条（保存后才写入数据库）
     panel.querySelectorAll("[data-sitebg-live]").forEach(inp => {
       inp.addEventListener("input", () => {
         const valEl = inp.closest(".sitebg-range-row").querySelector("[data-sitebg-val]");
         if (valEl) valEl.textContent = inp.value + (inp.dataset.sitebgUnit || "");
+        state.settings[inp.name] = inp.value;
+        applySiteBgVars(state.settings);
       });
     });
 
-    // 玻璃参数区跟随开关：开启全站背景图自动展开，关闭自动折叠（未保存时同样即时联动）
+    // 玻璃参数区跟随开关：开启全站背景图自动展开，关闭自动折叠（高度过渡动画，未保存同样即时联动）
     const siteBgToggle = panel.querySelector('[name="site_bg_enabled"]');
     const siteBgControls = panel.querySelector("[data-sitebg-controls]");
     if (siteBgToggle && siteBgControls) {
       siteBgToggle.addEventListener("change", () => {
-        siteBgControls.style.display = siteBgToggle.checked ? "" : "none";
+        siteBgControls.classList.toggle("is-collapsed", !siteBgToggle.checked);
       });
+    }
+
+    // 预览条铺当前背景图（与前台取图同一来源；random 走 /api/bg，static 直连横幅 URL）
+    const siteBgPreview = panel.querySelector("[data-sitebg-preview]");
+    if (siteBgPreview) {
+      const sNow = state.settings;
+      const bg = resolveSiteBgUrl(sNow);
+      if (bg) siteBgPreview.style.backgroundImage = `url("${bg.url.replace(/["\\]/g, encodeURIComponent)}")`;
     }
 
     // 头像类字段上传 + URL 实时预览
