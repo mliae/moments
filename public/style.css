@@ -3269,15 +3269,15 @@ html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .topbar {
   border-bottom-color: rgb(255 255 255 / 8%);
 }
 
-/* 背景模式下页脚同样玻璃化：否则实底色会盖住固定背景层，底部变成一条纯色 */
+/* 背景模式下页脚同样玻璃化：白色叠层要薄，否则与背景层 68% 遮罩叠加后图片被洗白成纯色带 */
 body.site-bg-on:not(.site-bg-admin) .site-footer {
-  background: rgb(255 255 255 / 62%);
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  background: rgb(255 255 255 / 30%);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
   border-top-color: rgb(0 0 0 / 6%);
 }
 html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .site-footer {
-  background: rgb(32 35 31 / 58%);
+  background: rgb(32 35 31 / 32%);
   border-top-color: rgb(255 255 255 / 8%);
 }
 
