@@ -6213,7 +6213,7 @@
           </label>
           <div class="field-hint">背景取图跟随上方横幅模式：「固定图片」填动态随机接口 URL 时，每次刷新随横幅一起换图；「随机图片（本站代理缓存）」时走 R2 时间桶，全站同周期一张、更快更稳。文章正文、评论弹窗、灯箱与后台保持纯色。</div>
         </div>
-        <div class="field" data-sitebg-controls>
+        <div class="field" data-sitebg-controls ${s.site_bg_enabled ? "" : 'style="display:none"'}>
           <label>玻璃效果微调（保存后返回前台查看）</label>
           <div class="sitebg-range-row">
             <span>遮罩浓度</span>
@@ -6406,6 +6406,15 @@
         if (valEl) valEl.textContent = inp.value + (inp.dataset.sitebgUnit || "");
       });
     });
+
+    // 玻璃参数区跟随开关：开启全站背景图自动展开，关闭自动折叠（未保存时同样即时联动）
+    const siteBgToggle = panel.querySelector('[name="site_bg_enabled"]');
+    const siteBgControls = panel.querySelector("[data-sitebg-controls]");
+    if (siteBgToggle && siteBgControls) {
+      siteBgToggle.addEventListener("change", () => {
+        siteBgControls.style.display = siteBgToggle.checked ? "" : "none";
+      });
+    }
 
     // 头像类字段上传 + URL 实时预览
     const avatarPreviewHtml = url =>
