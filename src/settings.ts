@@ -73,8 +73,9 @@ export interface SiteSettings {
   ai_bot_avatar: string; // 机器人头像：仅图片 URL；空=lucide bot 占位图标
   ai_text_model: string; // 自定义文本模型 ID（@cf/...）；留空=内置默认模型
   // QQ 昵称 API
-  qq_nick_mode: string; // QQ 昵称获取方式：direct=腾讯直连 / uapis=uapis 接口 / fallback=逐个尝试（先腾讯后 uapis）
-  uapis_key: string; // uapis.cn API Key，留空=使用内置默认
+  qq_nick_mode: string; // QQ 昵称获取方式：direct=腾讯直连 / apihz=apihz 接口 / fallback=逐个尝试（先腾讯后 apihz）
+  apihz_id: string; // apihz 开发者 ID，留空=使用内置默认（88888888）
+  apihz_key: string; // apihz 开发者 KEY，留空=使用内置默认（88888888）
   qq_nick_apis: string; // （已废弃，保留字段兼容旧数据）QQ 昵称 API 列表
   // 安全
   admin_path: string; // 后台秘密入口路径（/admin 或 /sys-xxxx），不通过公开 API 下发
@@ -201,7 +202,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   ai_bot_avatar: "",
   ai_text_model: "",
   qq_nick_mode: "fallback",
-  uapis_key: "",
+  apihz_id: "",
+  apihz_key: "",
   qq_nick_apis: "",
   admin_path: "/admin",
   site_icon: "",
@@ -299,7 +301,8 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   ai_bot_avatar: 200,
   ai_text_model: 100,
   qq_nick_mode: 10,
-  uapis_key: 100,
+  apihz_id: 20,
+  apihz_key: 100,
   qq_nick_apis: 2000,
   admin_path: 40,
   site_icon: 300,

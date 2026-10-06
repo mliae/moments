@@ -25,11 +25,8 @@ function decodeBuf(buf: ArrayBuffer): string {
   }
 }
 
-/** 内置默认 uapis 源（无其他备用源，由 qq_nick_mode 控制策略） */
-const UAPIS_URL = "https://uapis.cn/api/v1/social/qq/userinfo?qq={qq}";
-const UAPIS_DEFAULT_KEY = "uapi-lqlvdrzauI46iN55kgr-TtuDNdkugA2eD6q7C5KA";
-
-interface ApiEntry { url: string; auth?: string; parse: string; }
+/** apihz QQ 昵称接口 */
+const APIHZ_URL = "https://cn.apihz.cn/api/other/qq.php";
 
 /** 从响应文本中提取昵称，支持多种常见 JSON 结构 */
 function extractNick(text: string, parse: string, qq: string): string {
@@ -41,6 +38,7 @@ function extractNick(text: string, parse: string, qq: string): string {
     const raw = jsonMatch ? jsonMatch[0] : t;
     const d = JSON.parse(raw) as Record<string, unknown>;
     switch (parse) {
+      case "apihz": return d.code === 200 ? String(d.Name || d.name || "").trim() : "";
       case "uapis": return String(d.nickname || d.name || "").trim();
       case "uomg": return d.code === 1 ? String(d.nick || d.username || "").trim() : "";
       case "guiguiya": return d.code === 200 ? String((d.data as Record<string, unknown>)?.name || "").trim() : "";
@@ -66,29 +64,6 @@ function extractNick(text: string, parse: string, qq: string): string {
     }
   } catch {
     return "";
-  }
-}
-
-/** 单个 API 获取昵称 */
-async function fetchNickFromApi(api: ApiEntry, qq: string): Promise<string> {
-  const url = api.url.replace("{qq}", encodeURIComponent(qq));
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 5000);
-  try {
-    const headers: Record<string, string> = {};
-    if (api.auth) headers["Authorization"] = `Bearer ${api.auth}`;
-    if (url.includes("qzone.qq.com")) headers["Referer"] = "https://h5.qzone.qq.com";
-    const resp = await fetch(url, { signal: ctrl.signal, headers });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const ctype = resp.headers.get("content-type") || "";
-    const text = ctype.includes("json") || ctype.includes("javascript")
-      ? await resp.text()
-      : decodeBuf(await resp.arrayBuffer());
-    const nick = extractNick(text, api.parse, qq).trim();
-    if (!nick || nick === "null") throw new Error("empty nick");
-    return nick.slice(0, 50);
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -225,18 +200,25 @@ app.get("/qq-info", async c => {
   const s = await getSettings(c.env.DB);
   const mode = s.qq_nick_mode || "fallback";
 
-  /** 调用 uapis 获取昵称 */
-  const tryUapis = async (): Promise<string> => {
-    const key = (s.uapis_key || "").trim();
-    const api: ApiEntry = {
-      url: UAPIS_URL,
-      auth: key || UAPIS_DEFAULT_KEY,
-      parse: "uapis",
-    };
+  /** 调用 apihz 获取昵称 */
+  const tryApiHz = async (): Promise<string> => {
+    const id = (s.apihz_id || "").trim();
+    const key = (s.apihz_key || "").trim();
+    const ckqq = (s.qq_ckqq || "").trim();
+    const skey = (s.qq_skey || "").trim();
+    const pskey = (s.qq_pskey || "").trim();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
     try {
-      return await fetchNickFromApi(api, qq);
+      const url = `${APIHZ_URL}?id=${encodeURIComponent(id || "88888888")}&key=${encodeURIComponent(key || "88888888")}&qq=${encodeURIComponent(qq)}&ckqq=${encodeURIComponent(ckqq)}&skey=${encodeURIComponent(skey)}&pskey=${encodeURIComponent(pskey)}`;
+      const resp = await fetch(url, { signal: ctrl.signal });
+      if (!resp.ok) throw new Error("http " + resp.status);
+      const text = await resp.text();
+      return extractNick(text, "apihz", qq);
     } catch {
       return "";
+    } finally {
+      clearTimeout(timer);
     }
   };
 
@@ -245,15 +227,15 @@ app.get("/qq-info", async c => {
       const a = await fetchQqNickDirect(s, qq);
       if (a?.nickname) nickname = a.nickname;
     } catch { /* 忽略 */ }
-  } else if (mode === "uapis") {
-    nickname = await tryUapis();
+  } else if (mode === "apihz") {
+    nickname = await tryApiHz();
   } else {
-    // fallback（默认）：先腾讯直连，失败再 uapis
+    // fallback（默认）：先腾讯直连，失败再 apihz
     try {
       const a = await fetchQqNickDirect(s, qq);
       if (a?.nickname) nickname = a.nickname;
     } catch { /* 忽略 */ }
-    if (!nickname) nickname = await tryUapis();
+    if (!nickname) nickname = await tryApiHz();
   }
 
   return ok(c, { qq, nickname, email, avatar });

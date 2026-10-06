@@ -97,7 +97,8 @@
     ai_bot_avatar: "",
     ai_text_model: "",
     qq_nick_mode: "fallback",
-    uapis_key: "",
+    apihz_id: "",
+    apihz_key: "",
     qq_nick_apis: "",
     site_icon: "",
   comment_emoji_owo_url: "/owo.json",
@@ -6384,8 +6385,8 @@
             <label style="font-size:.82rem;font-weight:600">获取方式</label>
             <select name="qq_nick_mode" data-qq-mode style="max-width:280px">
               <option value="direct"${(s.qq_nick_mode || "fallback") === "direct" ? " selected" : ""}>腾讯直连（使用下方 Cookie 查 Qzone）</option>
-              <option value="uapis"${(s.qq_nick_mode || "fallback") === "uapis" ? " selected" : ""}>uapis 接口（使用下方 API Key）</option>
-              <option value="fallback"${(s.qq_nick_mode || "fallback") === "fallback" ? " selected" : ""}>逐个尝试（先腾讯，失败再 uapis）</option>
+              <option value="apihz"${(s.qq_nick_mode || "fallback") === "apihz" ? " selected" : ""}>apihz 接口（使用下方开发者 ID/KEY）</option>
+              <option value="fallback"${(s.qq_nick_mode || "fallback") === "fallback" ? " selected" : ""}>逐个尝试（先腾讯，失败再 apihz）</option>
             </select>
           </div>
 
@@ -6410,11 +6411,14 @@
             </details>
           </div>
 
-          <!-- uapis 配置 -->
-          <div data-qq-section="uapis" style="display:none">
-            <div style="font-size:.78rem;color:var(--anzhiyu-secondtext);margin:.4rem 0 .3rem;font-weight:600">uapis 接口</div>
-            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">API Key</label><input name="uapis_key" value="${esc(s.uapis_key)}" placeholder="留空=使用内置默认" style="width:100%" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
-            <div style="color:var(--anzhiyu-secondtext);font-size:.75rem;margin-top:.3rem">接口：<code>https://uapis.cn/api/v1/social/qq/userinfo</code>，支持自定义 Key</div>
+          <!-- apihz 配置 -->
+          <div data-qq-section="apihz" style="display:none">
+            <div style="font-size:.78rem;color:var(--anzhiyu-secondtext);margin:.4rem 0 .3rem;font-weight:600">apihz 接口（接口盒子）</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+              <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">开发者 ID</label><input name="apihz_id" value="${esc(s.apihz_id)}" placeholder="88888888" style="width:100%" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
+              <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">开发者 KEY</label><input name="apihz_key" value="${esc(s.apihz_key)}" placeholder="88888888" style="width:100%" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
+            </div>
+            <div style="color:var(--anzhiyu-secondtext);font-size:.75rem;margin-top:.3rem">接口：<code>https://cn.apihz.cn/api/other/qq.php</code>，可复用上方 QQ Cookie（ckqq/skey/pskey）</div>
           </div>
         </div>
           </div>
@@ -6611,7 +6615,7 @@
         const m = qqMode.value;
         panel.querySelectorAll("[data-qq-section]").forEach(sec => {
           const name = sec.dataset.qqSection;
-          // direct 和 fallback 都显示直连配置，uapis 和 fallback 都显示 uapis 配置
+          // direct 和 fallback 都显示直连配置，apihz 和 fallback 都显示 apihz 配置
           sec.style.display = (m === "fallback" || m === name) ? "" : "none";
         });
       };
@@ -10813,7 +10817,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "uapis_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
