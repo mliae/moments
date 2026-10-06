@@ -96,6 +96,8 @@
     ai_bot_name: "小J",
     ai_bot_avatar: "",
     ai_text_model: "",
+    qq_nick_mode: "fallback",
+    uapis_key: "",
     qq_nick_apis: "",
     site_icon: "",
   comment_emoji_owo_url: "/owo.json",
@@ -6374,26 +6376,46 @@
         </details>
 
         <details class="admin-fold">
-          <summary class="admin-fold-summary">QQ 昵称资料</summary>
+          <summary class="admin-fold-summary">QQ 昵称来源</summary>
           <div class="admin-fold-body">
         <div class="field" style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc)">
-          <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，后台用 Cookie 直连腾讯查询昵称。凭证仅存服务端，绝不下发前台。</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
-            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">系统 QQ（ckqq）</label><input name="qq_ckqq" value="${esc(s.qq_ckqq)}" placeholder="你的 QQ 号" /></div>
-            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">skey</label><input name="qq_skey" value="${esc(s.qq_skey)}" placeholder="cookie 里的 skey" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
+          <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，按所选方式获取昵称。凭证仅存服务端，绝不下发前台。</div>
+          <div class="field" style="margin-bottom:.6rem">
+            <label style="font-size:.82rem;font-weight:600">获取方式</label>
+            <select name="qq_nick_mode" data-qq-mode style="max-width:280px">
+              <option value="direct"${(s.qq_nick_mode || "fallback") === "direct" ? " selected" : ""}>腾讯直连（使用下方 Cookie 查 Qzone）</option>
+              <option value="uapis"${(s.qq_nick_mode || "fallback") === "uapis" ? " selected" : ""}>uapis 接口（使用下方 API Key）</option>
+              <option value="fallback"${(s.qq_nick_mode || "fallback") === "fallback" ? " selected" : ""}>逐个尝试（先腾讯，失败再 uapis）</option>
+            </select>
           </div>
-          <div style="margin-top:.4rem"><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">pskey（p_skey）</label><input name="qq_pskey" value="${esc(s.qq_pskey)}" placeholder="cookie 里的 p_skey" style="width:100%" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
-          <div style="margin-top:.4rem"><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">Cookie 保活间隔（小时）</label><input name="qq_keepalive_interval" type="number" min="1" max="72" value="${esc(s.qq_keepalive_interval)}" placeholder="6" style="width:100%" /></div>
-          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.6rem">
-            <a data-qq-bookmarklet class="btn" href="#" style="text-decoration:none">拖拽到书签栏：一键抓取</a>
-            <button type="button" class="btn" data-qq-test>测试连接</button>
-            <span data-qq-test-msg style="color:var(--anzhiyu-secondtext);font-size:.85rem"></span>
+
+          <!-- 腾讯直连配置 -->
+          <div data-qq-section="direct" style="display:none">
+            <div style="font-size:.78rem;color:var(--anzhiyu-secondtext);margin:.4rem 0 .3rem;font-weight:600">腾讯直连（Cookie 方式）</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+              <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">系统 QQ（ckqq）</label><input name="qq_ckqq" value="${esc(s.qq_ckqq)}" placeholder="你的 QQ 号" /></div>
+              <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">skey</label><input name="qq_skey" value="${esc(s.qq_skey)}" placeholder="cookie 里的 skey" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
+            </div>
+            <div style="margin-top:.4rem"><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">pskey（p_skey）</label><input name="qq_pskey" value="${esc(s.qq_pskey)}" placeholder="cookie 里的 p_skey" style="width:100%" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
+            <div style="margin-top:.4rem"><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">Cookie 保活间隔（小时）</label><input name="qq_keepalive_interval" type="number" min="1" max="72" value="${esc(s.qq_keepalive_interval)}" placeholder="6" style="width:100%" /></div>
+            <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.6rem">
+              <a data-qq-bookmarklet class="btn" href="#" style="text-decoration:none">拖拽到书签栏：一键抓取</a>
+              <button type="button" class="btn" data-qq-test>测试连接</button>
+              <span data-qq-test-msg style="color:var(--anzhiyu-secondtext);font-size:.85rem"></span>
+            </div>
+            <details style="margin-top:.6rem">
+              <summary style="cursor:pointer;font-size:.82rem;color:var(--anzhiyu-secondtext)">没有书签栏？手动粘贴 Cookie 自动解析</summary>
+              <textarea data-qq-paste rows="2" placeholder="登录 qzone.qq.com 后，F12 把整段 Cookie 粘到这里" style="width:100%;margin-top:.4rem;resize:vertical"></textarea>
+              <button type="button" class="btn" data-qq-parse style="margin-top:.35rem">解析并填入</button>
+            </details>
           </div>
-          <details style="margin-top:.6rem">
-            <summary style="cursor:pointer;font-size:.82rem;color:var(--anzhiyu-secondtext)">没有书签栏？手动粘贴 Cookie 自动解析</summary>
-            <textarea data-qq-paste rows="2" placeholder="登录 qzone.qq.com 后，F12 把整段 Cookie 粘到这里" style="width:100%;margin-top:.4rem;resize:vertical"></textarea>
-            <button type="button" class="btn" data-qq-parse style="margin-top:.35rem">解析并填入</button>
-          </details>
+
+          <!-- uapis 配置 -->
+          <div data-qq-section="uapis" style="display:none">
+            <div style="font-size:.78rem;color:var(--anzhiyu-secondtext);margin:.4rem 0 .3rem;font-weight:600">uapis 接口</div>
+            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">API Key</label><input name="uapis_key" value="${esc(s.uapis_key)}" placeholder="留空=使用内置默认" style="width:100%" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
+            <div style="color:var(--anzhiyu-secondtext);font-size:.75rem;margin-top:.3rem">接口：<code>https://uapis.cn/api/v1/social/qq/userinfo</code>，支持自定义 Key</div>
+          </div>
         </div>
           </div>
         </details>
@@ -6580,6 +6602,21 @@
           refreshBtn.disabled = false;
         }
       });
+    }
+
+    // QQ 昵称来源：策略切换时展开/收起对应配置区
+    const qqMode = panel.querySelector("[data-qq-mode]");
+    if (qqMode) {
+      const applyQqSections = () => {
+        const m = qqMode.value;
+        panel.querySelectorAll("[data-qq-section]").forEach(sec => {
+          const name = sec.dataset.qqSection;
+          // direct 和 fallback 都显示直连配置，uapis 和 fallback 都显示 uapis 配置
+          sec.style.display = (m === "fallback" || m === name) ? "" : "none";
+        });
+      };
+      qqMode.addEventListener("change", applyQqSections);
+      applyQqSections();
     }
 
     // QQ 资料：书签一键抓取 / 粘贴 Cookie 解析 / 测试连接
@@ -7088,15 +7125,6 @@
           <input name="ai_text_model" maxlength="100" value="${esc(s.ai_text_model)}" placeholder="@cf/qwen/qwen3-30b-a3b-fp8（留空=默认）" />
         </div>
         <button class="btn primary" type="submit">保存 AI 设置</button>
-      </form>
-
-      <div class="admin-panel-head" style="margin-top:1.75rem"><h3>QQ 昵称 API</h3></div>
-      <form class="settings-form" data-qq-api-form style="max-width:680px">
-        <div class="field">
-          <label>API 列表（每行一条，从上到下依次尝试，获取到昵称即停止）<br /><small style="color:var(--anzhiyu-secondtext)">格式：<code>URL|解析方式</code> 或 <code>URL|密钥|解析方式</code>，URL 中用 <code>{qq}</code> 占位 QQ 号<br />解析方式：<code>auto</code>（通用自动提取）、<code>uapis</code>、<code>uomg</code>、<code>guiguiya</code><br />留空=使用内置默认列表（主源 uapis + 备用 uomg + guiguiya）</small></label>
-          <textarea name="qq_nick_apis" maxlength="2000" rows="6" placeholder="https://api.example.com/qq?qq={qq}|auto&#10;https://api.example2.com/qq?qq={qq}|your-key|auto" style="font-family:monospace;font-size:.82rem">${esc(s.qq_nick_apis)}</textarea>
-        </div>
-        <button class="btn primary" type="submit">保存 QQ API</button>
       </form>`;
   }
 
@@ -10785,7 +10813,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "uapis_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
@@ -10972,24 +11000,7 @@
       return;
     }
 
-    /* ---------- 后台：QQ 昵称 API ---------- */
-    const qqApiForm = e.target.closest("[data-qq-api-form]");
-    if (qqApiForm) {
-      e.preventDefault();
-      const patch = { qq_nick_apis: qqApiForm.qq_nick_apis.value };
-      const btn = qqApiForm.querySelector('button[type="submit"]');
-      btn.disabled = true;
-      try {
-        const s = await api("/api/admin/settings", { method: "PUT", body: patch });
-        state.settings = s;
-        toast("QQ API 设置已保存");
-      } catch (err) {
-        toast(err.message);
-      } finally {
-        btn.disabled = false;
-      }
-      return;
-    }
+    /* ---------- 后台：QQ 昵称 API（已合并到站点外观 → QQ 昵称来源，此表单不再存在） ---------- */
 
     /* ---------- 后台：修改管理密码 ---------- */
     const passwordForm = e.target.closest("[data-password-form]");

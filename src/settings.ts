@@ -73,7 +73,9 @@ export interface SiteSettings {
   ai_bot_avatar: string; // 机器人头像：仅图片 URL；空=lucide bot 占位图标
   ai_text_model: string; // 自定义文本模型 ID（@cf/...）；留空=内置默认模型
   // QQ 昵称 API
-  qq_nick_apis: string; // QQ 昵称 API 列表，每行一条：URL 模板（{qq} 占位）|解析方式。留空=内置默认列表
+  qq_nick_mode: string; // QQ 昵称获取方式：direct=腾讯直连 / uapis=uapis 接口 / fallback=逐个尝试（先腾讯后 uapis）
+  uapis_key: string; // uapis.cn API Key，留空=使用内置默认
+  qq_nick_apis: string; // （已废弃，保留字段兼容旧数据）QQ 昵称 API 列表
   // 安全
   admin_path: string; // 后台秘密入口路径（/admin 或 /sys-xxxx），不通过公开 API 下发
   site_icon: string; // 站点图标（favicon）：仅图片 URL；空=默认 lucide 图标
@@ -198,6 +200,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   ai_bot_name: "小J",
   ai_bot_avatar: "",
   ai_text_model: "",
+  qq_nick_mode: "fallback",
+  uapis_key: "",
   qq_nick_apis: "",
   admin_path: "/admin",
   site_icon: "",
@@ -294,6 +298,8 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   ai_bot_name: 20,
   ai_bot_avatar: 200,
   ai_text_model: 100,
+  qq_nick_mode: 10,
+  uapis_key: 100,
   qq_nick_apis: 2000,
   admin_path: 40,
   site_icon: 300,

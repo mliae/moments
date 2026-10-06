@@ -25,36 +25,11 @@ function decodeBuf(buf: ArrayBuffer): string {
   }
 }
 
-/** 内置默认 API 列表（后台未配置时使用） */
-const DEFAULT_QQ_APIS: ApiEntry[] = [
-  { url: "https://uapis.cn/api/v1/social/qq/userinfo?qq={qq}", auth: "uapi-lqlvdrzauI46iN55kgr-TtuDNdkugA2eD6q7C5KA", parse: "uapis" },
-  { url: "https://api.uomg.com/api/qq.info?qq={qq}&format=json", parse: "uomg" },
-  { url: "https://api.guiguiya.com/api/qq_info?qq={qq}", parse: "guiguiya" },
-];
+/** 内置默认 uapis 源（无其他备用源，由 qq_nick_mode 控制策略） */
+const UAPIS_URL = "https://uapis.cn/api/v1/social/qq/userinfo?qq={qq}";
+const UAPIS_DEFAULT_KEY = "uapi-lqlvdrzauI46iN55kgr-TtuDNdkugA2eD6q7C5KA";
 
 interface ApiEntry { url: string; auth?: string; parse: string; }
-
-/** 解析后台 qq_nick_apis 配置（每行：URL|parse 或 URL|auth|parse） */
-function parseApiConfig(raw: string): ApiEntry[] {
-  if (!raw.trim()) return DEFAULT_QQ_APIS;
-  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
-  const out: ApiEntry[] = [];
-  for (const line of lines) {
-    const parts = line.split("|");
-    const url = (parts[0] || "").trim();
-    if (!url || !url.includes("{qq}")) continue;
-    const entry: ApiEntry = { url, parse: "auto" };
-    // 两段：URL|parse 或三段：URL|auth|parse
-    if (parts.length === 2) {
-      entry.parse = (parts[1] || "auto").trim();
-    } else if (parts.length >= 3) {
-      entry.auth = (parts[1] || "").trim();
-      entry.parse = (parts[2] || "auto").trim();
-    }
-    out.push(entry);
-  }
-  return out.length ? out : DEFAULT_QQ_APIS;
-}
 
 /** 从响应文本中提取昵称，支持多种常见 JSON 结构 */
 function extractNick(text: string, parse: string, qq: string): string {
@@ -247,26 +222,38 @@ app.get("/qq-info", async c => {
   const avatar = `https://q1.qlogo.cn/g?b=qq&nk=${qq}&s=100`;
   let nickname = "";
   const email = `${qq}@qq.com`;
-
-  // 从后台读取 API 列表（留空=内置默认），逐个尝试直到拿到昵称
   const s = await getSettings(c.env.DB);
+  const mode = s.qq_nick_mode || "fallback";
 
-  // 优先自建接口（Worker 直连腾讯，需配置 ckqq/pskey），失败再回退公开多源列表，最后兜底 QQ 号
-  try {
-    const a = await fetchQqNickDirect(s, qq);
-    if (a?.nickname) nickname = a.nickname;
-  } catch { /* 继续回退 */ }
-
-  if (!nickname) {
-    const apis = parseApiConfig(s.qq_nick_apis);
-    for (const api of apis) {
-      try {
-        nickname = await fetchNickFromApi(api, qq);
-        if (nickname) break;
-      } catch {
-        // 当前源失败，继续下一个
-      }
+  /** 调用 uapis 获取昵称 */
+  const tryUapis = async (): Promise<string> => {
+    const key = (s.uapis_key || "").trim();
+    const api: ApiEntry = {
+      url: UAPIS_URL,
+      auth: key || UAPIS_DEFAULT_KEY,
+      parse: "uapis",
+    };
+    try {
+      return await fetchNickFromApi(api, qq);
+    } catch {
+      return "";
     }
+  };
+
+  if (mode === "direct") {
+    try {
+      const a = await fetchQqNickDirect(s, qq);
+      if (a?.nickname) nickname = a.nickname;
+    } catch { /* 忽略 */ }
+  } else if (mode === "uapis") {
+    nickname = await tryUapis();
+  } else {
+    // fallback（默认）：先腾讯直连，失败再 uapis
+    try {
+      const a = await fetchQqNickDirect(s, qq);
+      if (a?.nickname) nickname = a.nickname;
+    } catch { /* 忽略 */ }
+    if (!nickname) nickname = await tryUapis();
   }
 
   return ok(c, { qq, nickname, email, avatar });
