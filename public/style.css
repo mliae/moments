@@ -3269,6 +3269,18 @@ html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .topbar {
   border-bottom-color: rgb(255 255 255 / 8%);
 }
 
+/* 背景模式下页脚同样玻璃化：否则实底色会盖住固定背景层，底部变成一条纯色 */
+body.site-bg-on:not(.site-bg-admin) .site-footer {
+  background: rgb(255 255 255 / 62%);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-top-color: rgb(0 0 0 / 6%);
+}
+html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .site-footer {
+  background: rgb(32 35 31 / 58%);
+  border-top-color: rgb(255 255 255 / 8%);
+}
+
 /* 观赏区卡片玻璃化（列表/关于/友链/空态）；正文 .article-card、弹窗 .modal、后台不在此列 */
 @supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
   body.site-bg-on:not(.site-bg-admin) .bber-item,
