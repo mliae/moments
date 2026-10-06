@@ -56,6 +56,7 @@ export interface SiteSettings {
   site_bg_card: string; // 玻璃卡片不透明度 %（0-100，默认 72）
   site_bg_footer: string; // 页脚不透明度 %（0-100，默认 20）
   site_bg_blur: string; // 毛玻璃模糊强度 px（0-40，默认 16）
+  bg_version: string; // 背景图版本号（后台"换一张"时 +1，用于击穿浏览器/边缘缓存）
   // 页脚
   footer_text: string; // 页脚文案（支持 HTML）
   footer_run_since: string; // 网站运行起始时间 ISO 字符串，空=不显示运行时长
@@ -186,6 +187,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   site_bg_card: "72",
   site_bg_footer: "20",
   site_bg_blur: "16",
+  bg_version: "0",
   footer_text: "",
   footer_run_since: "",
   feed_page_size: "20",
@@ -282,6 +284,7 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   site_bg_card: 3,
   site_bg_footer: 3,
   site_bg_blur: 3,
+  bg_version: 8,
   footer_text: 2000,
   footer_run_since: 40,
   feed_page_size: 3,

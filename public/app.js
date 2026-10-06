@@ -1823,11 +1823,12 @@
 
   function bannerHtml() {
     const s = state.settings;
-    const bg = s.banner_bg_mode === "random" ? "/api/bg" : (/^https?:\/\//i.test(s.banner_bg_image || "") ? s.banner_bg_image : "");
+    const bg = bannerInlineBg(s);
+    const hasBannerBg = s.banner_bg_mode === "random" || /^https?:\/\//i.test(s.banner_bg_image || "");
     const customUrl = /^https?:\/\//i.test(s.banner_button_url || "") ? s.banner_button_url : "";
     return `
     <div class="banner-card">
-      <div class="banner-inner${bg ? " has-bg" : ""}"${bg ? ` style="background-image:url('${esc(bg).replace(/'/g, "%27")}')" data-banner-bg="1"` : ""}>
+      <div class="banner-inner${hasBannerBg ? " has-bg" : ""}"${hasBannerBg ? ` data-banner-bg="1"` : ""}${bg ? ` style="background-image:url('${esc(bg).replace(/'/g, "%27")}')"` : ""}>
         ${state.admin ? `<button type="button" class="essay-publish-fab" data-act="publish-fab" aria-label="发布说说" title="发布说说">${svgIcon("plus", 18)}</button>` : ""}
         <div class="banner-content">
           <div>
@@ -1936,17 +1937,54 @@
     r.setProperty("--sitebg-blur", blur + "px");
   }
 
-  /** 解析全站背景当前应使用的图片 URL（前台背景层与后台预览条共用同一逻辑） */
+  /** 横幅模板内联背景 URL：random 与全站背景同 URL 共享缓存；
+   *  static 动态接口不内联（直连会各自 302 到不同图），由 applySiteBg 解析后回填同一张 */
+  function bannerInlineBg(s) {
+    if (s.banner_bg_mode === "random") return (resolveSiteBgUrl(s) || {}).url || "";
+    if (/^https?:\/\//i.test(s.banner_bg_image || "")) return (_bgResolved && _bgResolved.url) || "";
+    return "";
+  }
+
+  /** 解析全站背景当前应使用的图片 URL（前台背景层与后台预览条共用同一逻辑）；
+   *  random 模式 URL 带 bg_version，后台"换一张"后版本变化可击穿浏览器/边缘缓存 */
   function resolveSiteBgUrl(s) {
     if (s.banner_bg_mode === "random") {
       const h = Math.max(1, parseInt(s.banner_bg_interval, 10) || 24);
       const bucket = String(Math.floor(Date.now() / (h * 3600000)));
-      return { url: `/api/bg?b=${bucket}`, key: "bucket:" + bucket };
+      return { url: `/api/bg?b=${bucket}&v=${encodeURIComponent(s.bg_version || "0")}`, key: "bucket:" + bucket + ":" + (s.bg_version || "0") };
     }
     if (/^https?:\/\//i.test(s.banner_bg_image || "")) {
-      return { url: s.banner_bg_image, key: "direct:" + s.banner_bg_image }; // 整页刷新后 DOM 重建，自然重新请求动态接口
+      return { url: s.banner_bg_image, key: "direct:" + s.banner_bg_image + ":" + (s.bg_version || "0") };
     }
     return null;
+  }
+
+  /** static 模式动态接口：经本站 /resolve 拿到 302 之后的最终图 URL，
+   *  横幅与全站背景共用同一个最终 URL（直连动态接口时浏览器各请求各自跳转 → 两张图不一致）。
+   *  每次页面加载解析一次并缓存；"换一张"时清缓存重新解析。 */
+  let _bgResolved = null; // { key, url }
+  async function ensureBgResolved(s) {
+    if (s.banner_bg_mode === "random") return resolveSiteBgUrl(s);
+    if (!/^https?:\/\//i.test(s.banner_bg_image || "")) return null;
+    const key = "direct:" + s.banner_bg_image + ":" + (s.bg_version || "0");
+    if (_bgResolved && _bgResolved.key === key) return _bgResolved;
+    try {
+      const r = await fetch("/api/bg/resolve", { cache: "no-store" });
+      const j = await r.json();
+      const u = j && j.data && /^https?:\/\//i.test(j.data.url || "") ? j.data.url : s.banner_bg_image;
+      _bgResolved = { key, url: u };
+    } catch {
+      _bgResolved = { key, url: s.banner_bg_image };
+    }
+    return _bgResolved;
+  }
+
+  /** 把最终图 URL 同步到当前页面所有横幅（保证横幅与全站背景同一张图） */
+  function applyBannerImages(url) {
+    const safe = url.replace(/["\\]/g, encodeURIComponent);
+    document.querySelectorAll(".banner-inner[data-banner-bg]").forEach(el => {
+      el.style.backgroundImage = `url("${safe}")`;
+    });
   }
 
   const siteBgEl = document.getElementById("siteBg");
@@ -1958,31 +1996,30 @@
       siteBgEl.style.backgroundImage = "";
       delete siteBgEl.dataset.key;
     };
-    if (!s.site_bg_enabled) {
-      reset();
-      return;
-    }
-    const bg = resolveSiteBgUrl(s);
-    if (!bg) {
-      reset(); // 横幅既非随机也无直链图片：无背景可显示
-      return;
-    }
-    const { url, key } = bg;
-    if (siteBgEl.dataset.key === key && siteBgEl.classList.contains("ready")) return;
-    siteBgEl.dataset.key = key;
-    const safeUrl = url.replace(/["\\]/g, encodeURIComponent);
-    const img = new Image();
-    img.onload = () => {
-      if (!state.settings.site_bg_enabled) return; // 预载期间开关被关
-      if (siteBgEl.dataset.key !== key) return; // 期间已切换模式/跨桶
-      siteBgEl.style.backgroundImage = `url("${safeUrl}")`;
-      siteBgEl.classList.add("ready");
-    };
-    img.onerror = () => {
-      // 抓图失败保持纯色底，刷新或下个桶自然重试
-      if (siteBgEl.dataset.key === key) reset();
-    };
-    img.src = url;
+    const bgEnabled = !!s.site_bg_enabled;
+    ensureBgResolved(s).then(bg => {
+      // static 模式即使全站背景关闭，也要把解析出的最终 URL 同步给横幅（保证同图）
+      if (!bg) { if (bgEnabled) reset(); return; }
+      const { url, key } = bg;
+      if (siteBgEl.dataset.key !== key) applyBannerImages(url);
+      if (!bgEnabled) { reset(); return; }
+      if (siteBgEl.dataset.key === key && siteBgEl.classList.contains("ready")) return;
+      siteBgEl.dataset.key = key;
+      const safeUrl = url.replace(/["\\]/g, encodeURIComponent);
+      const img = new Image();
+      img.onload = () => {
+        if (!state.settings.site_bg_enabled) return; // 预载期间开关被关
+        if (siteBgEl.dataset.key !== key) return; // 期间已切换模式/跨桶
+        siteBgEl.style.backgroundImage = `url("${safeUrl}")`;
+        siteBgEl.classList.add("ready");
+        applyBannerImages(url); // 用已加载缓存里的图刷一次横幅，避免各走各的请求
+      };
+      img.onerror = () => {
+        // 抓图失败保持纯色底，刷新或下个桶自然重试
+        if (siteBgEl.dataset.key === key) reset();
+      };
+      img.src = url;
+    });
   }
 
   // 页脚运行时间计时器 id
@@ -3105,11 +3142,12 @@
       const s = state.settings;
       setSeo({ title: `${t("photos.title")} · ${s.site_title}`, description: t("photos.total", { n: total }), path: "/photos" });
       // 横幅背景图与首页一致（后台「横幅背景图」设置）
-      const bg = s.banner_bg_mode === "random" ? "/api/bg" : (/^https?:\/\//i.test(s.banner_bg_image || "") ? s.banner_bg_image : "");
+      const bg = bannerInlineBg(s);
+      const hasBannerBg = s.banner_bg_mode === "random" || /^https?:\/\//i.test(s.banner_bg_image || "");
       // 顶部标题卡（与首页横幅风格呼应）
       const header = `
         <div class="banner-card photos-banner">
-          <div class="banner-inner${bg ? " has-bg" : ""}"${bg ? ` style="background-image:url('${esc(bg).replace(/'/g, "%27")}')" data-banner-bg="1"` : ""}>
+          <div class="banner-inner${hasBannerBg ? " has-bg" : ""}"${hasBannerBg ? ` data-banner-bg="1"` : ""}${bg ? ` style="background-image:url('${esc(bg).replace(/'/g, "%27")}')"` : ""}>
             <div class="banner-content">
               <div>
                 <div class="banner-tips">${esc(s.essay_tips)}</div>
@@ -6186,6 +6224,12 @@
             <option value="random"${s.banner_bg_mode === "random" ? " selected" : ""}>随机图片（本站代理缓存，更快更稳）</option>
           </select>
         </div>
+        <div class="field">
+          <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+            <button type="button" class="btn" data-bg-refresh>换一张</button>
+            <span class="field-hint" style="margin:0">对当前图片不满意时点击：随机缓存模式会清除本站缓存重新抓图；动态接口模式会重新解析一张新图。立即生效，无需保存。</span>
+          </div>
+        </div>
         <div class="field" data-bg-panel="static">
           <label>背景图 URL（可选）<br /><small style="color:var(--anzhiyu-secondtext)">填图片 URL，或点"上传"存到 R2；留空用默认渐变</small></label>
           <div style="display:flex;gap:.5rem;align-items:center">
@@ -6408,6 +6452,40 @@
         if (inp) inp.value = b.getAttribute("data-bg-int");
       })
     );
+
+    // 「换一张」：random 模式清当前桶缓存；static 模式重新解析动态图源
+    const bgRefreshBtn = panel.querySelector("[data-bg-refresh]");
+    if (bgRefreshBtn) {
+      bgRefreshBtn.addEventListener("click", async () => {
+        bgRefreshBtn.disabled = true;
+        bgRefreshBtn.textContent = "更换中…";
+        try {
+          const r = await api("/api/bg/refresh", { method: "POST" });
+          if (r.settings) state.settings = r.settings;
+          _bgResolved = null; // 清缓存，下次重新解析
+          // 更新预览和已渲染页面
+          applySiteBg(state.settings);
+          // 同步刷新预览条
+          const pv = panel.querySelector("[data-sitebg-preview]");
+          if (pv) {
+            const bg = await ensureBgResolved(state.settings);
+            if (bg) pv.style.backgroundImage = `url("${bg.url.replace(/["\\]/g, encodeURIComponent)}")`;
+          }
+          // 同步刷新横幅预览小图（static 模式）
+          const bannerPreview = panel.querySelector("[data-banner-preview]");
+          if (bannerPreview) {
+            const bg = await ensureBgResolved(state.settings);
+            if (bg) bannerPreview.innerHTML = `<img src="${esc(bg.url)}" alt="" style="max-width:100%;max-height:120px;border-radius:8px;object-fit:cover" referrerpolicy="no-referrer" />`;
+          }
+          toast("已更换，刷新生效");
+        } catch (err) {
+          toast(err.message || "换图失败");
+        } finally {
+          bgRefreshBtn.disabled = false;
+          bgRefreshBtn.textContent = "换一张";
+        }
+      });
+    }
 
     // 全站背景玻璃滑块：数值标签即时更新 + 实时换算 CSS 变量驱动预览条（保存后才写入数据库）
     panel.querySelectorAll("[data-sitebg-live]").forEach(inp => {

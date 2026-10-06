@@ -6,8 +6,9 @@
  */
 import { Hono } from "hono";
 import type { HonoEnv } from "../types";
-import { fail } from "../respond";
-import { getSettings } from "../settings";
+import { fail, ok } from "../respond";
+import { getSettings, updateSettings, type SiteSettings } from "../settings";
+import { requireAdmin } from "../auth";
 
 const app = new Hono<HonoEnv>();
 
@@ -94,6 +95,52 @@ app.get("/", async c => {
   return new Response(buf, {
     headers: { "Content-Type": ct, "Cache-Control": `public, max-age=${maxAge}` },
   });
+});
+
+/** 计算当前/下一时间桶的 R2 缓存键（random 模式） */
+function bucketKeys(s: SiteSettings, now: number): string[] {
+  const source = (s.banner_bg_source || "").trim();
+  const hours = Math.max(1, Math.min(720, parseInt(s.banner_bg_interval, 10) || 24));
+  const bucketMs = hours * 3600_000;
+  const cur = Math.floor(now / bucketMs) * bucketMs;
+  const prefix = `bg/${hashStr(source)}/`;
+  return [`${prefix}${cur}.jpg`, `${prefix}${cur + bucketMs}.jpg`]; // 当前桶 + 可能已预热的下一桶
+}
+
+/**
+ * 换一张（后台按钮）：random 模式删除当前桶 R2 缓存（下次访问重新抓随机图）；
+ * 两种模式都递增 bg_version，让前台 URL 变化以击穿浏览器/边缘缓存
+ */
+app.post("/refresh", requireAdmin, async c => {
+  const s = await getSettings(c.env.DB);
+  if (s.banner_bg_mode === "random") {
+    for (const k of bucketKeys(s, Date.now())) await c.env.R2.delete(k).catch(() => {});
+  }
+  const v = String((parseInt(s.bg_version, 10) || 0) + 1);
+  const next = await updateSettings(c.env.DB, { bg_version: v });
+  return ok(c, { settings: next });
+});
+
+/**
+ * 解析动态图源最终 URL（static 模式 + 动态随机接口）：
+ * 服务端跟随 302 拿到真实图地址，横幅与全站背景共用同一个最终 URL，保证同一张图；
+ * 浏览器直连动态接口时每个请求各自跳转，会出现横幅/背景不一致。
+ */
+app.get("/resolve", async c => {
+  const s = await getSettings(c.env.DB);
+  const u = (s.banner_bg_image || "").trim();
+  if (s.banner_bg_mode === "random" || !/^https?:\/\//i.test(u)) return ok(c, { url: "" });
+  try {
+    const res = await fetch(u, {
+      headers: { "User-Agent": "moments-bg/1.0" },
+      signal: AbortSignal.timeout(8000),
+      redirect: "follow",
+    });
+    await res.body?.cancel().catch(() => {}); // 只要最终 URL，不下载图片
+    return ok(c, { url: res.url || u });
+  } catch {
+    return ok(c, { url: u }); // 解析失败回退原 URL
+  }
 });
 
 /**
