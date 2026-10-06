@@ -146,54 +146,36 @@ export async function fetchQqNickDirect(
   return null;
 }
 
-/** 检测 QQ Cookie 是否有效（用于保活+告警） */
+/** 检测 QQ Cookie 是否有效（用于保活+告警）。用 apihz 接口验证，因为 vip.qq.com 首页有反爬 */
 export async function checkQqCookie(s: SiteSettings): Promise<{ ok: boolean; msg: string; debug?: Record<string, unknown> }> {
   if (!s.qq_ckqq || !s.qq_pskey) return { ok: false, msg: "未配置 ckqq/pskey" };
-  const cookie = `uin=o${s.qq_ckqq}; skey=${s.qq_skey}; p_skey=${s.qq_pskey}`;
-  const endpoints = [
-    { name: "vip.qq.com", url: `https://vip.qq.com/` },
-    { name: "vip-my", url: `https://vip.qq.com/myvip.html` },
-  ];
-  const details: string[] = [];
-  for (const ep of endpoints) {
-    try {
-      const resp = await fetch(ep.url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-          "Cookie": cookie,
-          "Referer": "https://vip.qq.com/",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "zh-CN,zh;q=0.9",
-        },
-        redirect: "manual",
-      });
-      details.push(`${ep.name}: HTTP ${resp.status}`);
-      if (resp.status === 302 || resp.status === 301) {
-        const location = resp.headers.get("location") || "";
-        if (location.includes("login") || location.includes("xui.ptlogin2")) {
-          details.push(`  → 跳登录页`);
-          continue; // Cookie 失效，试下一个接口
-        }
-        // 非登录重定向（如正常跳转），视为有效
-        return { ok: true, msg: "Cookie 有效", debug: { details: details.join("\n"), endpoint: ep.name, status: resp.status } };
-      }
-      if (!resp.ok) {
-        details.push(`  → 非 200/302`);
-        continue;
-      }
-      // 200 但需检查内容是否是登录页
-      const html = await resp.text();
-      if (html.includes("ptlogin") || html.includes("login.qq.com") || html.includes("xui.ptlogin2")) {
-        details.push(`  → 返回登录页`);
-        continue;
-      }
-      return { ok: true, msg: "Cookie 有效", debug: { details: details.join("\n"), endpoint: ep.name, status: resp.status } };
-    } catch (e) {
-      details.push(`${ep.name}: 异常 ${e instanceof Error ? e.message : String(e)}`);
-      continue;
+  const id = (s.apihz_id || "").trim();
+  const key = (s.apihz_key || "").trim();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const url = `${APIHZ_URL}?id=${encodeURIComponent(id || "88888888")}&key=${encodeURIComponent(key || "88888888")}&qq=${encodeURIComponent(s.qq_ckqq)}&ckqq=${encodeURIComponent(s.qq_ckqq)}&skey=${encodeURIComponent(s.qq_skey)}&pskey=${encodeURIComponent(s.qq_pskey)}`;
+    const resp = await fetch(url, { signal: ctrl.signal });
+    const text = await resp.text();
+    const nick = extractNick(text, "apihz", s.qq_ckqq);
+    if (nick) {
+      return { ok: true, msg: `Cookie 有效（昵称：${nick}）`, debug: { endpoint: "apihz", status: resp.status } };
     }
+    // 解析错误码
+    try {
+      const d = JSON.parse(text) as Record<string, unknown>;
+      const code = d.code;
+      const textMsg = String(d.text || d.msg || "");
+      if (code === 400) return { ok: false, msg: `Cookie 已失效：${textMsg || "请重新登录 vip.qq.com 抓取"}`, debug: { endpoint: "apihz", status: resp.status, response: textMsg } };
+      return { ok: false, msg: `检测失败：${textMsg || "未知错误"}`, debug: { endpoint: "apihz", status: resp.status, response: textMsg } };
+    } catch {
+      return { ok: false, msg: "检测失败：接口返回异常", debug: { endpoint: "apihz", status: resp.status } };
+    }
+  } catch (e) {
+    return { ok: false, msg: `检测失败：${e instanceof Error ? e.message : "网络异常"}`, debug: { endpoint: "apihz", error: String(e) } };
+  } finally {
+    clearTimeout(timer);
   }
-  return { ok: false, msg: "Cookie 已失效（请重新登录 vip.qq.com 抓取）", debug: { details: details.join("\n") } };
 }
 
 app.get("/qq-info", async c => {
