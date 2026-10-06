@@ -3252,32 +3252,34 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   opacity: 0; transition: opacity .6s ease;
 }
 #siteBg.ready { opacity: 1; }
-.site-bg-mask { position: absolute; inset: 0; background: rgb(243 241 234 / 68%); }
-html[data-theme="dark"] .site-bg-mask { background: rgb(18 21 18 / 55%); }
+.site-bg-mask { position: absolute; inset: 0; background: rgb(243 241 234 / var(--sitebg-mask-a, 68%)); }
+html[data-theme="dark"] .site-bg-mask { background: rgb(18 21 18 / var(--sitebg-mask-a-dark, 55%)); }
 /* 背景开启后 body 让开底色；后台路由恢复纯色（后台不玻璃化） */
 body.site-bg-on { background: transparent; }
 body.site-bg-admin { background: var(--anzhiyu-background); }
 body.site-bg-admin #siteBg { display: none; }
 
-/* 背景模式下顶栏与卡片统一玻璃材质：暗色不再是一条近黑实底，改为与卡片一致的半透深绿 */
+/* 背景模式下顶栏玻璃材质（透明度随「卡片不透明度」联动，取其 86%；模糊跟随全局模糊值） */
 body.site-bg-on:not(.site-bg-admin) .topbar {
-  background: rgb(255 255 255 / 62%);
+  background: rgb(255 255 255 / var(--sitebg-bar-a, 62%));
+  backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+  -webkit-backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
   border-bottom-color: rgb(0 0 0 / 6%);
 }
 html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .topbar {
-  background: rgb(32 35 31 / 58%);
+  background: rgb(32 35 31 / var(--sitebg-bar-a-dark, 58%));
   border-bottom-color: rgb(255 255 255 / 8%);
 }
 
-/* 背景模式下页脚同样玻璃化：白色叠层要薄，否则与背景层 68% 遮罩叠加后图片被洗白成纯色带 */
+/* 页脚玻璃材质，透明度独立控制（默认更透） */
 body.site-bg-on:not(.site-bg-admin) .site-footer {
-  background: rgb(255 255 255 / 30%);
-  backdrop-filter: saturate(180%) blur(14px);
-  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  background: rgb(255 255 255 / var(--sitebg-footer-a, 20%));
+  backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+  -webkit-backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
   border-top-color: rgb(0 0 0 / 6%);
 }
 html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .site-footer {
-  background: rgb(32 35 31 / 32%);
+  background: rgb(32 35 31 / var(--sitebg-footer-a, 20%));
   border-top-color: rgb(255 255 255 / 8%);
 }
 
@@ -3290,9 +3292,9 @@ html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .site-footer {
   body.site-bg-on:not(.site-bg-admin) .links-card,
   body.site-bg-on:not(.site-bg-admin) .essay-loading,
   body.site-bg-on:not(.site-bg-admin) .essay-empty {
-    background: rgb(255 255 255 / 72%);
-    backdrop-filter: saturate(180%) blur(16px);
-    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    background: rgb(255 255 255 / var(--sitebg-card-a, 72%));
+    backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+    -webkit-backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
   }
   html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .bber-item,
   html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .post-item,
@@ -3301,8 +3303,16 @@ html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .site-footer {
   html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .links-card,
   html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .essay-loading,
   html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .essay-empty {
-    background: rgb(32 35 31 / 66%);
+    background: rgb(32 35 31 / var(--sitebg-card-a-dark, 66%));
   }
 }
 /* 不支持 backdrop-filter 的浏览器：保持原不透明卡片（仅缝隙露图，自动降级为 A 方案观感） */
+
+/* 后台玻璃参数滑块行 */
+.sitebg-range-row {
+  display: grid; grid-template-columns: 92px 1fr 52px; align-items: center;
+  gap: .7rem; margin-top: .65rem; font-size: .88rem;
+}
+.sitebg-range-row b { font-weight: 600; color: var(--anzhiyu-main); font-variant-numeric: tabular-nums; text-align: right; }
+.sitebg-range-row input[type="range"] { width: 100%; accent-color: var(--anzhiyu-main); cursor: pointer; }
 

@@ -52,6 +52,10 @@ export interface SiteSettings {
   banner_bg_source: string; // 随机图源 URL 模板，需含 {seed} 占位（默认 picsum）
   banner_bg_interval: string; // 随机图换图频率：多少小时换一张（数字字符串，默认 24=每天）
   site_bg_enabled: boolean; // 全站背景图开关（复用随机图源配置，玻璃拟态，后台/弹窗/正文除外）
+  site_bg_mask: string; // 背景遮罩浓度 %（0-100，默认 68；压在图片上保证文字对比度）
+  site_bg_card: string; // 玻璃卡片不透明度 %（0-100，默认 72）
+  site_bg_footer: string; // 页脚不透明度 %（0-100，默认 20）
+  site_bg_blur: string; // 毛玻璃模糊强度 px（0-40，默认 16）
   // 页脚
   footer_text: string; // 页脚文案（支持 HTML）
   footer_run_since: string; // 网站运行起始时间 ISO 字符串，空=不显示运行时长
@@ -178,6 +182,10 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   banner_bg_source: "https://picsum.photos/seed/{seed}/1350/300",
   banner_bg_interval: "24",
   site_bg_enabled: false,
+  site_bg_mask: "68",
+  site_bg_card: "72",
+  site_bg_footer: "20",
+  site_bg_blur: "16",
   footer_text: "",
   footer_run_since: "",
   feed_page_size: "20",
@@ -270,6 +278,10 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   banner_bg_mode: 10,
   banner_bg_source: 500,
   banner_bg_interval: 4,
+  site_bg_mask: 3,
+  site_bg_card: 3,
+  site_bg_footer: 3,
+  site_bg_blur: 3,
   footer_text: 2000,
   footer_run_since: 40,
   feed_page_size: 3,
@@ -387,6 +399,15 @@ export function normalizeSettings(raw: Record<string, unknown> | null | undefine
   out.banner_bg_interval = Number.isFinite(bi)
     ? String(Math.max(1, Math.min(720, bi)))
     : DEFAULT_SETTINGS.banner_bg_interval;
+  // 全站背景玻璃参数：百分比 0-100、模糊 0-40px，非法回退默认
+  const clampBg = (v: string, min: number, max: number, dft: string): string => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? String(Math.max(min, Math.min(max, n))) : dft;
+  };
+  out.site_bg_mask = clampBg(out.site_bg_mask, 0, 100, DEFAULT_SETTINGS.site_bg_mask);
+  out.site_bg_card = clampBg(out.site_bg_card, 0, 100, DEFAULT_SETTINGS.site_bg_card);
+  out.site_bg_footer = clampBg(out.site_bg_footer, 0, 100, DEFAULT_SETTINGS.site_bg_footer);
+  out.site_bg_blur = clampBg(out.site_bg_blur, 0, 40, DEFAULT_SETTINGS.site_bg_blur);
   // QQ Cookie 保活间隔（小时）：1-72，非法回退默认
   const ka = parseInt(out.qq_keepalive_interval, 10);
   out.qq_keepalive_interval = Number.isFinite(ka)

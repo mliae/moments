@@ -82,6 +82,10 @@
     banner_button_target: "_blank",
     banner_bg_image: "",
     site_bg_enabled: false,
+    site_bg_mask: "68",
+    site_bg_card: "72",
+    site_bg_footer: "20",
+    site_bg_blur: "16",
     footer_text: "",
     footer_run_since: "",
     feed_page_size: "20",
@@ -1906,7 +1910,30 @@
     // 页脚：文案 + 网站运行时间
     applyFooter(s);
     applyMusicSettings();
+    applySiteBgVars(s);
     applySiteBg(s);
+  }
+
+  /** 把后台玻璃参数（百分比/像素）换算为 CSS 变量注入根元素；
+   *  暗色遮罩=亮色×0.81、暗色卡片≈亮色×0.92、顶栏=卡片×0.86，保持各面层次 */
+  function applySiteBgVars(s) {
+    const num = (v, dft, min, max) => {
+      const n = parseInt(v, 10);
+      return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : dft;
+    };
+    const mask = num(s.site_bg_mask, 68, 0, 100) / 100;
+    const card = num(s.site_bg_card, 72, 0, 100) / 100;
+    const footer = num(s.site_bg_footer, 20, 0, 100) / 100;
+    const blur = num(s.site_bg_blur, 16, 0, 40);
+    const r = document.documentElement.style;
+    r.setProperty("--sitebg-mask-a", mask.toFixed(3));
+    r.setProperty("--sitebg-mask-a-dark", (mask * 0.81).toFixed(3));
+    r.setProperty("--sitebg-card-a", card.toFixed(3));
+    r.setProperty("--sitebg-card-a-dark", (card * 0.92).toFixed(3));
+    r.setProperty("--sitebg-bar-a", (card * 0.86).toFixed(3));
+    r.setProperty("--sitebg-bar-a-dark", (card * 0.92 * 0.88).toFixed(3));
+    r.setProperty("--sitebg-footer-a", footer.toFixed(3));
+    r.setProperty("--sitebg-blur", blur + "px");
   }
 
   /** 全站背景图（site_bg_enabled）：取图方式跟随横幅设置——
@@ -6186,6 +6213,30 @@
           </label>
           <div class="field-hint">背景取图跟随上方横幅模式：「固定图片」填动态随机接口 URL 时，每次刷新随横幅一起换图；「随机图片（本站代理缓存）」时走 R2 时间桶，全站同周期一张、更快更稳。文章正文、评论弹窗、灯箱与后台保持纯色。</div>
         </div>
+        <div class="field" data-sitebg-controls>
+          <label>玻璃效果微调（保存后返回前台查看）</label>
+          <div class="sitebg-range-row">
+            <span>遮罩浓度</span>
+            <input type="range" name="site_bg_mask" min="0" max="100" step="1" value="${esc(s.site_bg_mask)}" data-sitebg-live data-sitebg-unit="%" />
+            <b data-sitebg-val>${esc(s.site_bg_mask)}%</b>
+          </div>
+          <div class="sitebg-range-row">
+            <span>卡片不透明度</span>
+            <input type="range" name="site_bg_card" min="0" max="100" step="1" value="${esc(s.site_bg_card)}" data-sitebg-live data-sitebg-unit="%" />
+            <b data-sitebg-val>${esc(s.site_bg_card)}%</b>
+          </div>
+          <div class="sitebg-range-row">
+            <span>页脚不透明度</span>
+            <input type="range" name="site_bg_footer" min="0" max="100" step="1" value="${esc(s.site_bg_footer)}" data-sitebg-live data-sitebg-unit="%" />
+            <b data-sitebg-val>${esc(s.site_bg_footer)}%</b>
+          </div>
+          <div class="sitebg-range-row">
+            <span>毛玻璃模糊</span>
+            <input type="range" name="site_bg_blur" min="0" max="40" step="1" value="${esc(s.site_bg_blur)}" data-sitebg-live data-sitebg-unit="px" />
+            <b data-sitebg-val>${esc(s.site_bg_blur)}px</b>
+          </div>
+          <div class="field-hint">遮罩越大文字越清晰、背景越淡；卡片/页脚数值越小越透；模糊 0 = 无玻璃化（仅半透明）。</div>
+        </div>
           </div>
         </details>
 
@@ -6347,6 +6398,14 @@
         if (inp) inp.value = b.getAttribute("data-bg-int");
       })
     );
+
+    // 全站背景玻璃滑块：数值标签即时更新；后台不显示背景，保存后回前台查看效果
+    panel.querySelectorAll("[data-sitebg-live]").forEach(inp => {
+      inp.addEventListener("input", () => {
+        const valEl = inp.closest(".sitebg-range-row").querySelector("[data-sitebg-val]");
+        if (valEl) valEl.textContent = inp.value + (inp.dataset.sitebgUnit || "");
+      });
+    });
 
     // 头像类字段上传 + URL 实时预览
     const avatarPreviewHtml = url =>
@@ -10619,7 +10678,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
