@@ -8188,6 +8188,11 @@
   }
 
   function toggleMute() {
+    // 静音来自自动播放兜底时：用户点喇叭必然是要声音，直接接管，不能走"非静音→再静音"的反转分支
+    if (state.music.autoplayMuted) {
+      takeAutoplayMute();
+      return;
+    }
     state.music.autoplayMuted = false; // 手动操作静音按钮即接管，取消自动恢复
     if (audio.muted || state.music.volume === 0) {
       setMusicVolume(state.music.volume > 0 ? state.music.volume : 0.7);
@@ -8199,9 +8204,10 @@
   }
 
   function updateVolumeIcon() {
-    if (!musicPlayBtn || !musicPlayBtn.parentElement) return; // 音乐播放器未渲染（音乐功能关闭）
-    const on = musicPlayBtn.parentElement.querySelector(".icon-vol-on");
-    const off = musicPlayBtn.parentElement.querySelector(".icon-vol-off");
+    if (!musicCapsule) return; // 音乐播放器未渲染（音乐功能关闭）
+    // 音量键在 aux 控制段，与播放键不同父容器，需在整个胶囊范围内查找
+    const on = musicCapsule.querySelector(".icon-vol-on");
+    const off = musicCapsule.querySelector(".icon-vol-off");
     if (!on || !off) return;
     const muted = audio.muted || state.music.volume === 0;
     on.style.display = muted ? "none" : "";
@@ -8262,6 +8268,7 @@
 
   // 音量滑块
   musicVolume.addEventListener("input", e => {
+    state.music.autoplayMuted = false; // 手动调音量即接管
     setMusicVolume(e.target.value);
   });
 
@@ -8282,16 +8289,17 @@
 
   // 控制按钮委托
   musicCapsule.addEventListener("click", e => {
-    // 折叠态：点击整个球 → 展开（不暂停音乐）
+    // 折叠态：点击整个球 → 展开（不暂停音乐）；属于用户主动操作，接管静音自动播放
     if (musicCapsule.classList.contains("collapsed")) {
+      takeAutoplayMute();
       setCapsuleCollapsed(false);
       return;
     }
     const btn = e.target.closest("[data-music-prev]");
-    if (btn) { prevSong(); return; }
+    if (btn) { takeAutoplayMute(); prevSong(); return; }
     if (e.target.closest("[data-music-mode]")) { cyclePlayMode(); return; }
-    if (e.target.closest("[data-music-play]")) { togglePlay(); return; }
-    if (e.target.closest("[data-music-next]")) { nextSong(); return; }
+    if (e.target.closest("[data-music-play]")) { takeAutoplayMute(); togglePlay(); return; }
+    if (e.target.closest("[data-music-next]")) { takeAutoplayMute(); nextSong(); return; }
     if (e.target.closest("[data-music-list]")) { toggleMusicPlaylist(); return; }
     if (e.target.closest("[data-music-lyric]")) { toggleMusicLyric(); return; }
     if (e.target.closest("[data-music-mute]")) { toggleMute(); return; }
@@ -8312,6 +8320,7 @@
   musicPlaylistList.addEventListener("click", e => {
     const item = e.target.closest(".music-playlist-item");
     if (!item || item.dataset.musicIdx === undefined) return;
+    takeAutoplayMute();
     loadAndPlay(Number(item.dataset.musicIdx));
   });
 
@@ -8398,6 +8407,15 @@
     renderMusicPlaylist();
   }
 
+  /** 用户主动操作（点击播放/切歌/喇叭/选歌）时，接管浏览器策略导致的静音自动播放 */
+  function takeAutoplayMute() {
+    if (!state.music.autoplayMuted) return;
+    state.music.autoplayMuted = false;
+    audio.muted = false;
+    state.music.muted = false;
+    updateVolumeIcon();
+  }
+
   /** 自动播放（后台开启时）：预加载完成后直接播放。
    *  有声自动播放被浏览器策略拦截时（Safari/Firefox/无交互史的 Chrome 常见），
    *  回退为"静音自动播放"（各浏览器均允许），首次用户交互后自动恢复声音。 */
@@ -8406,7 +8424,27 @@
     try {
       await audio.play();
       markPlaying();
-    } catch (_) {
+    } catch (err) {
+      // 只有浏览器策略拦截才允许静音兜底；AbortError/音源错误等不应把用户静音
+      const blocked = err && (err.name === "NotAllowedError" || err.name === "SecurityError");
+      if (!blocked) return; // 保持暂停，等待用户手动点击
+      // 恢复监听在静音播放发起前同步注册：用户若在 play() resolve 前就点击，手势不能丢
+      const restore = e => {
+        // 播放器自身控件上的手势交给对应 click 处理器（takeAutoplayMute/toggleMute），
+        // 否则 pointerdown 先解除静音、随后 click 又把静音切回去，状态反转
+        if (e.target && e.target.closest && e.target.closest("#musicPlayer")) return;
+        window.removeEventListener("pointerdown", restore);
+        window.removeEventListener("keydown", restore);
+        window.removeEventListener("touchstart", restore);
+        if (!state.music.autoplayMuted) return;
+        state.music.autoplayMuted = false;
+        audio.muted = false;
+        state.music.muted = false;
+        updateVolumeIcon();
+      };
+      window.addEventListener("pointerdown", restore);
+      window.addEventListener("keydown", restore);
+      window.addEventListener("touchstart", restore);
       try {
         audio.muted = true;
         state.music.autoplayMuted = true;
@@ -8414,19 +8452,13 @@
         markPlaying();
         updateVolumeIcon();
         toast(t("music.muted_autoplay_tip"));
-        const restore = () => {
-          window.removeEventListener("pointerdown", restore);
-          window.removeEventListener("keydown", restore);
-          window.removeEventListener("touchstart", restore);
-          if (!state.music.autoplayMuted) return;
-          state.music.autoplayMuted = false;
-          audio.muted = false;
-          updateVolumeIcon();
-        };
-        window.addEventListener("pointerdown", restore);
-        window.addEventListener("keydown", restore);
-        window.addEventListener("touchstart", restore);
       } catch (_) {
+        window.removeEventListener("pointerdown", restore);
+        window.removeEventListener("keydown", restore);
+        window.removeEventListener("touchstart", restore);
+        state.music.autoplayMuted = false;
+        audio.muted = false; // 兜底播放也失败时不能把静音状态残留给后续手动播放
+        updateVolumeIcon();
         /* 完全无法自动播放：保持暂停，等待用户手动点击 */
       }
     }
