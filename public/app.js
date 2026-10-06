@@ -6667,7 +6667,8 @@
         try {
           const r = await api("/api/admin/qq/test", { method: "POST", body: qqFormVals() });
           let text = r.ok ? `✓ ${r.msg}` : `✗ ${r.msg}`;
-          if (r.debug) text += `\n[${r.debug.endpoint}] HTTP ${r.debug.status}`;
+          if (r.debug?.details) text += `\n${r.debug.details}`;
+          else if (r.debug) text += `\n[${r.debug.endpoint}] HTTP ${r.debug.status}`;
           if (tmsg) { tmsg.style.color = r.ok ? "#23b26d" : "#f56c6c"; tmsg.textContent = text; tmsg.style.whiteSpace = "pre-wrap"; }
         } catch (e) {
           if (tmsg) { tmsg.style.color = "#f56c6c"; tmsg.textContent = "✗ " + e.message; }

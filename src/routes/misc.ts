@@ -154,6 +154,7 @@ export async function checkQqCookie(s: SiteSettings): Promise<{ ok: boolean; msg
     { name: "vip.qq.com", url: `https://vip.qq.com/` },
     { name: "vip-my", url: `https://vip.qq.com/myvip.html` },
   ];
+  const details: string[] = [];
   for (const ep of endpoints) {
     try {
       const resp = await fetch(ep.url, {
@@ -166,27 +167,33 @@ export async function checkQqCookie(s: SiteSettings): Promise<{ ok: boolean; msg
         },
         redirect: "manual",
       });
-      const debug = { endpoint: ep.name, status: resp.status, headers: Object.fromEntries(resp.headers.entries()) };
+      details.push(`${ep.name}: HTTP ${resp.status}`);
       if (resp.status === 302 || resp.status === 301) {
         const location = resp.headers.get("location") || "";
         if (location.includes("login") || location.includes("xui.ptlogin2")) {
+          details.push(`  → 跳登录页`);
           continue; // Cookie 失效，试下一个接口
         }
         // 非登录重定向（如正常跳转），视为有效
-        return { ok: true, msg: "Cookie 有效", debug };
+        return { ok: true, msg: "Cookie 有效", debug: { details: details.join("\n"), endpoint: ep.name, status: resp.status } };
       }
-      if (!resp.ok) continue;
+      if (!resp.ok) {
+        details.push(`  → 非 200/302`);
+        continue;
+      }
       // 200 但需检查内容是否是登录页
       const html = await resp.text();
       if (html.includes("ptlogin") || html.includes("login.qq.com") || html.includes("xui.ptlogin2")) {
+        details.push(`  → 返回登录页`);
         continue;
       }
-      return { ok: true, msg: "Cookie 有效", debug };
-    } catch {
+      return { ok: true, msg: "Cookie 有效", debug: { details: details.join("\n"), endpoint: ep.name, status: resp.status } };
+    } catch (e) {
+      details.push(`${ep.name}: 异常 ${e instanceof Error ? e.message : String(e)}`);
       continue;
     }
   }
-  return { ok: false, msg: "Cookie 已失效（请重新登录 vip.qq.com 抓取）" };
+  return { ok: false, msg: "Cookie 已失效（请重新登录 vip.qq.com 抓取）", debug: { details: details.join("\n") } };
 }
 
 app.get("/qq-info", async c => {
