@@ -6406,7 +6406,7 @@
             </div>
             <details style="margin-top:.6rem">
               <summary style="cursor:pointer;font-size:.82rem;color:var(--anzhiyu-secondtext)">没有书签栏？手动粘贴 Cookie 自动解析</summary>
-              <textarea data-qq-paste rows="2" placeholder="登录 qzone.qq.com 后，F12 把整段 Cookie 粘到这里" style="width:100%;margin-top:.4rem;resize:vertical"></textarea>
+              <textarea data-qq-paste rows="2" placeholder="登录 vip.qq.com 后，F12 把整段 Cookie 粘到这里" style="width:100%;margin-top:.4rem;resize:vertical"></textarea>
               <button type="button" class="btn" data-qq-parse style="margin-top:.35rem">解析并填入</button>
             </details>
           </div>
@@ -6626,7 +6626,7 @@
     // QQ 资料：书签一键抓取 / 粘贴 Cookie 解析 / 测试连接
     const bmLink = panel.querySelector("[data-qq-bookmarklet]");
     if (bmLink) {
-      const bm = "javascript:(function(){try{var c=document.cookie.split('; '),g=function(k){for(var i=0;i<c.length;i++){var p=c[i].indexOf('=');if(c[i].slice(0,p)===k)return decodeURIComponent(c[i].slice(p+1));}return ''};var u=g('p_uin').replace(/^o0*/,'');var t='QQCK#'+new URLSearchParams({ckqq:u,skey:g('skey'),pskey:g('p_skey')}).toString();navigator.clipboard.writeText(t).then(function(){alert('已复制 QQ 登录态（QQ:'+(u||'未取到')+'），回到后台粘贴即可')}).catch(function(){prompt('复制失败，请手动复制：',t)})}catch(e){alert('请先在 qzone.qq.com 登录后，再点本书签')}})();";
+      const bm = "javascript:(function(){try{var c=document.cookie.split('; '),g=function(k){for(var i=0;i<c.length;i++){var p=c[i].indexOf('=');if(c[i].slice(0,p)===k)return decodeURIComponent(c[i].slice(p+1));}return ''};var u=g('p_uin').replace(/^o0*/,'');var t='QQCK#'+new URLSearchParams({ckqq:u,skey:g('skey'),pskey:g('p_skey')}).toString();navigator.clipboard.writeText(t).then(function(){alert('已复制 QQ 登录态（QQ:'+(u||'未取到')+'），回到后台粘贴即可')}).catch(function(){prompt('复制失败，请手动复制：',t)})}catch(e){alert('请先在 vip.qq.com 登录后，再点本书签')}})();";
       bmLink.setAttribute("href", bm);
       bmLink.addEventListener("click", e => e.preventDefault());
     }
@@ -6651,7 +6651,7 @@
           out.skey = g("skey");
           out.pskey = g("p_skey");
         }
-        if (!out.ckqq && !out.skey && !out.pskey) { toast("没解析到 p_uin/skey/p_skey，确认是 qzone.qq.com 的 Cookie"); return; }
+        if (!out.ckqq && !out.skey && !out.pskey) { toast("没解析到 p_uin/skey/p_skey，确认是 vip.qq.com 的 Cookie"); return; }
         if (out.ckqq) panel.querySelector('[name="qq_ckqq"]').value = out.ckqq;
         if (out.skey) panel.querySelector('[name="qq_skey"]').value = out.skey;
         if (out.pskey) panel.querySelector('[name="qq_pskey"]').value = out.pskey;

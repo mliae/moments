@@ -150,10 +150,9 @@ export async function fetchQqNickDirect(
 export async function checkQqCookie(s: SiteSettings): Promise<{ ok: boolean; msg: string; debug?: Record<string, unknown> }> {
   if (!s.qq_ckqq || !s.qq_pskey) return { ok: false, msg: "未配置 ckqq/pskey" };
   const cookie = `uin=o${s.qq_ckqq}; skey=${s.qq_skey}; p_skey=${s.qq_pskey}`;
-  // 先试轻量接口（qzone 主页头像接口），对 IP 风控更宽松
   const endpoints = [
-    { name: "qzone-home", url: `https://h5.qzone.qq.com/proxy/domain/g.qzone.qq.com/cgi-bin/cgi_get_qzone_index?uin=${s.qq_ckqq}&g_tk=5381` },
-    { name: "qzone-profile", url: `https://user.qzone.qq.com/${s.qq_ckqq}/profile` },
+    { name: "vip.qq.com", url: `https://vip.qq.com/` },
+    { name: "vip-my", url: `https://vip.qq.com/myvip.html` },
   ];
   for (const ep of endpoints) {
     try {
@@ -161,7 +160,7 @@ export async function checkQqCookie(s: SiteSettings): Promise<{ ok: boolean; msg
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
           "Cookie": cookie,
-          "Referer": "https://qzone.qq.com/",
+          "Referer": "https://vip.qq.com/",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "zh-CN,zh;q=0.9",
         },
@@ -187,7 +186,7 @@ export async function checkQqCookie(s: SiteSettings): Promise<{ ok: boolean; msg
       continue;
     }
   }
-  return { ok: false, msg: "Cookie 已失效（所有检测接口均返回登录页或 302）" };
+  return { ok: false, msg: "Cookie 已失效（请重新登录 vip.qq.com 抓取）" };
 }
 
 app.get("/qq-info", async c => {
