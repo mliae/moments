@@ -60,6 +60,8 @@ export interface SiteSettings {
   // 页脚
   footer_text: string; // 页脚文案（支持 HTML）
   footer_run_since: string; // 网站运行起始时间 ISO 字符串，空=不显示运行时长
+  // 主题
+  theme_auto_follow: boolean; // 是否自动跟随系统主题切换（深色/浅色），默认 false=手动切换后锁定
   // 首页
   feed_page_size: string; // 首页时间线每页条数（1-50），超过后分页加载
   // 视频
@@ -193,6 +195,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   bg_version: "0",
   footer_text: "",
   footer_run_since: "",
+  theme_auto_follow: false,
   feed_page_size: "20",
   video_default_poster: "",
   site_domain: "",
@@ -350,6 +353,7 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "music_autoplay",
   "music_preload",
   "music_collapsed",
+  "theme_auto_follow",
   "ai_reply_enabled",
   "about_enabled",
   "links_enabled",

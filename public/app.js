@@ -88,6 +88,7 @@
     site_bg_blur: "16",
     footer_text: "",
     footer_run_since: "",
+    theme_auto_follow: false,
     feed_page_size: "20",
     video_default_poster: "",
     site_domain: "",
@@ -6304,6 +6305,13 @@
           <label>网站运行起始时间（可选）<br /><small style="color:var(--anzhiyu-secondtext)">填写后页脚显示「网站已运行 X 天 HH:MM:SS」，支持 ISO 时间（如 2024-01-01T00:00:00）或 yyyy-mm-dd</small></label>
           <input name="footer_run_since" maxlength="40" value="${esc(s.footer_run_since)}" placeholder="2024-01-01T00:00:00" />
         </div>
+        <div class="field">
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="theme_auto_follow" ${s.theme_auto_follow ? "checked" : ""} /><span></span></span>
+            <span>自动跟随系统主题切换</span>
+          </label>
+          <small style="color:var(--anzhiyu-secondtext)">开启后，系统深色/浅色切换时网站自动跟随，并显示 toast 提醒；关闭则手动切换后锁定</small>
+        </div>
           </div>
         </details>
 
@@ -10346,6 +10354,26 @@
 
   /* ================= 主题 ================= */
 
+  // 系统主题监听：theme_auto_follow 开启时跟随系统切换
+  let themeMediaCleanup = null;
+  function setupThemeAutoFollow() {
+    if (themeMediaCleanup) themeMediaCleanup();
+    themeMediaCleanup = null;
+    if (!state.settings?.theme_auto_follow) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => {
+      const next = mq.matches ? "dark" : "light";
+      const cur = document.documentElement.dataset.theme;
+      if (next === cur) return;
+      document.documentElement.dataset.theme = next;
+      localStorage.setItem("moments_theme", next);
+      renderThemeBtn();
+      toast(next === "dark" ? "已跟随系统切换到深色模式" : "已跟随系统切换到浅色模式");
+    };
+    mq.addEventListener("change", handler);
+    themeMediaCleanup = () => mq.removeEventListener("change", handler);
+  }
+
   function renderThemeBtn() {
     const cur = document.documentElement.dataset.theme;
     themeToggle.innerHTML = svgIcon(cur === "dark" ? "sun" : "moon", 18);
@@ -10819,7 +10847,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "theme_auto_follow", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
@@ -10839,12 +10867,16 @@
       // 全站背景图开关
       const siteBgEl2 = settingsForm.querySelector('[name="site_bg_enabled"]');
       if (siteBgEl2) patch.site_bg_enabled = siteBgEl2.checked;
+      // 主题自动跟随开关
+      const themeAutoEl = settingsForm.querySelector('[name="theme_auto_follow"]');
+      if (themeAutoEl) patch.theme_auto_follow = themeAutoEl.checked;
       const btn = settingsForm.querySelector('button[type="submit"]');
       btn.disabled = true;
       try {
         const s = await api("/api/admin/settings", { method: "PUT", body: patch });
         state.settings = s;
         applySettings();
+        setupThemeAutoFollow();
         toast("设置已保存");
       } catch (err) {
         toast(err.message);
@@ -11798,6 +11830,7 @@
       /* 后端不可用时使用兜底默认值 */
     }
     applySettings();
+    setupThemeAutoFollow();
     // i18n：同步后台开关/语言集合；首次访问且无 SSR 注入（深链直连静态页）时调检测接口
     if (window.I18N) {
       window.I18N.configure(state.settings);
