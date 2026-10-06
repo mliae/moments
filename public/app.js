@@ -6392,7 +6392,7 @@
 
           <!-- 腾讯直连配置 -->
           <div data-qq-section="direct" style="display:none">
-            <div style="font-size:.78rem;color:var(--anzhiyu-secondtext);margin:.4rem 0 .3rem;font-weight:600">腾讯直连（Cookie 方式）</div>
+            <div style="font-size:.78rem;color:var(--anzhiyu-secondtext);margin:.4rem 0 .3rem;font-weight:600">QQ Cookie（腾讯直连与 apihz 共用）</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
               <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">系统 QQ（ckqq）</label><input name="qq_ckqq" value="${esc(s.qq_ckqq)}" placeholder="你的 QQ 号" /></div>
               <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">skey</label><input name="qq_skey" value="${esc(s.qq_skey)}" placeholder="cookie 里的 skey" autocomplete="off" data-lpignore="true" data-1p-ignore="true" /></div>
@@ -6615,8 +6615,9 @@
         const m = qqMode.value;
         panel.querySelectorAll("[data-qq-section]").forEach(sec => {
           const name = sec.dataset.qqSection;
-          // direct 和 fallback 都显示直连配置，apihz 和 fallback 都显示 apihz 配置
-          sec.style.display = (m === "fallback" || m === name) ? "" : "none";
+          // Cookie 区（direct）在所有模式都显示，apihz 区仅在 apihz/fallback 显示
+          const show = name === "direct" ? true : (m === "fallback" || m === name);
+          sec.style.display = show ? "" : "none";
         });
       };
       qqMode.addEventListener("change", applyQqSections);
