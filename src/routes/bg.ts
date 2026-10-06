@@ -102,7 +102,8 @@ app.get("/", async c => {
  */
 export async function preheatBg(env: HonoEnv["Bindings"]): Promise<void> {
   const s = await getSettings(env.DB);
-  if (s.banner_bg_mode !== "random" && !s.site_bg_enabled) return;
+  // 仅"本站代理缓存"模式需要预热 R2；直连（固定/动态 URL）模式浏览器自行请求，不经过 R2
+  if (s.banner_bg_mode !== "random") return;
   const source = (s.banner_bg_source || "").trim();
   if (!/^https:\/\//i.test(source) || !source.includes("{seed}")) return;
 

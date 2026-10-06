@@ -1909,36 +1909,49 @@
     applySiteBg(s);
   }
 
-  /** 全站背景图（site_bg_enabled）：固定图层 + 玻璃卡片由 CSS 处理，
-   *  这里只负责按"换图频率"时间桶把 /api/bg 预载进图层；桶不变不重复下载 */
+  /** 全站背景图（site_bg_enabled）：取图方式跟随横幅设置——
+   *  random 模式：/api/bg 时间桶代理缓存（同周期同一张）；
+   *  static 模式：直连横幅背景 URL（动态随机接口则每次刷新随横幅一起变化）。
+   *  固定全屏图层 + 玻璃卡片由 CSS 处理，这里只负责把图按对应 key 预载进图层 */
   const siteBgEl = document.getElementById("siteBg");
   function applySiteBg(s) {
     if (!siteBgEl) return;
     document.body.classList.toggle("site-bg-on", !!s.site_bg_enabled);
-    if (!s.site_bg_enabled) {
+    const reset = () => {
       siteBgEl.classList.remove("ready");
       siteBgEl.style.backgroundImage = "";
-      delete siteBgEl.dataset.bucket;
+      delete siteBgEl.dataset.key;
+    };
+    if (!s.site_bg_enabled) {
+      reset();
       return;
     }
-    const h = Math.max(1, parseInt(s.banner_bg_interval, 10) || 24);
-    const bucket = String(Math.floor(Date.now() / (h * 3600000)));
-    if (siteBgEl.dataset.bucket === bucket && siteBgEl.classList.contains("ready")) return;
-    siteBgEl.dataset.bucket = bucket;
-    const url = `/api/bg?b=${bucket}`;
+    let url, key;
+    if (s.banner_bg_mode === "random") {
+      const h = Math.max(1, parseInt(s.banner_bg_interval, 10) || 24);
+      const bucket = String(Math.floor(Date.now() / (h * 3600000)));
+      url = `/api/bg?b=${bucket}`;
+      key = "bucket:" + bucket;
+    } else if (/^https?:\/\//i.test(s.banner_bg_image || "")) {
+      url = s.banner_bg_image;
+      key = "direct:" + url; // 整页刷新后 DOM 重建，自然重新请求动态接口
+    } else {
+      reset(); // 横幅既非随机也无直链图片：无背景可显示
+      return;
+    }
+    if (siteBgEl.dataset.key === key && siteBgEl.classList.contains("ready")) return;
+    siteBgEl.dataset.key = key;
+    const safeUrl = url.replace(/["\\]/g, encodeURIComponent);
     const img = new Image();
     img.onload = () => {
       if (!state.settings.site_bg_enabled) return; // 预载期间开关被关
-      if (siteBgEl.dataset.bucket !== bucket) return; // 期间已跨桶/切换
-      siteBgEl.style.backgroundImage = `url("${url}")`;
+      if (siteBgEl.dataset.key !== key) return; // 期间已切换模式/跨桶
+      siteBgEl.style.backgroundImage = `url("${safeUrl}")`;
       siteBgEl.classList.add("ready");
     };
     img.onerror = () => {
-      // 抓图失败保持纯色底（CSS 给了同底色），下个桶自然重试
-      if (siteBgEl.dataset.bucket === bucket) {
-        siteBgEl.classList.remove("ready");
-        delete siteBgEl.dataset.bucket;
-      }
+      // 抓图失败保持纯色底，刷新或下个桶自然重试
+      if (siteBgEl.dataset.key === key) reset();
     };
     img.src = url;
   }
@@ -6169,9 +6182,9 @@
         <div class="field">
           <label class="switch-row">
             <span class="toggle"><input type="checkbox" name="site_bg_enabled" ${s.site_bg_enabled ? "checked" : ""} /><span></span></span>
-            <span>全站背景图（复用上方随机图源与换图频率，玻璃拟态）</span>
+            <span>全站背景图（跟随横幅取图模式，玻璃拟态）</span>
           </label>
-          <div class="field-hint">开启后随机图铺满全站背景，首页/文章列表/关于/友链卡片呈半透明毛玻璃；文章正文、评论弹窗、灯箱与后台保持纯色不透明。</div>
+          <div class="field-hint">背景取图跟随上方横幅模式：「固定图片」填动态随机接口 URL 时，每次刷新随横幅一起换图；「随机图片（本站代理缓存）」时走 R2 时间桶，全站同周期一张、更快更稳。文章正文、评论弹窗、灯箱与后台保持纯色。</div>
         </div>
           </div>
         </details>
