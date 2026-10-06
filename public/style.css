@@ -3308,6 +3308,19 @@ html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .site-footer {
 }
 /* 不支持 backdrop-filter 的浏览器：保持原不透明卡片（仅缝隙露图，自动降级为 A 方案观感） */
 
+/* 背景模式下悬浮按钮玻璃化：实心色块浮在玻璃背景上太突兀，
+   保留主色身份但降到 62% 并让背景模糊透出；不支持的浏览器保持原实心样式 */
+@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  body.site-bg-on:not(.site-bg-admin) .fab-publish,
+  body.site-bg-on:not(.site-bg-admin) .back-top,
+  body.site-bg-on:not(.site-bg-admin) .toc-fab {
+    background: color-mix(in srgb, var(--anzhiyu-main) 62%, transparent);
+    backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+    -webkit-backdrop-filter: saturate(180%) blur(var(--sitebg-blur, 16px));
+    border: 1px solid rgb(255 255 255 / 25%);
+  }
+}
+
 /* 后台玻璃参数滑块行 */
 .sitebg-range-row {
   display: grid; grid-template-columns: 92px 1fr 52px; align-items: center;
