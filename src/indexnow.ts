@@ -141,14 +141,14 @@ export async function baiduPush(
     let remain = "", success = "";
     try {
       const j = JSON.parse(text) as { remain?: number; success?: number; error?: number; message?: string };
-      remain = j.remain != null ? `remain=${j.remain}` : "";
-      success = j.success != null ? `success=${j.success}` : "";
-      if (j.error) return logReturn(false, `百度 error=${j.error} ${j.message || text.slice(0, 120)}`);
+      remain = j.remain != null ? `今日剩余额度 ${j.remain} 条` : "";
+      success = j.success != null ? `成功推送 ${j.success} 条` : "";
+      if (j.error) return logReturn(false, `百度返回错误 ${j.error}：${j.message || text.slice(0, 120)}`);
     } catch {
       /* 非 JSON，按 HTTP 状态判断 */
     }
     const okStatus = res.status >= 200 && res.status < 300;
-    const msg = [okStatus ? "HTTP " + res.status : "HTTP " + res.status, success, remain].filter(Boolean).join(" ");
+    const msg = [okStatus ? "推送成功" : `推送失败（HTTP ${res.status}）`, success, remain].filter(Boolean).join("，");
     return logReturn(okStatus, msg);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
