@@ -61,7 +61,9 @@ export interface SiteSettings {
   footer_text: string; // 页脚文案（支持 HTML）
   footer_run_since: string; // 网站运行起始时间 ISO 字符串，空=不显示运行时长
   // 主题
-  theme_auto_follow: boolean; // 是否自动跟随系统主题切换（深色/浅色），默认 false=手动切换后锁定
+  theme_auto_mode: string; // 主题自动切换模式：off=关闭 / system=跟随系统 / time=按时间切换
+  theme_dark_start: string; // 深色模式开始时间（小时，0-23），默认 18
+  theme_dark_end: string; // 深色模式结束时间（小时，0-23），默认 6
   // 首页
   feed_page_size: string; // 首页时间线每页条数（1-50），超过后分页加载
   // 视频
@@ -195,7 +197,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   bg_version: "0",
   footer_text: "",
   footer_run_since: "",
-  theme_auto_follow: false,
+  theme_auto_mode: "off",
+  theme_dark_start: "18",
+  theme_dark_end: "6",
   feed_page_size: "20",
   video_default_poster: "",
   site_domain: "",
@@ -296,6 +300,9 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   bg_version: 8,
   footer_text: 2000,
   footer_run_since: 40,
+  theme_auto_mode: 10,
+  theme_dark_start: 2,
+  theme_dark_end: 2,
   feed_page_size: 3,
   video_default_poster: 500,
   site_domain: 200,
@@ -353,7 +360,6 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "music_autoplay",
   "music_preload",
   "music_collapsed",
-  "theme_auto_follow",
   "ai_reply_enabled",
   "about_enabled",
   "links_enabled",

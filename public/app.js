@@ -88,7 +88,9 @@
     site_bg_blur: "16",
     footer_text: "",
     footer_run_since: "",
-    theme_auto_follow: false,
+    theme_auto_mode: "off",
+    theme_dark_start: "18",
+    theme_dark_end: "6",
     feed_page_size: "20",
     video_default_poster: "",
     site_domain: "",
@@ -6306,11 +6308,19 @@
           <input name="footer_run_since" maxlength="40" value="${esc(s.footer_run_since)}" placeholder="2024-01-01T00:00:00" />
         </div>
         <div class="field">
-          <label class="switch-row">
-            <span class="toggle"><input type="checkbox" name="theme_auto_follow" ${s.theme_auto_follow ? "checked" : ""} /><span></span></span>
-            <span>自动跟随系统主题切换</span>
-          </label>
-          <small style="color:var(--anzhiyu-secondtext)">开启后，系统深色/浅色切换时网站自动跟随，并显示 toast 提醒；关闭则手动切换后锁定</small>
+          <label>主题自动切换模式<br /><small style="color:var(--anzhiyu-secondtext)">关闭=手动切换后锁定；跟随系统=系统深色/浅色切换时网站自动跟随；按时间=白天浅色、夜晚深色</small></label>
+          <select name="theme_auto_mode" style="max-width:280px">
+            <option value="off"${(s.theme_auto_mode || "off") === "off" ? " selected" : ""}>关闭（手动切换后锁定）</option>
+            <option value="system"${(s.theme_auto_mode || "off") === "system" ? " selected" : ""}>跟随系统主题</option>
+            <option value="time"${(s.theme_auto_mode || "off") === "time" ? " selected" : ""}>按时间切换（白天/夜晚）</option>
+          </select>
+        </div>
+        <div class="field" data-theme-time-range style="display:${(s.theme_auto_mode || "off") === "time" ? "" : "none"}">
+          <label>深色模式时段<br /><small style="color:var(--anzhiyu-secondtext)">开始时间到结束时间显示深色，其余时间浅色。支持跨天（如 18-6 表示晚 6 点到早 6 点深色）</small></label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">开始（时）</label><input name="theme_dark_start" type="number" min="0" max="23" value="${esc(s.theme_dark_start)}" placeholder="18" /></div>
+            <div><label style="font-size:.78rem;color:var(--anzhiyu-secondtext)">结束（时）</label><input name="theme_dark_end" type="number" min="0" max="23" value="${esc(s.theme_dark_end)}" placeholder="6" /></div>
+          </div>
         </div>
           </div>
         </details>
@@ -6614,6 +6624,17 @@
           refreshBtn.disabled = false;
         }
       });
+    }
+
+    // 主题自动切换模式下拉联动：选择"按时间"时显示时间范围配置
+    const themeModeSel = panel.querySelector('[name="theme_auto_mode"]');
+    if (themeModeSel) {
+      const applyThemeMode = () => {
+        const timeRange = panel.querySelector('[data-theme-time-range]');
+        if (timeRange) timeRange.style.display = themeModeSel.value === "time" ? "" : "none";
+      };
+      themeModeSel.addEventListener("change", applyThemeMode);
+      applyThemeMode();
     }
 
     // QQ 设置：昵称获取策略切换时展开/收起对应配置区
@@ -10354,24 +10375,49 @@
 
   /* ================= 主题 ================= */
 
-  // 系统主题监听：theme_auto_follow 开启时跟随系统切换
+  // 主题自动切换：off=关闭 / system=跟随系统 / time=按时间切换
   let themeMediaCleanup = null;
+  let themeTimeCleanup = null;
   function setupThemeAutoFollow() {
     if (themeMediaCleanup) themeMediaCleanup();
+    if (themeTimeCleanup) themeTimeCleanup();
     themeMediaCleanup = null;
-    if (!state.settings?.theme_auto_follow) return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => {
-      const next = mq.matches ? "dark" : "light";
+    themeTimeCleanup = null;
+    const mode = state.settings?.theme_auto_mode || "off";
+    if (mode === "off") return;
+
+    const applyTheme = (next, source) => {
       const cur = document.documentElement.dataset.theme;
       if (next === cur) return;
       document.documentElement.dataset.theme = next;
       localStorage.setItem("moments_theme", next);
       renderThemeBtn();
-      toast(next === "dark" ? "已跟随系统切换到深色模式" : "已跟随系统切换到浅色模式");
+      if (source === "system") toast(next === "dark" ? "已跟随系统切换到深色模式" : "已跟随系统切换到浅色模式");
+      else toast(next === "dark" ? "已进入夜晚模式" : "已进入白天模式");
     };
-    mq.addEventListener("change", handler);
-    themeMediaCleanup = () => mq.removeEventListener("change", handler);
+
+    if (mode === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = () => applyTheme(mq.matches ? "dark" : "light", "system");
+      mq.addEventListener("change", handler);
+      themeMediaCleanup = () => mq.removeEventListener("change", handler);
+      // 立即执行一次，确保当前状态正确
+      handler();
+    } else if (mode === "time") {
+      const checkTime = () => {
+        const start = parseInt(state.settings?.theme_dark_start || "18", 10);
+        const end = parseInt(state.settings?.theme_dark_end || "6", 10);
+        const now = new Date().getHours();
+        // 跨天逻辑：start > end 时（如 18-6），深色时段为 start-23 和 0-end
+        const isDark = start > end ? (now >= start || now < end) : (now >= start && now < end);
+        applyTheme(isDark ? "dark" : "light", "time");
+      };
+      // 每分钟检查一次
+      const timer = setInterval(checkTime, 60000);
+      themeTimeCleanup = () => clearInterval(timer);
+      // 立即执行一次
+      checkTime();
+    }
   }
 
   function renderThemeBtn() {
@@ -10847,7 +10893,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "theme_auto_follow", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "theme_auto_mode", "theme_dark_start", "theme_dark_end", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
@@ -10867,9 +10913,13 @@
       // 全站背景图开关
       const siteBgEl2 = settingsForm.querySelector('[name="site_bg_enabled"]');
       if (siteBgEl2) patch.site_bg_enabled = siteBgEl2.checked;
-      // 主题自动跟随开关
-      const themeAutoEl = settingsForm.querySelector('[name="theme_auto_follow"]');
-      if (themeAutoEl) patch.theme_auto_follow = themeAutoEl.checked;
+      // 主题自动切换模式（下拉选择，非布尔）
+      // 主题时间范围显隐
+      const themeModeEl = settingsForm.querySelector('[name="theme_auto_mode"]');
+      if (themeModeEl) {
+        const timeRange = settingsForm.querySelector('[data-theme-time-range]');
+        if (timeRange) timeRange.style.display = themeModeEl.value === "time" ? "" : "none";
+      }
       const btn = settingsForm.querySelector('button[type="submit"]');
       btn.disabled = true;
       try {
