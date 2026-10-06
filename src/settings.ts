@@ -51,6 +51,7 @@ export interface SiteSettings {
   banner_bg_mode: string; // 横幅背景模式：static=固定图（用 banner_bg_image），random=随机图源（走 /api/bg 缓存）
   banner_bg_source: string; // 随机图源 URL 模板，需含 {seed} 占位（默认 picsum）
   banner_bg_interval: string; // 随机图换图频率：多少小时换一张（数字字符串，默认 24=每天）
+  site_bg_enabled: boolean; // 全站背景图开关（复用随机图源配置，玻璃拟态，后台/弹窗/正文除外）
   // 页脚
   footer_text: string; // 页脚文案（支持 HTML）
   footer_run_since: string; // 网站运行起始时间 ISO 字符串，空=不显示运行时长
@@ -176,6 +177,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   banner_bg_mode: "static",
   banner_bg_source: "https://picsum.photos/seed/{seed}/1350/300",
   banner_bg_interval: "24",
+  site_bg_enabled: false,
   footer_text: "",
   footer_run_since: "",
   feed_page_size: "20",
@@ -339,6 +341,7 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "mail_notify_admin",
   "mail_reply_notify",
   "reward_enabled",
+  "site_bg_enabled",
   "i18n_enabled",
   "i18n_auto_detect",
   "i18n_content_translate",

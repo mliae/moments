@@ -3242,3 +3242,55 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   .xlate-btn { font-size: .76rem; padding: .28rem .62rem; }
 }
 
+/* ==================== 全站背景图（site_bg_enabled，玻璃拟态 C 方案） ==================== */
+/* 固定全屏图层：图 cover 居中不随滚动，mask 压住明度保证正文对比度 */
+#siteBg {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-color: var(--anzhiyu-background);
+  background-position: center center; background-size: cover;
+  background-repeat: no-repeat; background-attachment: fixed;
+  opacity: 0; transition: opacity .6s ease;
+}
+#siteBg.ready { opacity: 1; }
+.site-bg-mask { position: absolute; inset: 0; background: rgb(243 241 234 / 68%); }
+html[data-theme="dark"] .site-bg-mask { background: rgb(18 21 18 / 55%); }
+/* 背景开启后 body 让开底色；后台路由恢复纯色（后台不玻璃化） */
+body.site-bg-on { background: transparent; }
+body.site-bg-admin { background: var(--anzhiyu-background); }
+body.site-bg-admin #siteBg { display: none; }
+
+/* 背景模式下顶栏与卡片统一玻璃材质：暗色不再是一条近黑实底，改为与卡片一致的半透深绿 */
+body.site-bg-on:not(.site-bg-admin) .topbar {
+  background: rgb(255 255 255 / 62%);
+  border-bottom-color: rgb(0 0 0 / 6%);
+}
+html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .topbar {
+  background: rgb(32 35 31 / 58%);
+  border-bottom-color: rgb(255 255 255 / 8%);
+}
+
+/* 观赏区卡片玻璃化（列表/关于/友链/空态）；正文 .article-card、弹窗 .modal、后台不在此列 */
+@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  body.site-bg-on:not(.site-bg-admin) .bber-item,
+  body.site-bg-on:not(.site-bg-admin) .post-item,
+  body.site-bg-on:not(.site-bg-admin) .about-card,
+  body.site-bg-on:not(.site-bg-admin) .about-post-item,
+  body.site-bg-on:not(.site-bg-admin) .links-card,
+  body.site-bg-on:not(.site-bg-admin) .essay-loading,
+  body.site-bg-on:not(.site-bg-admin) .essay-empty {
+    background: rgb(255 255 255 / 72%);
+    backdrop-filter: saturate(180%) blur(16px);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+  }
+  html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .bber-item,
+  html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .post-item,
+  html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .about-card,
+  html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .about-post-item,
+  html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .links-card,
+  html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .essay-loading,
+  html[data-theme="dark"] body.site-bg-on:not(.site-bg-admin) .essay-empty {
+    background: rgb(32 35 31 / 66%);
+  }
+}
+/* 不支持 backdrop-filter 的浏览器：保持原不透明卡片（仅缝隙露图，自动降级为 A 方案观感） */
+

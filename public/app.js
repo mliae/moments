@@ -81,6 +81,7 @@
     banner_button_url: "",
     banner_button_target: "_blank",
     banner_bg_image: "",
+    site_bg_enabled: false,
     footer_text: "",
     footer_run_since: "",
     feed_page_size: "20",
@@ -1905,6 +1906,41 @@
     // 页脚：文案 + 网站运行时间
     applyFooter(s);
     applyMusicSettings();
+    applySiteBg(s);
+  }
+
+  /** 全站背景图（site_bg_enabled）：固定图层 + 玻璃卡片由 CSS 处理，
+   *  这里只负责按"换图频率"时间桶把 /api/bg 预载进图层；桶不变不重复下载 */
+  const siteBgEl = document.getElementById("siteBg");
+  function applySiteBg(s) {
+    if (!siteBgEl) return;
+    document.body.classList.toggle("site-bg-on", !!s.site_bg_enabled);
+    if (!s.site_bg_enabled) {
+      siteBgEl.classList.remove("ready");
+      siteBgEl.style.backgroundImage = "";
+      delete siteBgEl.dataset.bucket;
+      return;
+    }
+    const h = Math.max(1, parseInt(s.banner_bg_interval, 10) || 24);
+    const bucket = String(Math.floor(Date.now() / (h * 3600000)));
+    if (siteBgEl.dataset.bucket === bucket && siteBgEl.classList.contains("ready")) return;
+    siteBgEl.dataset.bucket = bucket;
+    const url = `/api/bg?b=${bucket}`;
+    const img = new Image();
+    img.onload = () => {
+      if (!state.settings.site_bg_enabled) return; // 预载期间开关被关
+      if (siteBgEl.dataset.bucket !== bucket) return; // 期间已跨桶/切换
+      siteBgEl.style.backgroundImage = `url("${url}")`;
+      siteBgEl.classList.add("ready");
+    };
+    img.onerror = () => {
+      // 抓图失败保持纯色底（CSS 给了同底色），下个桶自然重试
+      if (siteBgEl.dataset.bucket === bucket) {
+        siteBgEl.classList.remove("ready");
+        delete siteBgEl.dataset.bucket;
+      }
+    };
+    img.src = url;
   }
 
   // 页脚运行时间计时器 id
@@ -6129,6 +6165,13 @@
             <span style="font-size:.8rem;color:var(--anzhiyu-secondtext)">小时（可自定义 1-720）</span>
           </div>
           <div class="field-hint" style="margin-top:.4rem">预览：<a href="/api/bg" target="_blank" rel="noopener" style="color:var(--anzhiyu-main)">/api/bg</a>（新标签打开，图片经本站抓取后缓存到 R2）</div>
+        </div>
+        <div class="field">
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="site_bg_enabled" ${s.site_bg_enabled ? "checked" : ""} /><span></span></span>
+            <span>全站背景图（复用上方随机图源与换图频率，玻璃拟态）</span>
+          </label>
+          <div class="field-hint">开启后随机图铺满全站背景，首页/文章列表/关于/友链卡片呈半透明毛玻璃；文章正文、评论弹窗、灯箱与后台保持纯色不透明。</div>
         </div>
           </div>
         </details>
@@ -10580,6 +10623,9 @@
       // 打赏开关
       const rewardEnabledEl = settingsForm.querySelector('[name="reward_enabled"]');
       if (rewardEnabledEl) patch.reward_enabled = rewardEnabledEl.checked;
+      // 全站背景图开关
+      const siteBgEl2 = settingsForm.querySelector('[name="site_bg_enabled"]');
+      if (siteBgEl2) patch.site_bg_enabled = siteBgEl2.checked;
       const btn = settingsForm.querySelector('button[type="submit"]');
       btn.disabled = true;
       try {
@@ -11123,6 +11169,9 @@
     // 首次部署且未设密码：渲染"设置初始密码"表单
     const setupMetaEl = document.querySelector('meta[name="x-admin-setup"]');
     const ssrSetup = setupMetaEl ? setupMetaEl.getAttribute("content") : null;
+    // 后台路由（含秘密入口与 SSR 判定为后台的路径）：隐藏全站背景、恢复纯色，后台不玻璃化
+    const isAdminRoute = path === state.adminPath || path === "/admin" || ssrEntry === "1";
+    document.body.classList.toggle("site-bg-admin", isAdminRoute);
     document.querySelectorAll("[data-route]").forEach(a => {
       const key = a.dataset.route;
       const isActive =

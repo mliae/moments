@@ -24,7 +24,7 @@ import friendRoutes, { adminFriendRoutes } from "./routes/friends";
 import searchRoutes from "./routes/search";
 import indexnowAdminRoutes from "./routes/indexnow";
 import baiduAdminRoutes from "./routes/baidu";
-import bgRoutes from "./routes/bg";
+import bgRoutes, { preheatBg } from "./routes/bg";
 import { analyticsPublicRoutes, analyticsAdminRoutes } from "./routes/analytics";
 import opsRoutes, { runUptimeCheck, recordPerf } from "./routes/ops";
 import { getSettings } from "./settings";
@@ -692,6 +692,13 @@ async function handleScheduled(env: HonoEnv["Bindings"]): Promise<void> {
           console.error("[uptime] check failed:", e);
         }
       }
+    }
+
+    // 随机背景时间桶预热：开启随机横幅或全站背景图时，提前抓图入 R2，访客不撞冷启动
+    try {
+      await preheatBg(env);
+    } catch (e) {
+      console.error("[bg-preheat] error:", e);
     }
 
     if (!s.qq_ckqq || !s.qq_pskey) return; // 未配置 QQ Cookie，跳过

@@ -45,7 +45,8 @@ async function pruneOld(R2: R2Bucket, prefix: string, now: number): Promise<void
 
 app.get("/", async c => {
   const s = await getSettings(c.env.DB);
-  if (s.banner_bg_mode !== "random") return fail(c, "未启用随机背景", 404);
+  // 横幅随机背景 与 全站背景图 任一开启即服务（两者复用同一图源与时间桶缓存）
+  if (s.banner_bg_mode !== "random" && !s.site_bg_enabled) return fail(c, "未启用随机背景", 404);
 
   const source = (s.banner_bg_source || "").trim();
   if (!/^https:\/\//i.test(source) || !source.includes("{seed}")) {
@@ -94,5 +95,45 @@ app.get("/", async c => {
     headers: { "Content-Type": ct, "Cache-Control": `public, max-age=${maxAge}` },
   });
 });
+
+/**
+ * 定时预热（cron 每分钟调用）：保证当前时间桶的图已在 R2，访客永不撞上 5 秒冷抓取；
+ * 距桶切换不足 5 分钟时提前抓下一桶，实现无感换图。失败静默，下个分钟自动重试。
+ */
+export async function preheatBg(env: HonoEnv["Bindings"]): Promise<void> {
+  const s = await getSettings(env.DB);
+  if (s.banner_bg_mode !== "random" && !s.site_bg_enabled) return;
+  const source = (s.banner_bg_source || "").trim();
+  if (!/^https:\/\//i.test(source) || !source.includes("{seed}")) return;
+
+  const hours = Math.max(1, Math.min(720, parseInt(s.banner_bg_interval, 10) || 24));
+  const bucketMs = hours * 3600_000;
+  const now = Date.now();
+  const cur = Math.floor(now / bucketMs) * bucketMs;
+  const seeds = [cur];
+  if (cur + bucketMs - now < 5 * 60_000) seeds.push(cur + bucketMs); // 临近换图：预热下一桶
+
+  const prefix = `bg/${hashStr(source)}/`;
+  for (const seed of seeds) {
+    const key = `${prefix}${seed}.jpg`;
+    try {
+      if (await env.R2.head(key)) continue; // 已在缓存
+      const res = await fetch(source.replace("{seed}", String(seed)), {
+        headers: { "User-Agent": "moments-bg/1.0" },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) continue;
+      const ct = res.headers.get("content-type") || "";
+      if (!/^image\//i.test(ct)) continue;
+      const buf = await res.arrayBuffer();
+      if (buf.byteLength === 0 || buf.byteLength > MAX_BYTES) continue;
+      await env.R2.put(key, buf, { httpMetadata: { contentType: ct } });
+      console.log(`[bg-preheat] warmed ${key} (${buf.byteLength} bytes)`);
+    } catch (e) {
+      console.error("[bg-preheat] failed:", e);
+    }
+  }
+  await pruneOld(env.R2, prefix, now);
+}
 
 export default app;
