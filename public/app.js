@@ -4796,7 +4796,7 @@
       { key: "music_player", label: "播放器" },
       { key: "music_library", label: "曲库" },
     ]},
-    { key: "appearance", label: "站点设置", icon: "settings", subs: [
+    { key: "appearance", label: "站点", icon: "settings", subs: [
       { key: "appearance", label: "外观" },
       { key: "i18n", label: "多语言" },
       { key: "about", label: "关于我" },
@@ -6183,10 +6183,6 @@
           </div>
           <div class="field-hint" data-avatar-preview="post_avatar" style="margin-top:.4rem">${/^https?:\/\//i.test(s.post_avatar || "") ? `<img src="${esc(s.post_avatar)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover" referrerpolicy="no-referrer" />` : ""}</div>
         </div>
-        <div class="field">
-          <label>自定义导航项（可选，每行一条：名称|链接，最多 6 条）<br /><small style="color:var(--anzhiyu-secondtext)">显示在顶栏"即刻"之后、"后台"之前，新标签打开</small></label>
-          <textarea name="nav_links" maxlength="1000" rows="3" placeholder="友链|https://example.com&#10;相册|https://example.com/photos">${esc(s.nav_links)}</textarea>
-        </div>
           </div>
         </details>
 
@@ -6312,7 +6308,7 @@
         </details>
 
         <details class="admin-fold">
-          <summary class="admin-fold-summary">导航入口开关</summary>
+          <summary class="admin-fold-summary">导航设置</summary>
           <div class="admin-fold-body">
         <div class="field">
           <label class="switch-row">
@@ -6324,6 +6320,10 @@
             <span>显示「相册」入口（/photos）</span>
           </label>
           <small style="color:var(--anzhiyu-secondtext)">「关于我」入口开关在「关于我」Tab。三个入口可独立开关，关闭后顶栏与移动端菜单均不显示。</small>
+        </div>
+        <div class="field">
+          <label>自定义导航项（可选，每行一条：名称|链接，最多 6 条）<br /><small style="color:var(--anzhiyu-secondtext)">显示在顶栏"即刻"之后、"后台"之前，新标签打开</small></label>
+          <textarea name="nav_links" maxlength="1000" rows="3" placeholder="友链|https://example.com&#10;相册|https://example.com/photos">${esc(s.nav_links)}</textarea>
         </div>
           </div>
         </details>
@@ -6377,7 +6377,7 @@
         </details>
 
         <details class="admin-fold">
-          <summary class="admin-fold-summary">QQ 昵称来源</summary>
+          <summary class="admin-fold-summary">QQ 设置</summary>
           <div class="admin-fold-body">
         <div class="field" style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc)">
           <div style="color:var(--anzhiyu-secondtext);font-size:.82rem;margin:.25rem 0 .6rem">评论者填 QQ 号时，按所选方式获取昵称。凭证仅存服务端，绝不下发前台。</div>
@@ -6608,7 +6608,7 @@
       });
     }
 
-    // QQ 昵称来源：策略切换时展开/收起对应配置区
+    // QQ 设置：昵称获取策略切换时展开/收起对应配置区
     const qqMode = panel.querySelector("[data-qq-mode]");
     if (qqMode) {
       const applyQqSections = () => {
@@ -11004,7 +11004,7 @@
       return;
     }
 
-    /* ---------- 后台：QQ 昵称 API（已合并到站点外观 → QQ 昵称来源，此表单不再存在） ---------- */
+    /* ---------- 后台：QQ 昵称 API（已合并到站点 → 外观 → QQ 设置，此表单不再存在） ---------- */
 
     /* ---------- 后台：修改管理密码 ---------- */
     const passwordForm = e.target.closest("[data-password-form]");
