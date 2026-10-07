@@ -1966,6 +1966,37 @@
     r.setProperty("--sitebg-blur", blur + "px");
   }
 
+  /** 与后端 bg.ts hashStr 完全一致的字符串哈希（djb2 变体，用于 R2 背景缓存目录名） */
+  function bgCacheHash(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+    return h.toString(16);
+  }
+
+  /** 本站媒体文件识别：/media/ 路径 / 裸 key / 当前 R2·B2 域名直链 → key；外链返回 null */
+  function localMediaKey(src) {
+    const r2 = (state.settings?.r2_domain || "").replace(/\/$/, "");
+    const b2 = (state.settings?.b2_domain || "").replace(/\/$/, "");
+    const s = String(src || "");
+    if (/^\/?media\//.test(s)) return s.replace(/^\/?media\//, "");
+    if (/^(uploads|b2\/uploads)\//.test(s)) return s;
+    if (/^https?:\/\//i.test(s) && ((r2 && s.startsWith(r2 + "/")) || (b2 && s.startsWith(b2 + "/")))) {
+      return s.replace(/^https?:\/\/[^/]+\//i, "");
+    }
+    return null;
+  }
+
+  /** 本站文件 → 当前直连域名 URL（换域名随设置自动切换）；外链原样 */
+  function bgDirectUrl(url) {
+    const r2 = (state.settings?.r2_domain || "").replace(/\/$/, "");
+    const b2 = (state.settings?.b2_domain || "").replace(/\/$/, "");
+    const key = localMediaKey(url);
+    if (!key) return url;
+    if (key.startsWith("b2/") && b2) return b2 + "/" + key;
+    if (r2) return r2 + "/" + key;
+    return "/media/" + key;
+  }
+
   /** 横幅模板内联背景 URL：random 与全站背景同 URL 共享缓存；
    *  static 动态接口不内联（直连会各自 302 到不同图），由 applySiteBg 解析后回填同一张 */
   function bannerInlineBg(s) {
@@ -1975,15 +2006,23 @@
   }
 
   /** 解析全站背景当前应使用的图片 URL（前台背景层与后台预览条共用同一逻辑）；
-   *  random 模式 URL 带 bg_version，后台"换一张"后版本变化可击穿浏览器/边缘缓存 */
+   *  random 模式 URL 带 bg_version，后台"换一张"后版本变化可击穿浏览器/边缘缓存；
+   *  配了 R2 直连域名时直接取 R2 缓存图（走 EdgeOne 等加速域名，边缘命中比 /api/bg Worker 直出快） */
   function resolveSiteBgUrl(s) {
     if (s.banner_bg_mode === "random") {
       const h = Math.max(1, parseInt(s.banner_bg_interval, 10) || 24);
-      const bucket = String(Math.floor(Date.now() / (h * 3600000)));
-      return { url: `/api/bg?b=${bucket}&v=${encodeURIComponent(s.bg_version || "0")}`, key: "bucket:" + bucket + ":" + (s.bg_version || "0") };
+      const bucketH = String(Math.floor(Date.now() / (h * 3600000))); // 小时桶（缓存去重键）
+      const bucketMs = Number(bucketH) * h * 3600000; // 毫秒桶（与后端 R2 缓存 key 一致）
+      const v = encodeURIComponent(s.bg_version || "0");
+      const r2 = (state.settings?.r2_domain || "").replace(/\/$/, "");
+      const source = (s.banner_bg_source || "").trim();
+      if (r2 && /^https:\/\//i.test(source) && source.includes("{seed}")) {
+        return { url: `${r2}/bg/${bgCacheHash(source)}/${bucketMs}.jpg?v=${v}`, key: "bucket:" + bucketH + ":" + (s.bg_version || "0") };
+      }
+      return { url: `/api/bg?b=${bucketH}&v=${v}`, key: "bucket:" + bucketH + ":" + (s.bg_version || "0") };
     }
     if (/^https?:\/\//i.test(s.banner_bg_image || "")) {
-      return { url: s.banner_bg_image, key: "direct:" + s.banner_bg_image + ":" + (s.bg_version || "0") };
+      return { url: bgDirectUrl(s.banner_bg_image), key: "direct:" + s.banner_bg_image + ":" + (s.bg_version || "0") };
     }
     return null;
   }
@@ -1997,6 +2036,12 @@
     if (!/^https?:\/\//i.test(s.banner_bg_image || "")) return null;
     const key = "direct:" + s.banner_bg_image + ":" + (s.bg_version || "0");
     if (_bgResolved && _bgResolved.key === key) return _bgResolved;
+    // 本站文件：直接归一化为当前直连域名 URL，无需走 /resolve 跟随 302
+    const local = bgDirectUrl(s.banner_bg_image);
+    if (local !== s.banner_bg_image) {
+      _bgResolved = { key, url: local };
+      return _bgResolved;
+    }
     try {
       const r = await fetch("/api/bg/resolve", { cache: "no-store" });
       const j = await r.json();
@@ -2034,20 +2079,28 @@
       if (!bgEnabled) { reset(); return; }
       if (siteBgEl.dataset.key === key && siteBgEl.classList.contains("ready")) return;
       siteBgEl.dataset.key = key;
-      const safeUrl = url.replace(/["\\]/g, encodeURIComponent);
-      const img = new Image();
-      img.onload = () => {
-        if (!state.settings.site_bg_enabled) return; // 预载期间开关被关
-        if (siteBgEl.dataset.key !== key) return; // 期间已切换模式/跨桶
-        siteBgEl.style.backgroundImage = `url("${safeUrl}")`;
-        siteBgEl.classList.add("ready");
-        applyBannerImages(url); // 用已加载缓存里的图刷一次横幅，避免各走各的请求
+      const tryLoad = obj => {
+        const img = new Image();
+        img.onload = () => {
+          if (!state.settings.site_bg_enabled) return; // 预载期间开关被关
+          if (siteBgEl.dataset.key !== key) return; // 期间已切换模式/跨桶
+          siteBgEl.style.backgroundImage = `url("${obj.url.replace(/["\\]/g, encodeURIComponent)}")`;
+          siteBgEl.classList.add("ready");
+          applyBannerImages(obj.url); // 用已加载缓存里的图刷一次横幅，避免各走各的请求
+        };
+        img.onerror = () => {
+          // R2 直连缓存图加载失败（如加速域名故障）→ 回退本站 /api/bg Worker 直出；再失败保持纯色底
+          if (s.banner_bg_mode === "random" && !obj.fallback) {
+            const h = Math.max(1, parseInt(s.banner_bg_interval, 10) || 24);
+            const bucketH = String(Math.floor(Date.now() / (h * 3600000)));
+            tryLoad({ url: `/api/bg?b=${bucketH}&v=${encodeURIComponent(s.bg_version || "0")}`, fallback: true });
+            return;
+          }
+          if (siteBgEl.dataset.key === key) reset();
+        };
+        img.src = obj.url;
       };
-      img.onerror = () => {
-        // 抓图失败保持纯色底，刷新或下个桶自然重试
-        if (siteBgEl.dataset.key === key) reset();
-      };
-      img.src = url;
+      tryLoad(bg);
     });
   }
 
