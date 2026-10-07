@@ -108,24 +108,18 @@ admin.post("/", requireAdmin, async c => {
 
   const title = String(body.title ?? "").slice(0, 200);
   const description = String(body.description ?? "").slice(0, 1000);
+  // sort_order 默认 0：列表按 sort_order ASC, id DESC 排序，同值时新的在前 → 最新上传的排最上；需固定位置时手动设置
   const sort_order = Number(body.sort_order) || 0;
   const visible = body.visible === false || body.visible === 0 || body.visible === "0" ? 0 : 1;
   const source_type = body.source_type === "moment" || body.source_type === "post" ? body.source_type : "upload";
   const source_id = Number(body.source_id) || 0;
-
-  // sort_order 未传时取当前最大值 + 1（保持递增，新图排在后面）
-  let finalSort = sort_order;
-  if (finalSort === 0) {
-    const maxRow = await c.env.DB.prepare(`SELECT MAX(sort_order) as m FROM photos`).first<{ m: number | null }>();
-    finalSort = (maxRow?.m ?? 0) + 1;
-  }
 
   const now = new Date().toISOString();
   const result = await c.env.DB.prepare(
     `INSERT INTO photos (src, title, description, sort_order, visible, source_type, source_id, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
   )
-    .bind(src, title, description, finalSort, visible, source_type, source_id, now, now)
+    .bind(src, title, description, sort_order, visible, source_type, source_id, now, now)
     .first<PhotoRow>();
   const s = await getSettings(c.env.DB);
   return ok(c, serializePhoto(result as PhotoRow, s.r2_domain, s.b2_domain), "已添加");
@@ -236,15 +230,19 @@ admin.post("/batch-toggle", requireAdmin, async c => {
 
 /**
  * 同步：扫描 moments.images（JSON 数组）与 posts.cover，
- * 将尚未出现在 photos 表中的图片插入（source_type=moment/post），
- * sort_order 自动取当前最大值 + 1（保持递增），visible=1。
+ * 按 key 幂等去重后插入 photos 表（source_type=moment/post），
+ * sort_order 统一 0（列表同值时 id 大的在前 → 最新同步的排最上），visible=1。
  * 返回新增数量。
  */
 admin.post("/sync", requireAdmin, async c => {
   const s = await getSettings(c.env.DB);
-  const existing = new Set(
-    (await c.env.DB.prepare(`SELECT src FROM photos`).all<{ src: string }>()).results.map(r => r.src)
-  );
+  // 已有图片按 key 归一化去重：/media/ 路径、R2/B2 直连 URL 统一提取 key 再比较，
+  // 避免同一对象因 src 记录形式不同（历史数据/域名配置变化）被重复同步
+  const existingRows = (await c.env.DB.prepare(`SELECT src FROM photos`).all<{ src: string }>()).results;
+  const existingKeys = new Set<string>();
+  for (const r of existingRows) {
+    existingKeys.add(mediaKeyFrom(r.src, s.r2_domain, s.b2_domain) ?? r.src);
+  }
 
   const toInsert: { src: string; source_type: "moment" | "post"; source_id: number }[] = [];
 
@@ -256,11 +254,9 @@ admin.post("/sync", requireAdmin, async c => {
   ).results;
   for (const m of moments) {
     for (const key of parseImages(m.images)) {
-      const src = keyToSrc(key, s.r2_domain, s.b2_domain);
-      if (!existing.has(src)) {
-        existing.add(src);
-        toInsert.push({ src, source_type: "moment", source_id: m.id });
-      }
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
+      toInsert.push({ src: keyToSrc(key, s.r2_domain, s.b2_domain), source_type: "moment", source_id: m.id });
     }
   }
 
@@ -271,28 +267,25 @@ admin.post("/sync", requireAdmin, async c => {
     }>()
   ).results;
   for (const p of posts) {
-    const src = keyToSrc(p.cover, s.r2_domain, s.b2_domain);
-    if (!existing.has(src)) {
-      existing.add(src);
-      toInsert.push({ src, source_type: "post", source_id: p.id });
-    }
+    const coverKey = mediaKeyFrom(p.cover, s.r2_domain, s.b2_domain) ?? p.cover;
+    if (existingKeys.has(coverKey)) continue;
+    existingKeys.add(coverKey);
+    toInsert.push({ src: keyToSrc(p.cover, s.r2_domain, s.b2_domain), source_type: "post", source_id: p.id });
   }
 
   const now = new Date().toISOString();
   let inserted = 0;
   if (toInsert.length) {
-    // sort_order 取当前最大值 + 1 递增，避免所有新图都是 0
-    const maxRow = await c.env.DB.prepare(`SELECT MAX(sort_order) as m FROM photos`).first<{ m: number | null }>();
-    let nextSort = (maxRow?.m ?? 0) + 1;
+    // sort_order 统一 0：列表按 sort_order ASC, id DESC 排序，同值时新的在前 → 最新同步的排最上面
     const stmt = c.env.DB.prepare(
       `INSERT INTO photos (src, title, description, sort_order, visible, source_type, source_id, created_at, updated_at)
-       VALUES (?, '', '', ?, 1, ?, ?, ?, ?)`
+       VALUES (?, '', '', 0, 1, ?, ?, ?, ?)`
     );
-    const batch = toInsert.map(item => stmt.bind(item.src, nextSort++, item.source_type, item.source_id, now, now));
+    const batch = toInsert.map(item => stmt.bind(item.src, item.source_type, item.source_id, now, now));
     await c.env.DB.batch(batch);
     inserted = toInsert.length;
   }
-  return ok(c, { inserted, total: existing.size }, `同步完成，新增 ${inserted} 张`);
+  return ok(c, { inserted, total: existingKeys.size }, `同步完成，新增 ${inserted} 张`);
 });
 
 export default app;
