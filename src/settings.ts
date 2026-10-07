@@ -132,6 +132,8 @@ export interface SiteSettings {
   i18n_langs: string; // 开放语言，逗号分隔（如 zh-CN,zh-TW,en）；至少包含默认语言
   i18n_auto_detect: boolean; // 首次访问是否按访问地/浏览器语言自动判定
   i18n_content_translate: boolean; // 是否自动翻译说说/文章等动态内容（P2，预留开关）
+  baidu_translate_appid: string; // 百度翻译开放平台 APP ID（私密）；留空=英文翻译仅走 Workers AI
+  baidu_translate_key: string; // 百度翻译密钥（私密）
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -255,6 +257,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   i18n_langs: "zh-CN,zh-TW,en",
   i18n_auto_detect: true,
   i18n_content_translate: true,
+  baidu_translate_appid: "",
+  baidu_translate_key: "",
 };
 
 /** 字符串字段约束：最大长度 */
@@ -339,6 +343,8 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   uptime_check_interval: 3,
   i18n_default: 10,
   i18n_langs: 40,
+  baidu_translate_appid: 32,
+  baidu_translate_key: 64,
 };
 
 /**

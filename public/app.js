@@ -110,6 +110,8 @@
   i18n_langs: "zh-CN,zh-TW,en",
   i18n_auto_detect: true,
   i18n_content_translate: true,
+  baidu_translate_appid: "",
+  baidu_translate_key: "",
   };
 
   const state = {
@@ -6105,10 +6107,17 @@
             <label class="switch-row">
               <span class="toggle"><input type="checkbox" name="i18n_content_translate" ${s.i18n_content_translate !== false ? "checked" : ""} /><span></span></span>
               <span>
-                动态内容自动翻译（即将上线）
-                <br /><small style="color:var(--anzhiyu-secondtext)">说说、文章、评论正文：繁体走本地转换，英语走 Workers AI 翻译并永久缓存，原文修改后自动重译。当前界面文案已完整三语，内容翻译将在下一阶段开放</small>
+                动态内容翻译
+                <br /><small style="color:var(--anzhiyu-secondtext)">说说、文章、关于页：繁体走本地转换，英语优先走百度翻译（国内直连、快速稳定），失败自动回退 Workers AI；译文永久缓存，原文修改后自动重译</small>
               </span>
             </label>
+            <div class="field">
+              <label>百度翻译凭证（可选）<br /><small style="color:var(--anzhiyu-secondtext)">在 <a href="https://fanyi-api.baidu.com/" target="_blank" rel="noopener">百度翻译开放平台</a> 开通「通用翻译API」后获取；标准版免费不限字符量（QPS=1），留空则仅使用 Workers AI 翻译</small></label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+                <input name="baidu_translate_appid" maxlength="32" value="${esc(s.baidu_translate_appid || "")}" placeholder="APP ID" autocomplete="off" />
+                <input name="baidu_translate_key" maxlength="64" value="${esc(s.baidu_translate_key || "")}" placeholder="密钥" autocomplete="new-password" />
+              </div>
+            </div>
           </div>
         </details>
         <button class="btn primary" type="submit">保存设置</button>
@@ -10987,6 +10996,8 @@
         i18n_langs: langs.join(","),
         i18n_auto_detect: i18nForm.querySelector('[name="i18n_auto_detect"]').checked,
         i18n_content_translate: i18nForm.querySelector('[name="i18n_content_translate"]').checked,
+        baidu_translate_appid: i18nForm.querySelector('[name="baidu_translate_appid"]').value.trim(),
+        baidu_translate_key: i18nForm.querySelector('[name="baidu_translate_key"]').value.trim(),
       };
       const btn = i18nForm.querySelector('button[type="submit"]');
       btn.disabled = true;

@@ -12,6 +12,7 @@ import { isAdmin } from "../auth";
 import { getSettings } from "../settings";
 import { parseLangs } from "../i18n";
 import { toTraditional, toEnglish, toEnglishShort } from "../translate";
+import { baiduToEnglish } from "../baidu-translate";
 
 const app = new Hono<HonoEnv>();
 
@@ -140,20 +141,39 @@ app.post("/", async c => {
         outContent = toTraditional(content);
       }
     } else {
-      // 英文：Workers AI
-      if (!c.env.AI) return fail(c, "翻译服务暂不可用", 503);
-      engine = "ai";
+      // 英文：优先百度翻译（国内直连、快且稳），任一失败回退 Workers AI
+      const hasBaidu = !!(s.baidu_translate_appid && s.baidu_translate_key);
+      engine = hasBaidu ? "baidu" : "ai";
+      /**
+       * 单段中译英：百度 → AI 回退。
+       * @param text 原文
+       * @param long 是否长文（长文走分块翻译，短文本直接单次请求）
+       */
+      const enText = async (text: string, long: boolean): Promise<string> => {
+        const t0 = (text || "").trim();
+        if (!t0) return text;
+        if (hasBaidu) {
+          try {
+            return await baiduToEnglish(s.baidu_translate_appid, s.baidu_translate_key, text);
+          } catch (e) {
+            console.warn("[translate] baidu failed, fallback to Workers AI:", e instanceof Error ? e.message : e);
+            engine = "ai";
+          }
+        }
+        if (!c.env.AI) throw new Error("AI binding unavailable");
+        return long ? toEnglish(c.env.AI, text) : toEnglishShort(c.env.AI, text);
+      };
+
       if (aboutFields) {
-        const [greeting, greetingSub, signature, bio] = await Promise.all([
-          aboutFields.greeting ? toEnglishShort(c.env.AI, aboutFields.greeting) : Promise.resolve(""),
-          aboutFields.greeting_sub ? toEnglishShort(c.env.AI, aboutFields.greeting_sub) : Promise.resolve(""),
-          aboutFields.signature ? toEnglishShort(c.env.AI, aboutFields.signature) : Promise.resolve(""),
-          aboutFields.bio ? toEnglish(c.env.AI, aboutFields.bio) : Promise.resolve(""),
-        ]);
+        // 顺序请求：百度标准版 QPS=1，并发会触发 54003 频控
+        const greeting = aboutFields.greeting ? await enText(aboutFields.greeting, false) : "";
+        const greetingSub = aboutFields.greeting_sub ? await enText(aboutFields.greeting_sub, false) : "";
+        const signature = aboutFields.signature ? await enText(aboutFields.signature, false) : "";
+        const bio = aboutFields.bio ? await enText(aboutFields.bio, true) : "";
         outContent = JSON.stringify({ greeting, greeting_sub: greetingSub, signature, bio });
       } else {
-        if (title) outTitle = await toEnglishShort(c.env.AI, title);
-        outContent = await toEnglish(c.env.AI, content);
+        if (title) outTitle = await enText(title, false);
+        outContent = await enText(content, true);
       }
       if (!outContent.trim() && !(outTitle && outTitle.trim())) {
         return fail(c, "翻译服务暂时不可用，请稍后重试", 502);

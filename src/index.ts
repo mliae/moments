@@ -201,14 +201,14 @@ app.get("/api/health", c => ok(c, { site: c.env.SITE_NAME ?? "moments", time: ne
 // 设置变更频率低：浏览器缓存 60s + Cloudflare 边缘缓存 5min（边缘命中不消耗 Worker 请求额度）
 app.get("/api/settings", async c => {
   const s = await getSettings(c.env.DB);
-  // 私密字段绝不下发：后台入口、apihz 凭证、QQ 登录态、邮件 API Key、告警 Webhook
+  // 私密字段绝不下发：后台入口、apihz 凭证、百度翻译凭证、QQ 登录态、邮件 API Key、告警 Webhook
   const {
     admin_path: _h1, apihz_id: _h2, apihz_key: _h3, qq_ckqq: _h4, qq_skey: _h5, qq_pskey: _h6,
     indexnow_key: _h7, baidu_push_token: _h8, mail_resend_key: _h9, security_webhook_url: _h10,
-    music_api_key: _h11,
+    music_api_key: _h11, baidu_translate_appid: _h12, baidu_translate_key: _h13,
     ...publicSettings
   } = s;
-  void [_h1, _h2, _h3, _h4, _h5, _h6, _h7, _h8, _h9, _h10, _h11];
+  void [_h1, _h2, _h3, _h4, _h5, _h6, _h7, _h8, _h9, _h10, _h11, _h12, _h13];
   const res = ok(c, publicSettings);
   res.headers.set("Cache-Control", "public, max-age=60, s-maxage=300");
   return res;

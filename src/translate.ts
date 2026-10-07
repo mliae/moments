@@ -103,12 +103,13 @@ export function toTraditional(input: string): string {
 
 /* ================= 简体中文 → 英语（Workers AI） ================= */
 
-/** 保护代码块/行内代码用的占位符（醒目的非常规 token，并在 prompt 中明确不可翻译） */
-const PLACEHOLDER_RE = /@@XCODE_(\d+)@@/g;
-const ph = (i: number) => `@@XCODE_${i}@@`;
+/** 保护代码块/行内代码用的占位符。
+ * 实测百度通用翻译会把 @/_ 类符号拆改（@ @ XCODE0 @ @），
+ * 而 {MDn} 花括号字母数字格式在密集多标记场景下原样保留，故统一使用此格式。 */
+export const ph = (i: number) => `{MD${i}}`;
 
 /** 抽出代码围栏与行内代码，返回 [去代码文本, 代码片段表] */
-function protectCode(md: string): [string, string[]] {
+export function protectCode(md: string): [string, string[]] {
   const slots: string[] = [];
   // 围栏代码块（含语言标注）
   let out = md.replace(/```[\s\S]*?```/g, m => {
@@ -123,12 +124,18 @@ function protectCode(md: string): [string, string[]] {
   return [out, slots];
 }
 
-function restoreCode(text: string, slots: string[]): string {
-  return text.replace(PLACEHOLDER_RE, (_, i) => slots[Number(i)] ?? ph(Number(i)));
+export function restoreCode(text: string, slots: string[]): string {
+  // 主路径：{MDn} 原样保留（百度实测稳定）
+  text = text.replace(/\{MD(\d+)\}/g, (_, i) => slots[Number(i)] ?? ph(Number(i)));
+  // 兜底：占位符被轻度破坏（花括号还在、内部被插空格/点号）；必须带花括号，避免误伤正文中的 MD5 等文本
+  return text.replace(/\{[ \t]*M[ \t]*D[ _.\s-]*(\d+)[ \t]*\}|\{[ \t]*M[ \t]*D[ _.\s-]*(\d+)\s*\}?/gi, (m) => {
+    const i = Number((m.match(/\d+/) || [""])[0]);
+    return slots[i] ?? ph(i);
+  });
 }
 
 /** 按段落切分并合并为不超过 maxChars 的块（标题/列表/引用保持完整行） */
-function chunkMarkdown(md: string, maxChars = 900): string[] {
+export function chunkMarkdown(md: string, maxChars = 900): string[] {
   const lines = md.split("\n");
   const chunks: string[] = [];
   let cur: string[] = [];
@@ -158,7 +165,7 @@ function chunkMarkdown(md: string, maxChars = 900): string[] {
 const SYSTEM_PROMPT =
   "You are a professional translator for a personal blog. Translate the user's text from Simplified Chinese into natural, fluent English. " +
   "Rules: preserve all Markdown syntax exactly (headings, lists, links, images, bold/italic, tables, blockquotes, line breaks); " +
-  "never translate URLs, file paths, code placeholder tokens such as @@XCODE_0@@, or tags wrapped in braces; keep emoji; " +
+  "never translate URLs, file paths, placeholder tokens such as {MD0}, or tags wrapped in braces; keep emoji; " +
   "output ONLY the translation with no notes, no explanation and no wrapping code fences.";
 
 /** 调 AI 翻译一段（主模型失败回退一次），返回译文 */
