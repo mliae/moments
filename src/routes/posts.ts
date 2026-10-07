@@ -4,6 +4,7 @@
  *       GET /:slug     文章详情（?preview=1 管理态可看草稿）
  * 管理：POST /          新建（published/draft）
  *       PUT /:id        编辑
+ *       POST /:id/publish 发布草稿/撤回为草稿
  *       POST /:id/pin   置顶/取消置顶 { pinned: 0|1 }
  *       DELETE /:id     删除
  */
@@ -120,8 +121,9 @@ function validatePost(raw: unknown, r2Domain?: string, b2Domain?: string): PostI
 }
 
 app.get("/", async c => {
-  // 管理态返回全部（含草稿，便于继续编辑）；访客仅已发布。分页：?page=&per_page=（1-50）
-  const admin = await isAdmin(c);
+  // 只有后台文章管理显式带 ?admin=1 时才返回全部（含草稿）；
+  // 前台文章列表/关于页等即使管理员登录也只返回已发布，避免草稿混进公开页面（分页 total 也保持准确）
+  const admin = c.req.query("admin") === "1" && (await isAdmin(c));
   const perPage = Math.min(50, Math.max(1, Number(c.req.query("per_page")) || 20));
   const page = Math.max(1, Number(c.req.query("page")) || 1);
   const where = admin ? "" : "WHERE status = 'published'";
@@ -223,7 +225,45 @@ app.put("/:id", requireAdmin, async c => {
   return ok(c, serializePost(row, true, s.r2_domain, s.b2_domain), "文章已更新");
 });
 
-/** POST /:id/pin 置顶/取消置顶，body: { pinned: 0|1 }（独立接口，编辑文章不会误改置顶态） */
+/** POST /:id/publish  快速发布草稿 / 撤回为草稿，body: { status: 'published' | 'draft' } */
+app.post("/:id/publish", requireAdmin, async c => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isFinite(id)) return fail(c, "无效的 ID", 400);
+
+  const existing = await c.env.DB.prepare(`SELECT * FROM posts WHERE id = ?`).bind(id).first<PostRow>();
+  if (!existing) return fail(c, "文章不存在", 404);
+
+  let nextStatus: "published" | "draft";
+  try {
+    const body = (await c.req.json()) as { status?: unknown };
+    nextStatus = body.status === "draft" ? "draft" : "published";
+  } catch {
+    nextStatus = "published";
+  }
+  if (existing.status === nextStatus) {
+    return ok(c, serializePost(existing, false), nextStatus === "published" ? "文章已是发布状态" : "文章已是草稿状态");
+  }
+
+  const now = new Date().toISOString();
+  const row = await c.env.DB.prepare(
+    `UPDATE posts SET status = ?, updated_at = ? WHERE id = ? RETURNING *`
+  )
+    .bind(nextStatus, now, id)
+    .first<PostRow>();
+  if (!row) return fail(c, "操作失败", 500);
+
+  // 草稿 → 发布：补发自动推送（best-effort）
+  if (nextStatus === "published") {
+    const s = await getSettings(c.env.DB);
+    const url = `/post/${encodeURIComponent(row.slug)}`;
+    const origin = new URL(c.req.url).origin;
+    if (s.indexnow_auto && s.indexnow_key?.trim()) pingIndexNow(c.env.DB, s, [url], origin).catch(() => {});
+    if (s.baidu_push_enabled && s.baidu_push_site?.trim() && s.baidu_push_token?.trim()) baiduPush(c.env.DB, s, [url], origin).catch(() => {});
+  }
+  return ok(c, serializePost(row, false), nextStatus === "published" ? "已发布" : "已撤回为草稿");
+});
+
+/** POST /:id/pin 置顶/取消置顶，body: { pinned: 0|1}（独立接口，编辑文章不会误改置顶态） */
 app.post("/:id/pin", requireAdmin, async c => {
   const id = Number(c.req.param("id"));
   if (!Number.isFinite(id)) return fail(c, "无效的 ID", 400);

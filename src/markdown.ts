@@ -22,8 +22,10 @@ function inline(text: string, r2Domain?: string, b2Domain?: string): string {
   // 行内代码
   out = out.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
   // 图片 ![alt](url) — 展示用缩略图，data-orig 供前端查看原图
+  // url 允许：http(s) 外链、/media/ 站内路径、uploads|b2/uploads 开头的裸 key（数据库统一存 key）
   out = out.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+&quot;[^&]*?&quot;)?\)/g, (_m, alt, url) => {
-    const safe = safeUrl(url);
+    let safe = safeUrl(url);
+    if (!safe && /^(uploads|b2\/uploads)\//.test(url)) safe = keyToSrc(url, r2Domain, b2Domain);
     if (!safe) return alt;
     return `<img src="${thumbUrl(safe, r2Domain, b2Domain)}" alt="${alt}" loading="lazy" data-orig="${safe}" referrerpolicy="no-referrer" />`;
   });

@@ -440,6 +440,22 @@
   }
 
   /**
+   * 裸 key（uploads/ / b2/uploads/ 开头）→ 解析为可访问的完整 URL（数据库统一存 key）。
+   * 与后端 keyToSrc 同规则：b2/ 前缀走 B2 直连域名，未配置时走 /media/ Worker 签名代理；
+   * 绝不能把 b2/ key 拼到 R2 域名上（R2 桶里没有 B2 对象，必定 404）。外链原样返回。
+   */
+  function fullSrc(src) {
+    if (!src) return src;
+    if (/^(uploads|b2\/uploads)\//.test(src)) {
+      const r2 = (state.settings?.r2_domain || "").replace(/\/$/, "");
+      const b2 = (state.settings?.b2_domain || "").replace(/\/$/, "");
+      if (src.startsWith("b2/")) return b2 ? b2 + "/" + src : "/media/" + src;
+      return r2 ? r2 + "/" + src : "/media/" + src;
+    }
+    return src;
+  }
+
+  /**
    * 从原图 src 推导缩略图 URL（/media/ 路径插入 _w1200.jpg 后缀；外链/GIF/已带后缀原样返回）。
    * 展示用缩略图，data-lightbox 用原图 → 点击查看原图。
    */
@@ -448,15 +464,13 @@
     const r2 = (state.settings?.r2_domain || "").replace(/\/$/, "");
     const b2 = (state.settings?.b2_domain || "").replace(/\/$/, "");
     // 裸 key（uploads/ / b2/uploads/ 开头）→ 先转直连或代理 URL（数据库统一存 key）
-    if (/^(uploads|b2\/uploads)\//.test(src)) {
-      src = src.startsWith("b2/") && b2 ? b2 + "/" + src : r2 ? r2 + "/" + src : "/media/" + src;
-    }
+    const resolved = fullSrc(src);
     // 站内资源：/media/ 代理路径 或 R2/B2 直连域名，才做缩略图转换
-    const isLocal = src.includes("/media/") || (r2 && src.startsWith(r2 + "/")) || (b2 && src.startsWith(b2 + "/"));
+    const isLocal = resolved.includes("/media/") || (r2 && resolved.startsWith(r2 + "/")) || (b2 && resolved.startsWith(b2 + "/"));
     if (!isLocal) return src; // 外链不处理
-    if (src.includes("_w1200.")) return src; // 已是缩略图
-    if (/\.gif(?:$|[?#])/i.test(src)) return src; // GIF 保动画，不换
-    return src.replace(/\.([^.]+)$/, "_w1200.jpg");
+    if (resolved.includes("_w1200.")) return resolved; // 已是缩略图
+    if (/\.gif(?:$|[?#])/i.test(resolved)) return resolved; // GIF 保动画，不换
+    return resolved.replace(/\.([^.]+)$/, "_w1200.jpg");
   }
 
   /** 缩略图 404 兜底：历史图/生成失败的图 R2 上没有 _w1200.jpg，回退加载原图避免裂图。
@@ -825,14 +839,17 @@
     const tpl = document.createElement("template");
     tpl.innerHTML = html;
     tpl.content.querySelectorAll("script,iframe,object,embed,link,meta,style,form,input,button").forEach(n => n.remove());
-    // 图片增强：用缩略图 src，原图存 data-orig + data-lightbox 供查看
+    // 图片增强：先把裸 key 解析成原图完整 URL（fullSrc），再用缩略图做 src；
+    // data-orig（缩略图 404 时回退原图）与 data-lightbox（灯箱看原图）必须是完整 URL，
+    // 不能存裸 key，否则相对路径会拼到 /post/ 下照样裂图
     tpl.content.querySelectorAll("img[src]").forEach(el => {
-      const src = el.getAttribute("src") || "";
-      const ts = thumbSrc(src);
-      if (ts !== src) {
+      const raw = el.getAttribute("src") || "";
+      const full = fullSrc(raw);
+      const ts = thumbSrc(raw);
+      if (ts !== full) {
         el.setAttribute("src", ts);
-        el.setAttribute("data-orig", src);
-        el.setAttribute("data-lightbox", src);
+        el.setAttribute("data-orig", full);
+        el.setAttribute("data-lightbox", full);
       }
     });
     tpl.content.querySelectorAll("*").forEach(el => {
@@ -1992,7 +2009,8 @@
     const b2 = (state.settings?.b2_domain || "").replace(/\/$/, "");
     const key = localMediaKey(url);
     if (!key) return url;
-    if (key.startsWith("b2/") && b2) return b2 + "/" + key;
+    // b2/ 前缀只走 B2 域名或 /media/ 签名代理，不能错拼到 R2 域名（与 keyToSrc 一致）
+    if (key.startsWith("b2/")) return b2 ? b2 + "/" + key : "/media/" + key;
     if (r2) return r2 + "/" + key;
     return "/media/" + key;
   }
@@ -4807,7 +4825,7 @@
         <div class="modal-foot">
           <button type="button" class="btn" data-close>取消</button>
           <button type="submit" class="btn" name="status" value="draft">存草稿</button>
-          <button type="submit" class="btn primary" name="status" value="published">${isEdit ? "保存" : "发布"}</button>
+          <button type="submit" class="btn primary" name="status" value="published">${isEdit && existing.status !== "draft" ? "保存" : "发布"}</button>
         </div>
       </form>`, { size: "lg" });
 
@@ -5494,7 +5512,7 @@
     let pvMap = {};
     try {
       const [data, stats] = await Promise.all([
-        api(`/api/posts?page=${page}&per_page=20`),
+        api(`/api/posts?page=${page}&per_page=20&admin=1`),
         api(`/api/admin/analytics/posts?days=90`).catch(() => ({ posts: [] })),
       ]);
       list = data.list;
@@ -5529,6 +5547,7 @@
           </div>
           <div class="row-actions">
             <a class="btn" href="/post/${encodeURIComponent(p.slug)}${p.status === "draft" ? "?preview=1" : ""}">查看</a>
+            ${p.status === "draft" ? `<button class="btn primary" data-admin-act="publish-post" data-id="${p.id}">发布</button>` : ""}
             <button class="btn${p.pinned ? " primary" : ""}" data-admin-act="pin-post" data-id="${p.id}" data-pinned="${p.pinned ? 1 : 0}">${p.pinned ? "取消置顶" : "置顶"}</button>
             <button class="btn" data-admin-act="edit-post" data-slug="${esc(p.slug)}">编辑</button>
             <button class="btn danger" data-admin-act="del-post" data-id="${p.id}">删除</button>
@@ -10867,6 +10886,19 @@
         try {
           const res = await api(`/api/posts/${id}/pin`, { method: "POST", body: { pinned: nextPinned } });
           toast(res.message || (nextPinned ? "已置顶" : "已取消置顶"));
+          renderAdminPosts(document.getElementById("adminPanel"));
+        } catch (err) {
+          adminAct.disabled = false;
+          toast(err.message);
+        }
+        return;
+      }
+      if (act === "publish-post") {
+        const id = Number(adminAct.dataset.id);
+        adminAct.disabled = true;
+        try {
+          const res = await api(`/api/posts/${id}/publish`, { method: "POST", body: { status: "published" } });
+          toast(res.message || "已发布");
           renderAdminPosts(document.getElementById("adminPanel"));
         } catch (err) {
           adminAct.disabled = false;
