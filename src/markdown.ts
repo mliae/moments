@@ -66,12 +66,13 @@ function videoBlock(url: string, poster: string, defaultPoster = "", r2Domain?: 
   if (emb) {
     return `<div class="article-video"><div class="video-embed" data-embed-provider="${emb.provider}" data-embed-vid="${escapeHtml(emb.vid)}"></div></div>`;
   }
-  const safe = safeUrl(url) || (r2Domain ? escapeHtml(keyToSrc(url, r2Domain, b2Domain)) : "");
+  const safe = safeUrl(url) || (/^(uploads|b2\/uploads)\//.test(url) ? escapeHtml(keyToSrc(url, r2Domain, b2Domain)) : "");
   if (!safe) return "";
   const resolvePoster = (p: string) => {
     if (!p) return "";
     if (/^https?:\/\//i.test(p) || p.startsWith("/")) return p;
-    return r2Domain ? keyToSrc(p, r2Domain, b2Domain) : "";
+    // 裸 key：无直连域名时 keyToSrc 回退 /media/ 代理
+    return keyToSrc(p, r2Domain, b2Domain);
   };
   const dp = defaultPoster && (/^https?:\/\//i.test(defaultPoster) || defaultPoster.startsWith("/"))
     ? escapeHtml(defaultPoster)
@@ -94,16 +95,19 @@ function safeUrl(url: string): string | null {
 
 /** 从原图 src 推导缩略图 URL（/media/ 或 R2/B2 直连域名路径插入 _w1200.jpg 后缀；外链/GIF 原样返回） */
 function thumbUrl(src: string, r2Domain?: string, b2Domain?: string): string {
+  // 裸 key（uploads/ / b2/uploads/ 开头）→ 先转直连或代理 URL（数据库已统一存 key）
+  let s = src;
+  if (/^(uploads|b2\/uploads)\//.test(s)) s = keyToSrc(s, r2Domain, b2Domain);
   const r2Base = r2Domain ? r2Domain.replace(/\/$/, "") : "";
   const b2Base = b2Domain ? b2Domain.replace(/\/$/, "") : "";
   const isLocal =
-    src.includes("/media/") ||
-    (r2Base && src.startsWith(r2Base + "/")) ||
-    (b2Base && src.startsWith(b2Base + "/"));
-  if (!isLocal) return src;
-  if (src.includes("_w1200.")) return src;
-  if (/\.gif(?:$|[?#])/i.test(src)) return src;
-  return src.replace(/\.([^.]+)$/, "_w1200.jpg");
+    s.includes("/media/") ||
+    (r2Base && s.startsWith(r2Base + "/")) ||
+    (b2Base && s.startsWith(b2Base + "/"));
+  if (!isLocal) return s;
+  if (s.includes("_w1200.")) return s;
+  if (/\.gif(?:$|[?#])/i.test(s)) return s;
+  return s.replace(/\.([^.]+)$/, "_w1200.jpg");
 }
 
 export function renderMarkdownSafe(input: string, defaultPoster = "", r2Domain?: string, b2Domain?: string): string {

@@ -445,9 +445,13 @@
    */
   function thumbSrc(src) {
     if (!src) return src;
-    // 站内资源：/media/ 代理路径 或 R2/B2 直连域名，才做缩略图转换
     const r2 = (state.settings?.r2_domain || "").replace(/\/$/, "");
     const b2 = (state.settings?.b2_domain || "").replace(/\/$/, "");
+    // 裸 key（uploads/ / b2/uploads/ 开头）→ 先转直连或代理 URL（数据库统一存 key）
+    if (/^(uploads|b2\/uploads)\//.test(src)) {
+      src = src.startsWith("b2/") && b2 ? b2 + "/" + src : r2 ? r2 + "/" + src : "/media/" + src;
+    }
+    // 站内资源：/media/ 代理路径 或 R2/B2 直连域名，才做缩略图转换
     const isLocal = src.includes("/media/") || (r2 && src.startsWith(r2 + "/")) || (b2 && src.startsWith(b2 + "/"));
     if (!isLocal) return src; // 外链不处理
     if (src.includes("_w1200.")) return src; // 已是缩略图
@@ -4385,9 +4389,9 @@
           if (modal.isConnected) prog.textContent = `上传视频 ${Math.round(videoToUpload.size / 1048576)}MB，${Math.round(p * 100)}%`;
         });
         if (!modal.isConnected) return;
-        const added = { kind: "mp4", src: data.src, poster: null };
+        const added = { kind: "mp4", src: data.key, poster: null };
         draft.videos.push(added);
-        const uploadedSrc = data.src;
+        const uploadedSrc = data.key;
         renderVideoPreview();
         // 视频上传完成后异步截取并上传封面（不阻塞插入，失败静默；用户也可事后自定义）
         // 注意：从转码后的文件截取封面（HEVC 原文件在 canvas 上可能无法渲染）
@@ -4399,7 +4403,7 @@
             const posterData = await uploadFile(new File([posterBlob], "poster.jpg", { type: "image/jpeg" }), "image");
             // 弹窗已关，或该视频已被用户移除：不写 draft
             if (!modal.isConnected || !draft.videos.includes(added) || added.src !== uploadedSrc) return;
-            added.poster = posterData.src;
+            added.poster = posterData.key;
             renderVideoPreview();
           } catch {}
           if (modal.isConnected) prog.textContent = "";
@@ -4476,7 +4480,7 @@
           const data = await uploadMedia(file, "image", p => {
             prog.textContent = `上传图片 ${file.name} ${Math.round(p * 100)}%`;
           });
-          draft.images.push(data.src);
+          draft.images.push(data.key);
           renderPicks();
         } catch (err) {
           toast(err.message);
@@ -4511,7 +4515,7 @@
         const data = await uploadMedia(file, "image", p => {
           if (modal.isConnected) prog.textContent = `上传粘贴图片 ${Math.round(p * 100)}%`;
         });
-        draft.images.push(data.src);
+        draft.images.push(data.key);
         renderPicks();
       } catch (err) {
         toast(err.message);
@@ -4525,7 +4529,7 @@
       input.value = "上传中…";
       try {
         const data = await uploadMedia(file, "image", () => {});
-        if (input.isConnected) { input.value = data.src; input.dispatchEvent(new Event("input")); }
+        if (input.isConnected) { input.value = data.key; input.dispatchEvent(new Event("input")); }
         toast("封面已上传");
       } catch (err) {
         if (input.isConnected) input.value = old;
@@ -4765,7 +4769,7 @@
       try {
         toast("正在处理封面图片…");
         const data = await uploadMedia(file, "image");
-        coverInput.value = data.src;
+        coverInput.value = data.key;
         toast("封面已上传");
       } catch (err) {
         toast(err.message);
@@ -5636,7 +5640,7 @@
           const data = await uploadMedia(file, "image");
           if (!data?.key) throw new Error("上传失败");
           // 存储 canonical /media/<key>，由后端 serializePhoto 根据 r2_domain 动态转换为 R2 直连或代理
-          await api("/api/admin/photos", { method: "POST", body: { src: "/media/" + data.key, title: file.name.replace(/\.[^.]+$/, "") } });
+          await api("/api/admin/photos", { method: "POST", body: { src: data.key, title: file.name.replace(/\.[^.]+$/, "") } });
         } catch (err) {
           toast(`${file.name}: ${err.message}`);
         }
@@ -9255,8 +9259,8 @@
       try {
         onMsg?.(kind === "image" ? `生成缩略图 ${file.name} …` : `上传中 ${file.name} 0%`);
         const data = await uploadMedia(file, kind, p => onMsg?.(`上传中 ${file.name} ${Math.round(p * 100)}%`));
-        if (kind === "video") mdInsertBlock(ta, `@[video](${data.src})`);
-        else mdInsertBlock(ta, `![](${data.src})`);
+        if (kind === "video") mdInsertBlock(ta, `@[video](${data.key})`);
+        else mdInsertBlock(ta, `![](${data.key})`);
         ok++;
       } catch (err) {
         toast(err.message || "上传失败");
@@ -9444,7 +9448,7 @@
         const data = await uploadMedia(videoToUpload, "video", p => {
           if (panel.isConnected) progress.textContent = `上传视频 ${Math.round(videoToUpload.size / 1048576)}MB，${Math.round(p * 100)}%`;
         });
-        mdInsertBlock(ta, `@[video](${data.src})`);
+        mdInsertBlock(ta, `@[video](${data.key})`);
         panel.remove();
         toast("视频已插入");
         // 视频上传完成后异步截取并上传封面，追加到刚插入的块（不阻塞，失败静默；用户也可自定义）
@@ -9456,8 +9460,8 @@
             const posterData = await uploadFile(new File([posterBlob], "poster.jpg", { type: "image/jpeg" }), "image");
             // 编辑器已关闭/销毁：不再回写
             if (!ta.isConnected) return;
-            const target = `@[video](${data.src})`;
-            const withPoster = `@[video](${data.src} "${posterData.src}")`;
+            const target = `@[video](${data.key})`;
+            const withPoster = `@[video](${data.key} "${posterData.key}")`;
             if (ta.value.indexOf(target) >= 0) {
               ta.value = ta.value.split(target).join(withPoster);
               ta.dispatchEvent(new Event("input"));

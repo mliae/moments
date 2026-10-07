@@ -101,10 +101,12 @@ admin.post("/", requireAdmin, async c => {
   } catch {
     return fail(c, "请求格式错误", 400);
   }
-  const src = String(body.src ?? "").trim();
-  if (!src) return fail(c, "图片地址不能为空", 400);
-  // src 只允许 /media/ 本站路径或 http(s) 外链
-  if (!/^(\/media\/|https?:\/\/)/i.test(src)) return fail(c, "图片地址非法", 400);
+  const srcRaw = String(body.src ?? "").trim();
+  if (!srcRaw) return fail(c, "图片地址不能为空", 400);
+  const s = await getSettings(c.env.DB);
+  // 入库归一化：本站文件（域名 URL / /media/ 路径 / key）统一转 key 存储，换域名随设置自动切换；外链 URL 保留原样
+  const src = mediaKeyFrom(srcRaw, s.r2_domain, s.b2_domain) ?? (/^https?:\/\//i.test(srcRaw) ? srcRaw : null);
+  if (!src) return fail(c, "图片地址非法", 400);
 
   const title = String(body.title ?? "").slice(0, 200);
   const description = String(body.description ?? "").slice(0, 1000);
@@ -121,7 +123,6 @@ admin.post("/", requireAdmin, async c => {
   )
     .bind(src, title, description, sort_order, visible, source_type, source_id, now, now)
     .first<PhotoRow>();
-  const s = await getSettings(c.env.DB);
   return ok(c, serializePhoto(result as PhotoRow, s.r2_domain, s.b2_domain), "已添加");
 });
 
@@ -256,7 +257,7 @@ admin.post("/sync", requireAdmin, async c => {
     for (const key of parseImages(m.images)) {
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
-      toInsert.push({ src: keyToSrc(key, s.r2_domain, s.b2_domain), source_type: "moment", source_id: m.id });
+      toInsert.push({ src: key, source_type: "moment", source_id: m.id });
     }
   }
 
@@ -270,7 +271,7 @@ admin.post("/sync", requireAdmin, async c => {
     const coverKey = mediaKeyFrom(p.cover, s.r2_domain, s.b2_domain) ?? p.cover;
     if (existingKeys.has(coverKey)) continue;
     existingKeys.add(coverKey);
-    toInsert.push({ src: keyToSrc(p.cover, s.r2_domain, s.b2_domain), source_type: "post", source_id: p.id });
+    toInsert.push({ src: coverKey, source_type: "post", source_id: p.id });
   }
 
   const now = new Date().toISOString();

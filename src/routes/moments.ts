@@ -85,15 +85,11 @@ function validateVideoObj(rv: unknown, r2Domain?: string, b2Domain?: string): Vi
   let poster: string | null = null;
   const posterRaw = typeof v.poster === "string" ? v.poster.trim() : "";
   if (posterRaw) {
-    if (
-      !/^https?:\/\//i.test(posterRaw) &&
-      !posterRaw.startsWith("/media/") &&
-      !/^uploads\//.test(posterRaw) &&
-      !/^b2\/uploads\//.test(posterRaw)
-    ) {
-      return "封面地址非法";
-    }
-    poster = posterRaw;
+    // 入库归一化：本站文件（域名 URL / /media/ 路径 / key）统一转 key 存储，换域名随设置自动切换；外链 URL 保留原样
+    const pKey = mediaKeyFrom(posterRaw, r2Domain, b2Domain);
+    if (pKey) poster = pKey;
+    else if (/^https?:\/\//i.test(posterRaw)) poster = posterRaw;
+    else return "封面地址非法";
   }
   if (kind === "mp4") {
     const key = mediaKeyFrom(src, r2Domain, b2Domain) ?? (/^https?:\/\//i.test(src) ? src : null);

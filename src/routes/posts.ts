@@ -13,7 +13,7 @@ import type { HonoEnv } from "../types";
 import { requireAdmin, isAdmin } from "../auth";
 import { getSettings } from "../settings";
 import { pingIndexNow, baiduPush } from "../indexnow";
-import { serializePost, srcToKey, type PostRow } from "../db";
+import { serializePost, mediaKeyFrom, type PostRow } from "../db";
 import {
   parseCommentBody,
   validateCommentInput,
@@ -75,16 +75,14 @@ function plainExcerpt(md: string): string {
     .slice(0, 120);
 }
 
-function normalizeCover(raw: unknown): string | null {
+function normalizeCover(raw: unknown, r2Domain?: string, b2Domain?: string): string | null {
   const cover = String(raw ?? "").trim();
   if (!cover) return "";
-  if (/^https?:\/\//i.test(cover)) return cover;
-  const key = cover.startsWith("/media/")
-    ? srcToKey(cover)
-    : /^(uploads|b2\/uploads)\/images\//.test(cover)
-      ? cover
-      : null;
-  return key;
+  // 入库归一化：本站文件（域名 URL / /media/ 路径 / key）统一转 key 存储，换域名随设置自动切换；外链 URL 保留原样
+  const key = mediaKeyFrom(cover, r2Domain, b2Domain);
+  if (key) return key;
+  if (/^https?:\/\//i.test(cover)) return cover; // 外链封面
+  return null;
 }
 
 /** 从正文 markdown 中提取第一张图片地址（兼容 ![alt](url) 与 <img src="url">），用于无封面时自动兜底 */
@@ -105,17 +103,17 @@ interface PostInput {
   status: "published" | "draft";
 }
 
-function validatePost(raw: unknown): PostInput | string {
+function validatePost(raw: unknown, r2Domain?: string, b2Domain?: string): PostInput | string {
   const body = (raw ?? {}) as Record<string, unknown>;
   const title = String(body.title ?? "").trim().slice(0, MAX_TITLE);
   if (!title) return "标题不能为空";
   const content_md = String(body.content_md ?? "").slice(0, MAX_MD);
   const excerptRaw = String(body.excerpt ?? "").trim().slice(0, MAX_EXCERPT);
   const excerpt = excerptRaw || plainExcerpt(content_md);
-  const explicitCover = normalizeCover(body.cover);
+  const explicitCover = normalizeCover(body.cover, r2Domain, b2Domain);
   if (explicitCover === null) return "封面地址非法";
   // 未设置封面时，自动用正文第一张图兜底（新建/编辑均生效）
-  const cover = explicitCover || normalizeCover(extractFirstImage(content_md)) || "";
+  const cover = explicitCover || normalizeCover(extractFirstImage(content_md), r2Domain, b2Domain) || "";
   const status = body.status === "draft" ? "draft" : "published";
   if (!content_md.trim()) return "正文不能为空";
   return { title, excerpt, content_md, cover, status };
@@ -160,7 +158,8 @@ app.post("/", requireAdmin, async c => {
   } catch {
     return fail(c, "请求格式错误", 400);
   }
-  const input = validatePost(body);
+  const s = await getSettings(c.env.DB);
+  const input = validatePost(body, s.r2_domain, s.b2_domain);
   if (typeof input === "string") return fail(c, input);
 
   const slug = await uniqueSlug(c.env.DB, input.title);
@@ -173,7 +172,6 @@ app.post("/", requireAdmin, async c => {
     .first<PostRow>();
   if (!row) return fail(c, "保存失败", 500);
 
-  const s = await getSettings(c.env.DB);
   const url = `/post/${encodeURIComponent(slug)}`;
   const origin = new URL(c.req.url).origin;
   // 发布即自动推送（best-effort，失败不影响保存）
@@ -197,7 +195,8 @@ app.put("/:id", requireAdmin, async c => {
   } catch {
     return fail(c, "请求格式错误", 400);
   }
-  const input = validatePost(body);
+  const sPut = await getSettings(c.env.DB);
+  const input = validatePost(body, sPut.r2_domain, sPut.b2_domain);
   if (typeof input === "string") return fail(c, input);
 
   // 标题变化时重新生成唯一 slug；标题不变则保留原 slug（保护已分享链接）
