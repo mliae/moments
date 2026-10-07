@@ -154,32 +154,38 @@ export async function checkQqCookie(s: SiteSettings): Promise<{ ok: boolean; msg
   if (!s.qq_ckqq || !s.qq_pskey) return { ok: false, msg: "未配置 ckqq/pskey" };
   const id = (s.apihz_id || "").trim();
   const key = (s.apihz_key || "").trim();
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 8000);
-  try {
-    const url = `${APIHZ_URL}?id=${encodeURIComponent(id || "88888888")}&key=${encodeURIComponent(key || "88888888")}&qq=${encodeURIComponent(s.qq_ckqq)}&ckqq=${encodeURIComponent(s.qq_ckqq)}&skey=${encodeURIComponent(s.qq_skey)}&pskey=${encodeURIComponent(s.qq_pskey)}`;
-    const resp = await fetch(url, { signal: ctrl.signal });
-    const text = await resp.text();
-    const debug = { endpoint: "apihz", status: resp.status };
-    const nick = extractNick(text, "apihz", s.qq_ckqq);
-    if (nick) {
-      return { ok: true, msg: `Cookie 有效（昵称：${nick}）`, debug };
-    }
+  const url = `${APIHZ_URL}?id=${encodeURIComponent(id || "88888888")}&key=${encodeURIComponent(key || "88888888")}&qq=${encodeURIComponent(s.qq_ckqq)}&ckqq=${encodeURIComponent(s.qq_ckqq)}&skey=${encodeURIComponent(s.qq_skey)}&pskey=${encodeURIComponent(s.qq_pskey)}`;
+  // Workers 海外节点访问 apihz（国内站）偶发慢，15s 超时 + 失败后重试一次
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
     try {
-      const d = JSON.parse(text) as Record<string, unknown>;
-      const textMsg = String(d.text || d.msg || "");
-      if (d.code === 400) {
-        return { ok: false, msg: `Cookie 已失效：${textMsg || "请重新登录 vip.qq.com 抓取，并更新监控平台请求头"}`, debug: { ...debug, response: textMsg } };
+      const resp = await fetch(url, { signal: ctrl.signal });
+      const text = await resp.text();
+      const debug = { endpoint: "apihz", status: resp.status, attempt: attempt + 1 };
+      const nick = extractNick(text, "apihz", s.qq_ckqq);
+      if (nick) {
+        return { ok: true, msg: `Cookie 有效（昵称：${nick}）`, debug };
       }
-      return { ok: false, msg: `检测失败：${textMsg || "apihz 返回未知错误"}`, debug: { ...debug, response: textMsg } };
-    } catch {
-      return { ok: false, msg: "检测失败：apihz 返回异常", debug };
+      try {
+        const d = JSON.parse(text) as Record<string, unknown>;
+        const textMsg = String(d.text || d.msg || "");
+        if (d.code === 400) {
+          return { ok: false, msg: `Cookie 已失效：${textMsg || "请重新登录 vip.qq.com 抓取，并更新监控平台请求头"}`, debug: { ...debug, response: textMsg } };
+        }
+        return { ok: false, msg: `检测失败：${textMsg || "apihz 返回未知错误"}`, debug: { ...debug, response: textMsg } };
+      } catch {
+        return { ok: false, msg: "检测失败：apihz 返回异常", debug };
+      }
+    } catch (e) {
+      if (attempt === 1) {
+        return { ok: false, msg: `检测失败：apihz 连接超时（已重试 1 次），请稍后再试`, debug: { endpoint: "apihz", error: String(e) } };
+      }
+    } finally {
+      clearTimeout(timer);
     }
-  } catch (e) {
-    return { ok: false, msg: `检测失败：${e instanceof Error ? e.message : "网络异常"}`, debug: { endpoint: "apihz", error: String(e) } };
-  } finally {
-    clearTimeout(timer);
   }
+  return { ok: false, msg: "检测失败：未知错误" };
 }
 
 app.get("/qq-info", async c => {
