@@ -1210,7 +1210,8 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
   .mobile-menu {
     position: absolute; top: 100%; left: 0; right: 0;
     padding: .6rem .9rem calc(.8rem + env(safe-area-inset-bottom, 0px));
-    background: color-mix(in srgb, var(--anzhiyu-card-bg) 94%, transparent);
+    /* 玻璃化：与顶栏同款 78% 透明度背景 + 毛玻璃模糊（94% 过实看不出玻璃感） */
+    background: color-mix(in srgb, var(--anzhiyu-background) 78%, transparent);
     -webkit-backdrop-filter: saturate(180%) blur(16px);
     backdrop-filter: saturate(180%) blur(16px);
     border-bottom: var(--style-border);
