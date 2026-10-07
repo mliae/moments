@@ -411,7 +411,8 @@ async function getIndexHtml(c: Context<HonoEnv>): Promise<string> {
 
 const TITLE_TAG = "<title>Moments</title>";
 const DESC_TAG = '<meta name="description" content="朋友圈式轻博客：图文动态与文章" />';
-const ICON_TAG = `<link rel="icon" href="${iconToHref("")}" />`;
+// favicon 用正则匹配（模板里的默认图标颜色可能被手动改过，固定字符串会匹配不上导致替换静默失败）
+const ICON_RE = /<link rel="icon"[^>]*>/i;
 const HEAD_MARK = "<!--SSR_HEAD-->";
 const I18N_MARK = "<!--I18N_BOOT-->";
 const APP_MARK = '<main id="app" class="page-main"></main>';
@@ -446,7 +447,7 @@ async function serveSsr(
   const out = html
     .replace(TITLE_TAG, () => `<title>${opts.title}</title>`)
     .replace(DESC_TAG, () => `<meta name="description" content="${opts.description}" />`)
-    .replace(ICON_TAG, () => `<link rel="icon" href="${iconToHref(s.site_icon)}" />`)
+    .replace(ICON_RE, () => `<link rel="icon" href="${iconToHref(s.site_icon)}" />`)
     .replace(HEAD_MARK, () => opts.head)
     .replace(I18N_MARK, () => i18nBoot)
     .replace(APP_MARK, () => `<main id="app" class="page-main">${opts.body ?? ""}</main>`);
