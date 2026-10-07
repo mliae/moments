@@ -483,6 +483,11 @@ export function normalizeSettings(raw: Record<string, unknown> | null | undefine
   if (out.banner_bg_mode !== "static" && out.banner_bg_mode !== "random") out.banner_bg_mode = DEFAULT_SETTINGS.banner_bg_mode;
   // 存储模式：r2=Cloudflare R2 / b2=Backblaze B2，非法回退默认
   if (out.storage_mode !== "r2" && out.storage_mode !== "b2") out.storage_mode = DEFAULT_SETTINGS.storage_mode;
+  // B2 端点/域名：自动补 https:// 前缀（防手滑漏写导致 Invalid URL）；B2 域名误填占位提示文字时视为未填
+  const b2ep = out.b2_endpoint.trim();
+  if (b2ep && !/^https?:\/\//i.test(b2ep)) out.b2_endpoint = "https://" + b2ep;
+  const b2dm = out.b2_domain.trim();
+  if (!b2dm || /^[^ ]*[（(]私有桶/.test(b2dm)) out.b2_domain = "";
   // 多语言：默认语言/开放语言白名单校验，非法回退默认；保证默认语言一定在开放列表中
   const I18N_SUPPORTED = ["zh-CN", "zh-TW", "en"];
   if (!I18N_SUPPORTED.includes(out.i18n_default)) out.i18n_default = DEFAULT_SETTINGS.i18n_default;

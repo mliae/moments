@@ -6782,7 +6782,7 @@
           </div>
           <div class="field">
             <label>B2 公开访问域名（私有桶留空）<br /><small style="color:var(--anzhiyu-secondtext)">桶设为公开并绑定自定义域名时填写（带 https://，如 https://b2.e.jce.me），文件直连访问、不消耗 Worker 请求；<b>私有桶留空即可</b>，文件自动走 Worker 签名代理访问（无需信用卡，B2 egress 走 Cloudflare 联盟免费）</small></label>
-            <input name="b2_domain" maxlength="200" value="${esc(s.b2_domain)}" placeholder="https://b2.e.jce.me（私有桶留空）" />
+            <input name="b2_domain" maxlength="200" value="${esc(s.b2_domain)}" placeholder="私有桶留空" />
           </div>
           <div style="display:flex;gap:.75rem;align-items:center">
             <button type="button" class="btn" data-b2-test>测试 B2 连接</button>
