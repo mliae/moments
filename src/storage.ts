@@ -53,14 +53,15 @@ type StorageBody = string | ArrayBuffer | ArrayBufferView | Blob | ReadableStrea
 /**
  * 发送带 AWS SigV4 签名的 S3 兼容请求（path-style：/<bucket>/<key>）。
  * PUT 使用 UNSIGNED-PAYLOAD 流式上传（不整读文件，兼容大视频）；
- * DELETE/HEAD 使用空载荷哈希。
+ * GET/DELETE/HEAD 使用空载荷哈希。GET 可透传 Range 头（视频拖拽）。
  */
 async function b2Fetch(
   s: SiteSettings,
-  method: "PUT" | "DELETE" | "HEAD",
+  method: "GET" | "PUT" | "DELETE" | "HEAD",
   key: string,
   body?: StorageBody,
-  contentType?: string
+  contentType?: string,
+  extraHeaders?: Record<string, string>
 ): Promise<Response> {
   const endpoint = (s.b2_endpoint || "").trim().replace(/\/+$/, "");
   const bucket = (s.b2_bucket || "").trim();
@@ -83,6 +84,7 @@ async function b2Fetch(
     "x-amz-date": amzDate,
   };
   if (method === "PUT" && contentType) headers["content-type"] = contentType;
+  if (extraHeaders) Object.assign(headers, extraHeaders);
 
   const signedNames = Object.keys(headers).sort();
   const canonicalHeaders =
@@ -164,6 +166,20 @@ export async function headObject(r2: R2Bucket, s: SiteSettings, key: string): Pr
     return resp.status === 200;
   }
   return (await r2.head(key)) !== null;
+}
+
+/**
+ * 从 B2 读取对象流（私有桶代理用）：返回 fetch Response，对象不存在返回 null。
+ * @param range 客户端 Range 头原样透传（S3 支持，视频拖拽必需）
+ */
+export async function getB2Object(s: SiteSettings, key: string, range?: string): Promise<Response | null> {
+  const resp = await b2Fetch(s, "GET", key, undefined, undefined, range ? { range } : undefined);
+  if (resp.status === 404) return null;
+  if (!resp.ok && resp.status !== 206) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`B2 读取失败（HTTP ${resp.status}）：${text.slice(0, 200)}`);
+  }
+  return resp;
 }
 
 /** 测试 B2 配置：写入并删除一个探针对象，验证凭证/桶/读写权限 */

@@ -1,10 +1,13 @@
 /**
- * /media/* —— R2 私有桶对象的流式输出。
+ * /media/* —— R2 / B2 私有桶对象的流式输出。
  * 支持 HTTP Range（MP4 拖拽必需）、不可变长缓存、扩展名兜底 MIME。
+ * b2/ 前缀对象（Backblaze B2 私有桶）通过 SigV4 签名拉取代理。
  */
 import type { Context } from "hono";
 import { fail } from "./respond";
 import type { HonoEnv } from "./types";
+import { isB2Key, getB2Object } from "./storage";
+import { getSettings } from "./settings";
 
 const EXT_MIME: Record<string, string> = {
   jpg: "image/jpeg",
@@ -30,7 +33,7 @@ function extMime(key: string): string {
   return EXT_MIME[ext] ?? "application/octet-stream";
 }
 
-/** 从 URL 路径解析受保护的 R2 key（拒绝越权路径） */
+/** 从 URL 路径解析受保护的对象 key（拒绝越权路径） */
 function resolveKey(pathname: string): string | null {
   if (!pathname.startsWith("/media/")) return null;
   let key: string;
@@ -40,7 +43,14 @@ function resolveKey(pathname: string): string | null {
     return null;
   }
   if (!key || key.startsWith("/") || key.includes("..") || key.includes("\\")) return null;
-  if (!key.startsWith("uploads/") && !key.startsWith("emoji/") && !key.startsWith("music/")) return null; // 只允许访问上传/表情/音乐目录
+  // B2 私有桶代理：b2/ 前缀下只允许上传/头像目录
+  if (isB2Key(key)) {
+    const sub = key.slice("b2/".length);
+    if (sub.startsWith("uploads/") || sub.startsWith("avatars/")) return key;
+    return null;
+  }
+  // R2：只允许访问上传/表情/音乐目录
+  if (!key.startsWith("uploads/") && !key.startsWith("emoji/") && !key.startsWith("music/")) return null;
   return key;
 }
 
@@ -52,6 +62,9 @@ export async function serveMedia(c: Context<HonoEnv>): Promise<Response> {
 
   const rangeHeader = c.req.header("range") ?? c.req.header("Range");
   const m = rangeHeader ? /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim()) : null;
+
+  // B2 私有桶对象：SigV4 签名代理拉取（Range 原样透传，S3 支持）
+  if (isB2Key(key)) return serveB2Media(c, key, rangeHeader ?? undefined);
 
   // 后缀范围 bytes=-N
   if (m && m[1] === "" && m[2] !== "") {
@@ -126,4 +139,47 @@ function rangeResponse(obj: R2ObjectBody, key: string): Response {
   headers.set("Content-Range", `bytes ${start}-${end}/${size}`);
   headers.set("Content-Length", String(end - start + 1));
   return new Response(obj.body, { status: 206, headers });
+}
+
+/** B2 私有桶对象代理：SigV4 GET 拉流，无 Range 请求写边缘缓存减少 B2 访问 */
+async function serveB2Media(c: Context<HonoEnv>, key: string, range?: string): Promise<Response> {
+  const cache = (caches as unknown as { default: Cache }).default;
+  const cacheKey = new Request(c.req.url, { method: "GET" });
+
+  if (!range) {
+    const hit = await cache.match(cacheKey);
+    if (hit) return hit;
+  }
+
+  const s = await getSettings(c.env.DB);
+  if (!(s.b2_endpoint && s.b2_bucket && s.b2_key_id && s.b2_app_key)) {
+    return fail(c, "B2 存储未配置，无法访问该资源", 502);
+  }
+
+  let resp: Response | null;
+  try {
+    resp = await getB2Object(s, key, range);
+  } catch (e) {
+    return fail(c, "B2 读取失败：" + (e instanceof Error ? e.message : String(e)), 502);
+  }
+  if (!resp) return fail(c, "资源不存在", 404);
+
+  const headers = new Headers();
+  const ct = resp.headers.get("content-type");
+  headers.set("Content-Type", ct && ct !== "application/xml" && ct !== "application/octet-stream" ? ct : extMime(key));
+  headers.set("Accept-Ranges", "bytes");
+  headers.set("Cache-Control", IMMUTABLE);
+  const len = resp.headers.get("content-length");
+  if (len) headers.set("Content-Length", len);
+  const cr = resp.headers.get("content-range");
+  if (cr) headers.set("Content-Range", cr);
+  const etag = resp.headers.get("etag");
+  if (etag) headers.set("ETag", etag);
+
+  const res = new Response(resp.body, { status: resp.status, headers });
+  // 整对象响应写入边缘缓存（206 不缓存）
+  if (resp.status === 200 && !range) {
+    c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()).catch(() => {}));
+  }
+  return res;
 }

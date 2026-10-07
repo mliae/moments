@@ -6757,7 +6757,7 @@
           <input name="r2_domain" maxlength="200" value="${esc(s.r2_domain)}" placeholder="https://r2.e.jxe.me（留空=走 /media/ 代理）" />
         </div>
         <div class="field">
-          <label>上传存储<br /><small style="color:var(--anzhiyu-secondtext)">切换不影响历史文件：R2 旧文件继续通过上方 R2 域名正常访问；选择 B2 后，<b>新上传</b>的图片/视频/头像/评论图都会存入 B2（对象自动加 b2/ 前缀），并通过下方 B2 域名直连</small></label>
+          <label>上传存储<br /><small style="color:var(--anzhiyu-secondtext)">切换不影响历史文件：R2 旧文件继续通过上方 R2 域名正常访问；选择 B2 后，<b>新上传</b>的图片/视频/头像/评论图都会存入 B2（对象自动加 b2/ 前缀）。B2 桶公开填了域名则直连访问，私有桶则自动走 Worker 代理</small></label>
           <select name="storage_mode" data-storage-mode>
             <option value="r2" ${s.storage_mode !== "b2" ? "selected" : ""}>Cloudflare R2（默认，新上传存 R2）</option>
             <option value="b2" ${s.storage_mode === "b2" ? "selected" : ""}>Backblaze B2（新上传存 B2）</option>
@@ -6781,8 +6781,8 @@
             <input name="b2_app_key" type="password" maxlength="200" value="${esc(s.b2_app_key)}" placeholder="applicationKey" autocomplete="new-password" />
           </div>
           <div class="field">
-            <label>B2 公开访问域名<br /><small style="color:var(--anzhiyu-secondtext)">B2 桶绑定的自定义公开域名，带 https://，如 https://b2.e.jce.me。桶需设为公开，否则图片无法访问</small></label>
-            <input name="b2_domain" maxlength="200" value="${esc(s.b2_domain)}" placeholder="https://b2.e.jce.me" />
+            <label>B2 公开访问域名（私有桶留空）<br /><small style="color:var(--anzhiyu-secondtext)">桶设为公开并绑定自定义域名时填写（带 https://，如 https://b2.e.jce.me），文件直连访问、不消耗 Worker 请求；<b>私有桶留空即可</b>，文件自动走 Worker 签名代理访问（无需信用卡，B2 egress 走 Cloudflare 联盟免费）</small></label>
+            <input name="b2_domain" maxlength="200" value="${esc(s.b2_domain)}" placeholder="https://b2.e.jce.me（私有桶留空）" />
           </div>
           <div style="display:flex;gap:.75rem;align-items:center">
             <button type="button" class="btn" data-b2-test>测试 B2 连接</button>
