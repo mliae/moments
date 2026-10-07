@@ -71,6 +71,13 @@ export interface SiteSettings {
   // 域名
   site_domain: string; // 站点主域名（带 https://，如 https://jxe.me），用于 SEO/RSS/OG 绝对 URL；留空=用请求 origin
   r2_domain: string; // R2 自定义域名（带 https://，如 https://r2.e.jxe.me）；留空=走 Worker /media/ 代理
+  // 存储管理
+  storage_mode: string; // 上传存储：r2=Cloudflare R2（默认，旧文件继续在 R2） / b2=Backblaze B2（新上传走 B2）
+  b2_endpoint: string; // B2 S3 兼容端点（带 https://，如 https://s3.us-west-004.backblazeb2.com）
+  b2_bucket: string; // B2 桶名
+  b2_key_id: string; // B2 Application Key ID（私密，不公开）
+  b2_app_key: string; // B2 Application Key（私密，不公开）
+  b2_domain: string; // B2 公开访问域名（带 https://，如 https://b2.e.jce.me）；B2 桶需设为公开
   // AI 评论机器人
   ai_reply_enabled: boolean; // 是否启用评论 @AI 自动回复（Workers AI，消耗每日免费额度）
   ai_bot_name: string; // 机器人昵称（评论中 @此昵称 触发回复），默认「小J」
@@ -206,6 +213,12 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   video_default_poster: "",
   site_domain: "",
   r2_domain: "",
+  storage_mode: "r2",
+  b2_endpoint: "",
+  b2_bucket: "",
+  b2_key_id: "",
+  b2_app_key: "",
+  b2_domain: "",
   ai_reply_enabled: false,
   ai_bot_name: "小J",
   ai_bot_avatar: "",
@@ -311,6 +324,12 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   video_default_poster: 500,
   site_domain: 200,
   r2_domain: 200,
+  storage_mode: 10,
+  b2_endpoint: 200,
+  b2_bucket: 100,
+  b2_key_id: 100,
+  b2_app_key: 200,
+  b2_domain: 200,
   ai_bot_name: 20,
   ai_bot_avatar: 200,
   ai_text_model: 100,
@@ -462,6 +481,8 @@ export function normalizeSettings(raw: Record<string, unknown> | null | undefine
     ? String(Math.max(1, Math.min(720, ui)))
     : DEFAULT_SETTINGS.uptime_check_interval;
   if (out.banner_bg_mode !== "static" && out.banner_bg_mode !== "random") out.banner_bg_mode = DEFAULT_SETTINGS.banner_bg_mode;
+  // 存储模式：r2=Cloudflare R2 / b2=Backblaze B2，非法回退默认
+  if (out.storage_mode !== "r2" && out.storage_mode !== "b2") out.storage_mode = DEFAULT_SETTINGS.storage_mode;
   // 多语言：默认语言/开放语言白名单校验，非法回退默认；保证默认语言一定在开放列表中
   const I18N_SUPPORTED = ["zh-CN", "zh-TW", "en"];
   if (!I18N_SUPPORTED.includes(out.i18n_default)) out.i18n_default = DEFAULT_SETTINGS.i18n_default;

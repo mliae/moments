@@ -28,6 +28,7 @@ app.get("/", async c => {
 
   const s = await getSettings(c.env.DB);
   const r2 = s.r2_domain;
+  const b2 = s.b2_domain;
   const like = `%${q}%`;
 
   // 已发布文章：标题 / 摘要 / 正文
@@ -46,7 +47,7 @@ app.get("/", async c => {
     slug: p.slug,
     title: p.title,
     excerpt: snippet(p.excerpt || p.title, q),
-    cover: p.cover ? keyToSrc(p.cover, r2) : "",
+    cover: p.cover ? keyToSrc(p.cover, r2, b2) : "",
     created_at: p.created_at,
   }));
 
@@ -84,7 +85,7 @@ app.get("/", async c => {
     name: f.name,
     url: f.url,
     description: snippet(f.description, q, 60),
-    avatar: f.avatar ? keyToSrc(f.avatar, r2) : "",
+    avatar: f.avatar ? keyToSrc(f.avatar, r2, b2) : "",
     category: f.category || "",
   }));
 

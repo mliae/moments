@@ -10,6 +10,7 @@ import { getSettings } from "../settings";
 import type { SiteSettings } from "../settings";
 import { keyToSrc } from "../db";
 import { ensureAvatar } from "../avatar";
+import { putObject } from "../storage";
 
 const app = new Hono<HonoEnv>();
 
@@ -263,10 +264,12 @@ app.post("/comment-upload", async c => {
   const date = new Date().toISOString().slice(0, 10);
   const uuid = crypto.randomUUID();
   const key = `uploads/comments/${date}/${uuid}.${ext}`;
-  await c.env.R2.put(key, file.stream(), { httpMetadata: { contentType: file.type } });
 
   const s = await getSettings(c.env.DB);
-  return ok(c, { key, src: keyToSrc(key, s.r2_domain), content_type: file.type, size: file.size });
+  // B2 模式下评论图片也走 B2，key 加 b2/ 前缀便于路由与删除
+  const finalKey = s.storage_mode === "b2" ? `b2/${key}` : key;
+  await putObject(c.env.R2, s, finalKey, file.stream(), file.type);
+  return ok(c, { key: finalKey, src: keyToSrc(finalKey, s.r2_domain, s.b2_domain), content_type: file.type, size: file.size });
 });
 
 /**

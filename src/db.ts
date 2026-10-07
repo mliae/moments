@@ -407,11 +407,15 @@ export function parseVideos(raw: string | null | undefined): VideoRef[] {
   return one ? [one] : [];
 }
 
-/** 本站图片 R2 key → 可访问路径；外链原样返回。
- *  r2Domain 有值时直连 R2 自定义域名（省 Worker 请求），否则走 /media/ 代理。 */
-export function keyToSrc(keyOrUrl: string, r2Domain?: string): string {
+/** 本站图片/媒体 key → 可访问路径；外链原样返回。
+ *  b2/ 前缀的 key 视为 B2 对象，使用 b2Domain 直连（否则回退 /media/）；
+ *  其余 key 视为 R2 对象，r2Domain 有值时直连 R2 自定义域名（省 Worker 请求），否则走 /media/ 代理。 */
+export function keyToSrc(keyOrUrl: string, r2Domain?: string, b2Domain?: string): string {
   if (/^https?:\/\//i.test(keyOrUrl)) return keyOrUrl;
   const encoded = keyOrUrl.split("/").map(encodeURIComponent).join("/");
+  if (keyOrUrl.startsWith("b2/")) {
+    return b2Domain ? `${b2Domain.replace(/\/$/, "")}/${encoded}` : `/media/${encoded}`;
+  }
   return r2Domain ? `${r2Domain.replace(/\/$/, "")}/${encoded}` : `/media/${encoded}`;
 }
 
@@ -428,19 +432,35 @@ export function srcToKey(src: string): string | null {
   }
 }
 
-/** 宽松提取本站媒体 key：/media/<key>、纯 uploads/ key、R2 直连完整 URL（host 必须匹配配置的 r2_domain）。
- *  背景：配置 r2_domain 后上传接口返回 R2 直连 URL，前端原样提交，校验层需能提取 key。
+/** 宽松提取本站媒体 key：/media/<key>、纯 uploads/ 或 b2/uploads/ key、R2/B2 直连完整 URL（host 必须匹配配置的 r2_domain / b2_domain）。
+ *  背景：配置 r2_domain/b2_domain 后上传接口返回直连 URL，前端原样提交，校验层需能提取 key。
  *  提取不到返回 null（视为外链或非法来源）。 */
-export function mediaKeyFrom(src: string, r2Domain?: string): string | null {
+export function mediaKeyFrom(src: string, r2Domain?: string, b2Domain?: string): string | null {
   if (!src) return null;
   if (src.startsWith("/media/")) return srcToKey(src);
   if (/^uploads\//.test(src)) return src;
-  if (/^https?:\/\//i.test(src) && r2Domain) {
+  if (/^b2\/uploads\//.test(src)) return src;
+  if (/^https?:\/\//i.test(src)) {
     try {
       const u = new URL(src);
-      if (u.host !== new URL(r2Domain).host) return null;
-      const p = decodeURIComponent(u.pathname).replace(/^\//, "");
-      return /^uploads\//.test(p) && !p.includes("..") && !p.includes("\\") ? p : null;
+      // R2 直连：host 匹配 r2_domain，路径必须 uploads/
+      if (r2Domain) {
+        try {
+          if (u.host === new URL(r2Domain).host) {
+            const p = decodeURIComponent(u.pathname).replace(/^\//, "");
+            return /^uploads\//.test(p) && !p.includes("..") && !p.includes("\\") ? p : null;
+          }
+        } catch { /* r2_domain 非法则忽略 */ }
+      }
+      // B2 直连：host 匹配 b2_domain，路径必须 b2/
+      if (b2Domain) {
+        try {
+          if (u.host === new URL(b2Domain).host) {
+            const p = decodeURIComponent(u.pathname).replace(/^\//, "");
+            return /^b2\//.test(p) && !p.includes("..") && !p.includes("\\") ? p : null;
+          }
+        } catch { /* b2_domain 非法则忽略 */ }
+      }
     } catch {
       return null;
     }
@@ -448,16 +468,16 @@ export function mediaKeyFrom(src: string, r2Domain?: string): string | null {
   return null;
 }
 
-export function serializeMoment(row: MomentRow, withComments?: CommentRow[], r2Domain?: string): MomentView {
+export function serializeMoment(row: MomentRow, withComments?: CommentRow[], r2Domain?: string, b2Domain?: string): MomentView {
   const out: MomentView = {
     id: row.id,
     content: row.content ?? "",
-    images: parseImages(row.images).map(k => keyToSrc(k, r2Domain)),
+    images: parseImages(row.images).map(k => keyToSrc(k, r2Domain, b2Domain)),
     videos: (() => {
       const transform = (v: VideoRef): VideoRef => {
         if (v.kind === "embed") return { kind: "embed", src: "", provider: v.provider, vid: v.vid, poster: null };
-        const poster = v.poster ? (/^https?:\/\//i.test(v.poster) || v.poster.startsWith("/media/") ? v.poster : keyToSrc(v.poster, r2Domain)) : null;
-        return /^https?:\/\//i.test(v.src) || v.src.startsWith("/media/") ? { ...v, poster } : { kind: v.kind, src: keyToSrc(v.src, r2Domain), poster };
+        const poster = v.poster ? (/^https?:\/\//i.test(v.poster) || v.poster.startsWith("/media/") ? v.poster : keyToSrc(v.poster, r2Domain, b2Domain)) : null;
+        return /^https?:\/\//i.test(v.src) || v.src.startsWith("/media/") ? { ...v, poster } : { kind: v.kind, src: keyToSrc(v.src, r2Domain, b2Domain), poster };
       };
       return parseVideos(row.video).map(transform);
     })(),
@@ -474,13 +494,13 @@ export function serializeMoment(row: MomentRow, withComments?: CommentRow[], r2D
   return out;
 }
 
-export function serializePost(row: PostRow, withContent = false, r2Domain?: string) {
+export function serializePost(row: PostRow, withContent = false, r2Domain?: string, b2Domain?: string) {
   const base = {
     id: row.id,
     slug: row.slug,
     title: row.title,
     excerpt: row.excerpt,
-    cover: row.cover ? keyToSrc(row.cover, r2Domain) : "",
+    cover: row.cover ? keyToSrc(row.cover, r2Domain, b2Domain) : "",
     status: row.status,
     pinned: row.pinned ? 1 : 0,
     created_at: row.created_at,
@@ -514,11 +534,12 @@ function momentSelectColumns(voter: string): string {
  */
 export async function queryMoments(
   db: D1Database,
-  opts: { cursor?: number; limit?: number; voterId?: string; r2Domain?: string }
+  opts: { cursor?: number; limit?: number; voterId?: string; r2Domain?: string; b2Domain?: string }
 ): Promise<{ list: MomentView[]; nextCursor: number | null }> {
   const limit = Math.min(50, Math.max(1, opts.limit ?? 20));
   const voter = safeVoter(opts.voterId);
   const r2 = opts.r2Domain;
+  const b2 = opts.b2Domain;
   const binds: (string | number)[] = [];
   if (voter) binds.push(voter);
 
@@ -536,7 +557,7 @@ export async function queryMoments(
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
   const nextCursor = hasMore ? page[page.length - 1].id : null;
-  return { list: page.map(r => serializeMoment(r, undefined, r2)), nextCursor };
+  return { list: page.map(r => serializeMoment(r, undefined, r2, b2)), nextCursor };
 }
 
 /* ==================== 说说 + 文章 混合时间线 ==================== */
@@ -586,11 +607,12 @@ export function decodeFeedCursor(raw: string): FeedCursor | null {
  */
 export async function queryFeed(
   db: D1Database,
-  opts: { cursor?: FeedCursor | null; limit?: number; voterId?: string; r2Domain?: string; q?: string }
+  opts: { cursor?: FeedCursor | null; limit?: number; voterId?: string; r2Domain?: string; b2Domain?: string; q?: string }
 ): Promise<{ list: FeedItem[]; nextCursor: string | null }> {
   const limit = Math.min(50, Math.max(1, opts.limit ?? 20));
   const voter = safeVoter(opts.voterId);
   const r2 = opts.r2Domain;
+  const b2 = opts.b2Domain;
   const cur = opts.cursor ?? null;
   const useWatermark = !!cur && !cur.head; // head 游标表示普通流起点，不加时间条件
   // 关键词过滤：有 q 时只检索匹配的说说（内容/位置），不混入文章
@@ -616,7 +638,7 @@ export async function queryFeed(
     slug: row.slug,
     title: row.title,
     excerpt: row.excerpt,
-    cover: row.cover ? keyToSrc(row.cover, r2) : "",
+    cover: row.cover ? keyToSrc(row.cover, r2, b2) : "",
     pinned: row.pinned ? 1 : 0,
     created_at: row.created_at,
   });
@@ -651,7 +673,7 @@ export async function queryFeed(
   }
 
   const normalItems: FeedItem[] = [
-    ...mRows.map<MomentFeedView>(r => ({ kind: "moment", ...serializeMoment(r, undefined, r2) })),
+    ...mRows.map<MomentFeedView>(r => ({ kind: "moment", ...serializeMoment(r, undefined, r2, b2) })),
     ...pRows.map(toPostFeed),
   ];
 
@@ -686,7 +708,8 @@ export async function queryMomentById(
   id: number,
   voterId?: string,
   withComments = false,
-  r2Domain?: string
+  r2Domain?: string,
+  b2Domain?: string
 ): Promise<MomentView | null> {
   const voter = safeVoter(voterId);
   const binds: (string | number)[] = [];
@@ -696,12 +719,12 @@ export async function queryMomentById(
   const row = await db.prepare(`${momentSelectColumns(voter)} WHERE m.id = ?`).bind(...binds).first<MomentRow>();
   if (!row) return null;
 
-  if (!withComments) return serializeMoment(row, undefined, r2Domain);
+  if (!withComments) return serializeMoment(row, undefined, r2Domain, b2Domain);
   const comments = (
     await db
       .prepare(`SELECT * FROM comments WHERE target_type = 'moment' AND target_id = ? ORDER BY id ASC`)
       .bind(id)
       .all<CommentRow>()
   ).results;
-  return serializeMoment(row, comments, r2Domain);
+  return serializeMoment(row, comments, r2Domain, b2Domain);
 }

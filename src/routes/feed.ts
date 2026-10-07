@@ -21,7 +21,7 @@ app.get("/", async c => {
     return ok(c, { list: [], nextCursor: null });
   }
   const s = await getSettings(c.env.DB);
-  const result = await queryFeed(c.env.DB, { cursor, limit, voterId, r2Domain: s.r2_domain, q });
+  const result = await queryFeed(c.env.DB, { cursor, limit, voterId, r2Domain: s.r2_domain, b2Domain: s.b2_domain, q });
   return ok(c, result);
 });
 

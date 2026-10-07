@@ -95,6 +95,12 @@
     video_default_poster: "",
     site_domain: "",
     r2_domain: "",
+    storage_mode: "r2",
+    b2_endpoint: "",
+    b2_bucket: "",
+    b2_key_id: "",
+    b2_app_key: "",
+    b2_domain: "",
     ai_reply_enabled: false,
     ai_bot_name: "小J",
     ai_bot_avatar: "",
@@ -439,9 +445,10 @@
    */
   function thumbSrc(src) {
     if (!src) return src;
-    // 站内资源：/media/ 代理路径 或 R2 直连域名，才做缩略图转换
+    // 站内资源：/media/ 代理路径 或 R2/B2 直连域名，才做缩略图转换
     const r2 = (state.settings?.r2_domain || "").replace(/\/$/, "");
-    const isLocal = src.includes("/media/") || (r2 && src.startsWith(r2 + "/"));
+    const b2 = (state.settings?.b2_domain || "").replace(/\/$/, "");
+    const isLocal = src.includes("/media/") || (r2 && src.startsWith(r2 + "/")) || (b2 && src.startsWith(b2 + "/"));
     if (!isLocal) return src; // 外链不处理
     if (src.includes("_w1200.")) return src; // 已是缩略图
     if (/\.gif(?:$|[?#])/i.test(src)) return src; // GIF 保动画，不换
@@ -476,20 +483,27 @@
     btn.disabled = true;
     try {
       const r2 = (state.settings?.r2_domain || "").replace(/\/$/, "");
+      const b2 = (state.settings?.b2_domain || "").replace(/\/$/, "");
       const keyFrom = src => {
         if (!src) return null;
         try {
           if (src.includes("/media/")) {
             const k = decodeURIComponent(src.split("/media/")[1].split(/[?#]/)[0]);
-            return k.startsWith("uploads/") ? k : null;
+            return k.startsWith("uploads/") || k.startsWith("b2/uploads/") ? k : null;
           }
           if (r2 && src.startsWith(r2 + "/")) {
             const k = decodeURIComponent(src.slice(r2.length + 1).split(/[?#]/)[0]);
             return k.startsWith("uploads/") ? k : null;
           }
+          if (b2 && src.startsWith(b2 + "/")) {
+            const k = decodeURIComponent(src.slice(b2.length + 1).split(/[?#]/)[0]);
+            return k.startsWith("b2/") ? k : null;
+          }
         } catch {}
         return null;
       };
+      // B2 对象走 B2 直连域名取原图（桶内 key 本身含 b2/ 前缀；/media/ 代理只服务 R2），其余走 /media/
+      const fetchSrc = key => (key.startsWith("b2/") && b2 ? b2 + "/" + encodeURI(key) : "/media/" + encodeURI(key));
       const keys = new Set();
       let cursor = "";
       setMsg("正在收集图片列表…");
@@ -532,9 +546,9 @@
         setMsg(`重建缩略图 ${done}/${targets.length}（已补 ${made}）…`);
         const thumbKey = key.replace(/\.([^.]+)$/i, "_w1200.jpg");
         try {
-          const head = await fetchWithTimeout("/media/" + encodeURI(thumbKey), { method: "HEAD" });
+          const head = await fetchWithTimeout(fetchSrc(thumbKey), { method: "HEAD" });
           if (head.ok) continue;
-          const resp = await fetchWithTimeout("/media/" + encodeURI(key));
+          const resp = await fetchWithTimeout(fetchSrc(key));
           if (!resp.ok) { missing++; continue; }
           const blob = await resp.blob();
           const file = new File([blob], key.split("/").pop() || "img", { type: blob.type || "image/jpeg" });
@@ -543,7 +557,8 @@
           const fd = new FormData();
           fd.append("file", thumb, "thumb.jpg");
           fd.append("kind", "image");
-          fd.append("key", thumbKey);
+          // 后端按 uploads/ 前缀校验后自动按存储模式加 b2/ 前缀，B2 key 需去掉前缀再传
+          fd.append("key", key.startsWith("b2/") ? key.slice(3) : key);
           const res = await fetchWithTimeout("/api/admin/upload", { method: "POST", body: fd, credentials: "same-origin" });
           if (res.ok) made++; else failed++;
         } catch {
@@ -1173,10 +1188,12 @@
     if (!url || !/^https?:\/\//i.test(url)) return url;
     try {
       const u = new URL(url, location.origin);
-      // R2 直连域名：文件本就可公网访问，原样保留——不能转 pathname，
+      // R2/B2 直连域名：文件本就可公网访问，原样保留——不能转 pathname，
       // Worker 站点上不存在 /uploads/ 路径（站内媒体走 /media/<key>），转了必 404
-      const r2Host = state.settings?.r2_domain ? new URL(state.settings.r2_domain, location.origin).host : "";
-      if (r2Host && u.host === r2Host) return url;
+      const cdnHosts = ["r2_domain", "b2_domain"]
+        .map(k => (state.settings?.[k] ? new URL(state.settings[k], location.origin).host : ""))
+        .filter(Boolean);
+      if (cdnHosts.includes(u.host)) return url;
       // 当前站点域名：转相对路径（/media/<key> 在本站有效）
       if (u.host === location.host) return u.pathname + u.search + u.hash;
       // 其他外链：走 imgproxy 反代（防被墙/防盗链）
@@ -6740,6 +6757,39 @@
           <input name="r2_domain" maxlength="200" value="${esc(s.r2_domain)}" placeholder="https://r2.e.jxe.me（留空=走 /media/ 代理）" />
         </div>
         <div class="field">
+          <label>上传存储<br /><small style="color:var(--anzhiyu-secondtext)">切换不影响历史文件：R2 旧文件继续通过上方 R2 域名正常访问；选择 B2 后，<b>新上传</b>的图片/视频/头像/评论图都会存入 B2（对象自动加 b2/ 前缀），并通过下方 B2 域名直连</small></label>
+          <select name="storage_mode" data-storage-mode>
+            <option value="r2" ${s.storage_mode !== "b2" ? "selected" : ""}>Cloudflare R2（默认，新上传存 R2）</option>
+            <option value="b2" ${s.storage_mode === "b2" ? "selected" : ""}>Backblaze B2（新上传存 B2）</option>
+          </select>
+        </div>
+        <div data-b2-fields style="${s.storage_mode === "b2" ? "" : "display:none"};border:1px dashed var(--anzhiyu-border, #555);border-radius:10px;padding:.75rem 1rem;margin-bottom:.25rem">
+          <div class="field">
+            <label>B2 S3 端点<br /><small style="color:var(--anzhiyu-secondtext)">Backblaze 控制台显示的 S3 兼容端点，带 https://，如 https://s3.us-west-004.backblazeb2.com</small></label>
+            <input name="b2_endpoint" maxlength="200" value="${esc(s.b2_endpoint)}" placeholder="https://s3.us-west-004.backblazeb2.com" />
+          </div>
+          <div class="field">
+            <label>B2 桶名<br /><small style="color:var(--anzhiyu-secondtext)">存储桶名称（Bucket），需已设为公开，否则图片无法通过下方域名访问</small></label>
+            <input name="b2_bucket" maxlength="100" value="${esc(s.b2_bucket)}" placeholder="my-moments-bucket" />
+          </div>
+          <div class="field">
+            <label>Application Key ID<br /><small style="color:var(--anzhiyu-secondtext)">B2 应用密钥 ID（keyID），需具备读写权限</small></label>
+            <input name="b2_key_id" maxlength="100" value="${esc(s.b2_key_id)}" placeholder="keyID" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>Application Key<br /><small style="color:var(--anzhiyu-secondtext)">B2 应用密钥（applicationKey），只保存在服务端，公开 API 不下发</small></label>
+            <input name="b2_app_key" type="password" maxlength="200" value="${esc(s.b2_app_key)}" placeholder="applicationKey" autocomplete="new-password" />
+          </div>
+          <div class="field">
+            <label>B2 公开访问域名<br /><small style="color:var(--anzhiyu-secondtext)">B2 桶绑定的自定义公开域名，带 https://，如 https://b2.e.jce.me。桶需设为公开，否则图片无法访问</small></label>
+            <input name="b2_domain" maxlength="200" value="${esc(s.b2_domain)}" placeholder="https://b2.e.jce.me" />
+          </div>
+          <div style="display:flex;gap:.75rem;align-items:center">
+            <button type="button" class="btn" data-b2-test>测试 B2 连接</button>
+            <span data-b2-test-msg style="font-size:.8rem;color:var(--anzhiyu-secondtext)"></span>
+          </div>
+        </div>
+        <div class="field">
           <label>视频默认封面（可选）<br /><small style="color:var(--anzhiyu-secondtext)">说说和文章中的视频未单独设置封面时统一使用此图；可填图片 URL 或上传本地图片（建议 16:9 JPG）。留空则无封面视频显示播放器默认底色</small></label>
           <div style="display:flex;gap:.5rem;align-items:center">
             <input name="video_default_poster" maxlength="500" value="${esc(s.video_default_poster)}" placeholder="https://... 或 /media/...（留空不启用）" style="flex:1" />
@@ -6791,6 +6841,40 @@
           vpUploadBtn.disabled = false;
           vpUploadBtn.textContent = "上传";
           vpFileInput.value = "";
+        }
+      });
+    }
+
+    // 存储模式下拉：切换 B2 配置区显隐
+    const storageModeEl = panel.querySelector("[data-storage-mode]");
+    const b2Fields = panel.querySelector("[data-b2-fields]");
+    if (storageModeEl && b2Fields) {
+      storageModeEl.addEventListener("change", () => {
+        b2Fields.style.display = storageModeEl.value === "b2" ? "" : "none";
+      });
+    }
+    // B2 连接测试：先用当前表单值保存，再调用测试接口（服务端读已存配置）
+    const b2TestBtn = panel.querySelector("[data-b2-test]");
+    if (b2TestBtn) {
+      const tmsg = panel.querySelector("[data-b2-test-msg]");
+      b2TestBtn.addEventListener("click", async () => {
+        b2TestBtn.disabled = true;
+        if (tmsg) { tmsg.style.color = ""; tmsg.textContent = "测试中…（会先保存 B2 配置）"; }
+        try {
+          // 先保存当前表单（保证服务端拿到最新填写的 B2 配置），再触发测试
+          const fd = new FormData(panel.querySelector("[data-settings-form]"));
+          const patch = {};
+          ["storage_mode", "b2_endpoint", "b2_bucket", "b2_key_id", "b2_app_key", "b2_domain"].forEach(k => {
+            if (fd.has(k)) patch[k] = String(fd.get(k) || "").trim();
+          });
+          await api("/api/admin/settings", { method: "PUT", body: patch });
+          const r = await api("/api/admin/storage/test", { method: "POST", body: {} });
+          if (tmsg) { tmsg.style.color = r.ok ? "#23b26d" : "#f56c6c"; tmsg.textContent = (r.ok ? "✓ " : "✗ ") + r.msg; }
+          if (r.ok) toast("B2 连接正常，配置已保存");
+        } catch (e) {
+          if (tmsg) { tmsg.style.color = "#f56c6c"; tmsg.textContent = "✗ " + e.message; }
+        } finally {
+          b2TestBtn.disabled = false;
         }
       });
     }
@@ -10902,7 +10986,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "theme_auto_mode", "theme_dark_start", "theme_dark_end", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "theme_auto_mode", "theme_dark_start", "theme_dark_end", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "storage_mode", "b2_endpoint", "b2_bucket", "b2_key_id", "b2_app_key", "b2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;

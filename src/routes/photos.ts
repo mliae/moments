@@ -11,8 +11,9 @@ import { Hono } from "hono";
 import { ok, fail } from "../respond";
 import type { HonoEnv } from "../types";
 import { requireAdmin } from "../auth";
-import { keyToSrc, srcToKey, parseImages } from "../db";
+import { keyToSrc, srcToKey, parseImages, mediaKeyFrom } from "../db";
 import { getSettings } from "../settings";
+import { deleteObject, deleteObjects } from "../storage";
 
 const app = new Hono<HonoEnv>();
 
@@ -29,12 +30,12 @@ export interface PhotoRow {
   updated_at: string;
 }
 
-/** 序列化相册图片：若 r2_domain 已配置，把站内 /media/<key> 转为 R2 直连 URL；外链原样返回 */
-function serializePhoto(row: PhotoRow, r2Domain?: string) {
+/** 序列化相册图片：若已配置直连域名，把站内 /media/<key> 转为 R2/B2 直连 URL；外链原样返回 */
+function serializePhoto(row: PhotoRow, r2Domain?: string, b2Domain?: string) {
   const src = (() => {
-    if (!r2Domain) return row.src;
+    if (!r2Domain && !b2Domain) return row.src;
     const key = srcToKey(row.src);
-    return key ? keyToSrc(key, r2Domain) : row.src;
+    return key ? keyToSrc(key, r2Domain, b2Domain) : row.src;
   })();
   return {
     id: row.id,
@@ -67,7 +68,7 @@ app.get("/", async c => {
       .bind(perPage, (page - 1) * perPage)
       .all<PhotoRow>()
   ).results;
-  return ok(c, { list: rows.map(r => serializePhoto(r, s.r2_domain)), page, per_page: perPage, total });
+  return ok(c, { list: rows.map(r => serializePhoto(r, s.r2_domain, s.b2_domain)), page, per_page: perPage, total });
 });
 
 /* ==================== 后台接口 ==================== */
@@ -90,7 +91,7 @@ admin.get("/", requireAdmin, async c => {
       .bind(perPage, (page - 1) * perPage)
       .all<PhotoRow>()
   ).results;
-  return ok(c, { list: rows.map(r => serializePhoto(r, s.r2_domain)), page, per_page: perPage, total });
+  return ok(c, { list: rows.map(r => serializePhoto(r, s.r2_domain, s.b2_domain)), page, per_page: perPage, total });
 });
 
 admin.post("/", requireAdmin, async c => {
@@ -127,7 +128,7 @@ admin.post("/", requireAdmin, async c => {
     .bind(src, title, description, finalSort, visible, source_type, source_id, now, now)
     .first<PhotoRow>();
   const s = await getSettings(c.env.DB);
-  return ok(c, serializePhoto(result as PhotoRow, s.r2_domain), "已添加");
+  return ok(c, serializePhoto(result as PhotoRow, s.r2_domain, s.b2_domain), "已添加");
 });
 
 admin.put("/:id", requireAdmin, async c => {
@@ -163,7 +164,7 @@ admin.put("/:id", requireAdmin, async c => {
 
   const updated = await c.env.DB.prepare(`SELECT * FROM photos WHERE id = ?`).bind(id).first<PhotoRow>();
   const s = await getSettings(c.env.DB);
-  return ok(c, serializePhoto(updated as PhotoRow, s.r2_domain), "已更新");
+  return ok(c, serializePhoto(updated as PhotoRow, s.r2_domain, s.b2_domain), "已更新");
 });
 
 admin.delete("/:id", requireAdmin, async c => {
@@ -173,16 +174,15 @@ admin.delete("/:id", requireAdmin, async c => {
   const row = await c.env.DB.prepare(`SELECT src FROM photos WHERE id = ?`).bind(id).first<{ src: string }>();
   if (!row) return fail(c, "图片不存在", 404);
 
-  // 若为本站 R2 对象则一并删除（同步自说说/文章的图片不删原对象，避免影响原内容）
-  const key = srcToKey(row.src);
+  // 若为本站对象则一并删除（同步自说说/文章的图片不删原对象，避免影响原内容）
+  const s = await getSettings(c.env.DB);
+  const key = mediaKeyFrom(row.src, s.r2_domain, s.b2_domain);
   await c.env.DB.prepare(`DELETE FROM photos WHERE id = ?`).bind(id).run();
-  if (key && key.startsWith("uploads/")) {
-    await c.env.R2.delete(key);
-  }
+  if (key) await deleteObject(c.env.R2, s, key);
   return ok(c, { id }, "已删除");
 });
 
-/** POST /batch-delete  批量删除相册图片（本站 R2 对象一并删除），body: { ids: number[] } */
+/** POST /batch-delete  批量删除相册图片（本站对象一并删除），body: { ids: number[] } */
 admin.post("/batch-delete", requireAdmin, async c => {
   let ids: number[];
   try {
@@ -198,10 +198,15 @@ admin.post("/batch-delete", requireAdmin, async c => {
     .prepare(`SELECT src FROM photos WHERE id IN (${ph})`)
     .bind(...ids)
     .all<{ src: string }>();
-  const keys = [...new Set(rows.results.map(r => srcToKey(r.src)).filter((k): k is string => !!k && k.startsWith("uploads/")))];
+  const s = await getSettings(c.env.DB);
+  const keys = [...new Set(
+    rows.results
+      .map(r => mediaKeyFrom(r.src, s.r2_domain, s.b2_domain))
+      .filter((k): k is string => !!k)
+  )];
 
   await c.env.DB.batch(ids.map(id => c.env.DB.prepare(`DELETE FROM photos WHERE id = ?`).bind(id)));
-  if (keys.length) await c.env.R2.delete(keys);
+  await deleteObjects(c.env.R2, s, keys);
 
   return ok(c, { deleted: ids.length }, `已删除 ${ids.length} 张图片`);
 });
@@ -236,6 +241,7 @@ admin.post("/batch-toggle", requireAdmin, async c => {
  * 返回新增数量。
  */
 admin.post("/sync", requireAdmin, async c => {
+  const s = await getSettings(c.env.DB);
   const existing = new Set(
     (await c.env.DB.prepare(`SELECT src FROM photos`).all<{ src: string }>()).results.map(r => r.src)
   );
@@ -250,7 +256,7 @@ admin.post("/sync", requireAdmin, async c => {
   ).results;
   for (const m of moments) {
     for (const key of parseImages(m.images)) {
-      const src = keyToSrc(key);
+      const src = keyToSrc(key, s.r2_domain, s.b2_domain);
       if (!existing.has(src)) {
         existing.add(src);
         toInsert.push({ src, source_type: "moment", source_id: m.id });
@@ -265,7 +271,7 @@ admin.post("/sync", requireAdmin, async c => {
     }>()
   ).results;
   for (const p of posts) {
-    const src = keyToSrc(p.cover);
+    const src = keyToSrc(p.cover, s.r2_domain, s.b2_domain);
     if (!existing.has(src)) {
       existing.add(src);
       toInsert.push({ src, source_type: "post", source_id: p.id });

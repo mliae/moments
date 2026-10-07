@@ -117,7 +117,7 @@ export function postJsonLd(origin: string, s: SiteSettings, post: PostRow) {
     publisher: { "@type": "Person", name: s.author_name || s.site_title },
     mainEntityOfPage: { "@type": "WebPage", "@id": origin + "/post/" + encodeURIComponent(post.slug) },
   };
-  if (post.cover) data.image = absoluteUrl(origin, keyToSrc(post.cover, s.r2_domain), s.site_domain);
+  if (post.cover) data.image = absoluteUrl(origin, keyToSrc(post.cover, s.r2_domain, s.b2_domain), s.site_domain);
   return data;
 }
 
@@ -133,9 +133,9 @@ const fmtDate = (iso: string) => {
 const PIN_BADGE =
   '<span class="top-badge"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg><span>置顶</span></span>';
 
-export function renderPostSsr(row: PostRow, commentCount: number, defaultPoster = "", r2Domain?: string): string {
-  const p = serializePost(row, true, r2Domain);
-  const body = renderMarkdownSafe(row.content_md || "", defaultPoster, r2Domain);
+export function renderPostSsr(row: PostRow, commentCount: number, defaultPoster = "", r2Domain?: string, b2Domain?: string): string {
+  const p = serializePost(row, true, r2Domain, b2Domain);
+  const body = renderMarkdownSafe(row.content_md || "", defaultPoster, r2Domain, b2Domain);
   return `
       <div class="essay">
         <div class="post-layout">
@@ -212,7 +212,7 @@ export function rssXml(origin: string, s: SiteSettings, posts: PostRow[]): strin
   const items = posts
     .map(p => {
       const desc = esc(p.excerpt || "");
-      const cover = p.cover ? `<p><img src="${esc(absoluteUrl(origin, keyToSrc(p.cover, s.r2_domain), s.site_domain))}" alt="${esc(p.title)}" /></p>` : "";
+      const cover = p.cover ? `<p><img src="${esc(absoluteUrl(origin, keyToSrc(p.cover, s.r2_domain, s.b2_domain), s.site_domain))}" alt="${esc(p.title)}" /></p>` : "";
       return `    <item>
       <title>${esc(p.title)}</title>
       <link>${esc(origin + "/post/" + encodeURIComponent(p.slug))}</link>

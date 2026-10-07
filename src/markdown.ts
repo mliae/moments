@@ -17,7 +17,7 @@ const escapeHtml = (s: string) =>
     .replace(/'/g, "&#39;");
 
 /** 行内：转义后调用，输入已安全 */
-function inline(text: string, r2Domain?: string): string {
+function inline(text: string, r2Domain?: string, b2Domain?: string): string {
   let out = text;
   // 行内代码
   out = out.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
@@ -25,7 +25,7 @@ function inline(text: string, r2Domain?: string): string {
   out = out.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+&quot;[^&]*?&quot;)?\)/g, (_m, alt, url) => {
     const safe = safeUrl(url);
     if (!safe) return alt;
-    return `<img src="${thumbUrl(safe, r2Domain)}" alt="${alt}" loading="lazy" data-orig="${safe}" referrerpolicy="no-referrer" />`;
+    return `<img src="${thumbUrl(safe, r2Domain, b2Domain)}" alt="${alt}" loading="lazy" data-orig="${safe}" referrerpolicy="no-referrer" />`;
   });
   // 链接 [text](url)
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+&quot;[^&]*?&quot;)?\)/g, (_m, label, url) => {
@@ -58,7 +58,7 @@ function musicBlock(label: string): string {
 
 /** @[video](url) 或 @[video](url "封面URL") 视频块（m3u8 输出占位 video，前端水合挂 HLS；mp4 直出 src）。
  *  无封面时使用站点统一封面 defaultPoster（后台设置） */
-function videoBlock(url: string, poster: string, defaultPoster = "", r2Domain?: string): string {
+function videoBlock(url: string, poster: string, defaultPoster = "", r2Domain?: string, b2Domain?: string): string {
   // 站外嵌入（B站/YouTube）：输出带 provider/vid 的占位容器，前端 hydrateVideos 注入 iframe。
   // 不能直出 <iframe>——客户端 sanitizeHtml 会过滤掉 iframe。
   const rawUrl = url.replace(/&amp;/g, "&");
@@ -66,16 +66,16 @@ function videoBlock(url: string, poster: string, defaultPoster = "", r2Domain?: 
   if (emb) {
     return `<div class="article-video"><div class="video-embed" data-embed-provider="${emb.provider}" data-embed-vid="${escapeHtml(emb.vid)}"></div></div>`;
   }
-  const safe = safeUrl(url) || (r2Domain ? escapeHtml(keyToSrc(url, r2Domain)) : "");
+  const safe = safeUrl(url) || (r2Domain ? escapeHtml(keyToSrc(url, r2Domain, b2Domain)) : "");
   if (!safe) return "";
   const resolvePoster = (p: string) => {
     if (!p) return "";
     if (/^https?:\/\//i.test(p) || p.startsWith("/")) return p;
-    return r2Domain ? keyToSrc(p, r2Domain) : "";
+    return r2Domain ? keyToSrc(p, r2Domain, b2Domain) : "";
   };
   const dp = defaultPoster && (/^https?:\/\//i.test(defaultPoster) || defaultPoster.startsWith("/"))
     ? escapeHtml(defaultPoster)
-    : defaultPoster ? escapeHtml(keyToSrc(defaultPoster, r2Domain)) : "";
+    : defaultPoster ? escapeHtml(keyToSrc(defaultPoster, r2Domain, b2Domain)) : "";
   const usePoster = resolvePoster(poster) || dp;
   const posterAttr = usePoster ? ` poster="${usePoster}"` : "";
   const inner = /\.m3u8(?:[?#]|$)/i.test(safe)
@@ -92,16 +92,21 @@ function safeUrl(url: string): string | null {
   return null;
 }
 
-/** 从原图 src 推导缩略图 URL（/media/ 或 R2 直连域名路径插入 _w1200.jpg 后缀；外链/GIF 原样返回） */
-function thumbUrl(src: string, r2Domain?: string): string {
-  const isLocal = src.includes("/media/") || (r2Domain && src.startsWith(r2Domain.replace(/\/$/, "") + "/"));
+/** 从原图 src 推导缩略图 URL（/media/ 或 R2/B2 直连域名路径插入 _w1200.jpg 后缀；外链/GIF 原样返回） */
+function thumbUrl(src: string, r2Domain?: string, b2Domain?: string): string {
+  const r2Base = r2Domain ? r2Domain.replace(/\/$/, "") : "";
+  const b2Base = b2Domain ? b2Domain.replace(/\/$/, "") : "";
+  const isLocal =
+    src.includes("/media/") ||
+    (r2Base && src.startsWith(r2Base + "/")) ||
+    (b2Base && src.startsWith(b2Base + "/"));
   if (!isLocal) return src;
   if (src.includes("_w1200.")) return src;
   if (/\.gif(?:$|[?#])/i.test(src)) return src;
   return src.replace(/\.([^.]+)$/, "_w1200.jpg");
 }
 
-export function renderMarkdownSafe(input: string, defaultPoster = "", r2Domain?: string): string {
+export function renderMarkdownSafe(input: string, defaultPoster = "", r2Domain?: string, b2Domain?: string): string {
   if (!input) return "";
   const src = escapeHtml(input.replace(/\r\n?/g, "\n"));
   const lines = src.split("\n");
@@ -111,7 +116,7 @@ export function renderMarkdownSafe(input: string, defaultPoster = "", r2Domain?:
   let para: string[] = [];
   const flushPara = () => {
     if (para.length) {
-      html.push(`<p>${inline(para.join("<br>"), r2Domain)}</p>`);
+      html.push(`<p>${inline(para.join("<br>"), r2Domain, b2Domain)}</p>`);
       para = [];
     }
   };
@@ -146,7 +151,7 @@ export function renderMarkdownSafe(input: string, defaultPoster = "", r2Domain?:
     if (h) {
       flushPara();
       const level = h[1].length;
-      html.push(`<h${level}>${inline(h[2].trim(), r2Domain)}</h${level}>`);
+      html.push(`<h${level}>${inline(h[2].trim(), r2Domain, b2Domain)}</h${level}>`);
       i++;
       continue;
     }
@@ -164,7 +169,7 @@ export function renderMarkdownSafe(input: string, defaultPoster = "", r2Domain?:
     const vid = line.match(/^@\[video\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)\s*$/);
     if (vid) {
       flushPara();
-      html.push(videoBlock(vid[1], vid[2] || "", defaultPoster, r2Domain));
+      html.push(videoBlock(vid[1], vid[2] || "", defaultPoster, r2Domain, b2Domain));
       i++;
       continue;
     }
@@ -179,7 +184,7 @@ export function renderMarkdownSafe(input: string, defaultPoster = "", r2Domain?:
         i++;
       }
       i++; // 跳过结束围栏（缺失时到文件尾）
-      html.push(`<div class="text-center">${renderMarkdownSafe(buf.join("\n"), defaultPoster, r2Domain)}</div>`);
+      html.push(`<div class="text-center">${renderMarkdownSafe(buf.join("\n"), defaultPoster, r2Domain, b2Domain)}</div>`);
       continue;
     }
 
@@ -191,7 +196,7 @@ export function renderMarkdownSafe(input: string, defaultPoster = "", r2Domain?:
         buf.push(lines[i].replace(/^&gt;\s?/, ""));
         i++;
       }
-      html.push(`<blockquote>${inline(buf.join("<br>"), r2Domain)}</blockquote>`);
+      html.push(`<blockquote>${inline(buf.join("<br>"), r2Domain, b2Domain)}</blockquote>`);
       continue;
     }
 
@@ -200,7 +205,7 @@ export function renderMarkdownSafe(input: string, defaultPoster = "", r2Domain?:
       flushPara();
       const items: string[] = [];
       while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
-        items.push(`<li>${inline(lines[i].replace(/^\s*[-*+]\s+/, ""), r2Domain)}</li>`);
+        items.push(`<li>${inline(lines[i].replace(/^\s*[-*+]\s+/, ""), r2Domain, b2Domain)}</li>`);
         i++;
       }
       html.push(`<ul>${items.join("")}</ul>`);
@@ -212,7 +217,7 @@ export function renderMarkdownSafe(input: string, defaultPoster = "", r2Domain?:
       flushPara();
       const items: string[] = [];
       while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
-        items.push(`<li>${inline(lines[i].replace(/^\s*\d+\.\s+/, ""), r2Domain)}</li>`);
+        items.push(`<li>${inline(lines[i].replace(/^\s*\d+\.\s+/, ""), r2Domain, b2Domain)}</li>`);
         i++;
       }
       html.push(`<ol>${items.join("")}</ol>`);

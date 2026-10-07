@@ -79,7 +79,11 @@ function normalizeCover(raw: unknown): string | null {
   const cover = String(raw ?? "").trim();
   if (!cover) return "";
   if (/^https?:\/\//i.test(cover)) return cover;
-  const key = cover.startsWith("/media/") ? srcToKey(cover) : /^uploads\/images\//.test(cover) ? cover : null;
+  const key = cover.startsWith("/media/")
+    ? srcToKey(cover)
+    : /^(uploads|b2\/uploads)\/images\//.test(cover)
+      ? cover
+      : null;
   return key;
 }
 
@@ -134,7 +138,7 @@ app.get("/", async c => {
       .all<PostRow>()
   ).results;
   const s = await getSettings(c.env.DB);
-  return ok(c, { list: rows.map(r => serializePost(r, false, s.r2_domain)), page, per_page: perPage, total });
+  return ok(c, { list: rows.map(r => serializePost(r, false, s.r2_domain, s.b2_domain)), page, per_page: perPage, total });
 });
 
 app.get("/:slug", async c => {
@@ -146,7 +150,7 @@ app.get("/:slug", async c => {
     if (!preview || !(await isAdmin(c))) return fail(c, "文章不存在", 404);
   }
   const s = await getSettings(c.env.DB);
-  return ok(c, serializePost(row, true, s.r2_domain));
+  return ok(c, serializePost(row, true, s.r2_domain, s.b2_domain));
 });
 
 app.post("/", requireAdmin, async c => {
@@ -177,7 +181,7 @@ app.post("/", requireAdmin, async c => {
     if (s.indexnow_auto && s.indexnow_key?.trim()) pingIndexNow(c.env.DB, s, [url], origin).catch(() => {});
     if (s.baidu_push_enabled && s.baidu_push_site?.trim() && s.baidu_push_token?.trim()) baiduPush(c.env.DB, s, [url], origin).catch(() => {});
   }
-  return ok(c, serializePost(row, true, s.r2_domain), "文章已保存");
+  return ok(c, serializePost(row, true, s.r2_domain, s.b2_domain), "文章已保存");
 });
 
 app.put("/:id", requireAdmin, async c => {
@@ -217,7 +221,7 @@ app.put("/:id", requireAdmin, async c => {
     if (s.indexnow_auto && s.indexnow_key?.trim()) pingIndexNow(c.env.DB, s, [url], origin).catch(() => {});
     if (s.baidu_push_enabled && s.baidu_push_site?.trim() && s.baidu_push_token?.trim()) baiduPush(c.env.DB, s, [url], origin).catch(() => {});
   }
-  return ok(c, serializePost(row, true, s.r2_domain), "文章已更新");
+  return ok(c, serializePost(row, true, s.r2_domain, s.b2_domain), "文章已更新");
 });
 
 /** POST /:id/pin 置顶/取消置顶，body: { pinned: 0|1 }（独立接口，编辑文章不会误改置顶态） */
@@ -245,7 +249,7 @@ app.post("/:id/pin", requireAdmin, async c => {
     .first<PostRow>();
   if (!row) return fail(c, "文章不存在", 404);
   const s = await getSettings(c.env.DB);
-  return ok(c, serializePost(row, false, s.r2_domain), pinned ? "已置顶" : "已取消置顶");
+  return ok(c, serializePost(row, false, s.r2_domain, s.b2_domain), pinned ? "已置顶" : "已取消置顶");
 });
 
 app.delete("/:id", requireAdmin, async c => {

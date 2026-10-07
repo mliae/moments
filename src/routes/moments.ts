@@ -20,6 +20,7 @@ import {
   mediaKeyFrom,
   type VideoRef,
 } from "../db";
+import { deleteObjects } from "../storage";
 
 const app = new Hono<HonoEnv>();
 
@@ -35,23 +36,23 @@ interface MomentInput {
 }
 
 /** 校验并归一化发布输入；返回错误字符串或输入对象。
- *  r2Domain：配置 R2 直连后上传返回完整 URL，需按域名提取 key。 */
-function validateMomentInput(raw: unknown, r2Domain?: string): MomentInput | string {
+ *  r2Domain/b2Domain：配置直连域名后上传返回完整 URL，需按域名提取 key。 */
+function validateMomentInput(raw: unknown, r2Domain?: string, b2Domain?: string): MomentInput | string {
   const body = (raw ?? {}) as Record<string, unknown>;
 
   const content = String(body.content ?? "").trim().slice(0, MAX_CONTENT);
   const location = String(body.location ?? "").trim().slice(0, MAX_LOCATION);
 
-  // 图片：仅接受本站 uploads/images key
+  // 图片：仅接受本站 uploads/images key（R2）或 b2/uploads/images key（B2）
   let images: string[] = [];
   if (body.images !== undefined && body.images !== null) {
     if (!Array.isArray(body.images)) return "images 必须是数组";
     if (body.images.length > MAX_IMAGES) return `最多 ${MAX_IMAGES} 张图片`;
     for (const item of body.images) {
       const src = String(item ?? "");
-      // 接受 /media/<key>、纯 key、R2 直连 URL（host 匹配 r2_domain）
-      const key = mediaKeyFrom(src, r2Domain);
-      if (!key || !key.startsWith("uploads/images/")) return "存在非法的图片来源";
+      // 接受 /media/<key>、纯 key、R2/B2 直连 URL（host 匹配 r2_domain/b2_domain）
+      const key = mediaKeyFrom(src, r2Domain, b2Domain);
+      if (!key || (!key.startsWith("uploads/images/") && !key.startsWith("b2/uploads/images/"))) return "存在非法的图片来源";
       images.push(key);
     }
     images = [...new Set(images)];
@@ -65,7 +66,7 @@ function validateMomentInput(raw: unknown, r2Domain?: string): MomentInput | str
 
   const videos: VideoRef[] = [];
   for (const rv of rawVideos.slice(0, 9)) {
-    const res = validateVideoObj(rv, r2Domain);
+    const res = validateVideoObj(rv, r2Domain, b2Domain);
     if (typeof res === "string") return res;
     if (res) videos.push(res);
   }
@@ -75,7 +76,7 @@ function validateMomentInput(raw: unknown, r2Domain?: string): MomentInput | str
 }
 
 /** 校验单个视频对象 → 返回 VideoRef，或错误字符串；空对象返回 null */
-function validateVideoObj(rv: unknown, r2Domain?: string): VideoRef | string | null {
+function validateVideoObj(rv: unknown, r2Domain?: string, b2Domain?: string): VideoRef | string | null {
   if (!rv || typeof rv !== "object") return null;
   const v = rv as Record<string, unknown>;
   const kind = String(v.kind ?? "");
@@ -84,13 +85,18 @@ function validateVideoObj(rv: unknown, r2Domain?: string): VideoRef | string | n
   let poster: string | null = null;
   const posterRaw = typeof v.poster === "string" ? v.poster.trim() : "";
   if (posterRaw) {
-    if (!/^https?:\/\//i.test(posterRaw) && !posterRaw.startsWith("/media/") && !/^uploads\//.test(posterRaw)) {
+    if (
+      !/^https?:\/\//i.test(posterRaw) &&
+      !posterRaw.startsWith("/media/") &&
+      !/^uploads\//.test(posterRaw) &&
+      !/^b2\/uploads\//.test(posterRaw)
+    ) {
       return "封面地址非法";
     }
     poster = posterRaw;
   }
   if (kind === "mp4") {
-    const key = mediaKeyFrom(src, r2Domain) ?? (/^https?:\/\//i.test(src) ? src : null);
+    const key = mediaKeyFrom(src, r2Domain, b2Domain) ?? (/^https?:\/\//i.test(src) ? src : null);
     if (!key) return "MP4 地址非法";
     return { kind: "mp4", src: key, poster };
   }
@@ -126,7 +132,7 @@ app.get("/", async c => {
   const cursor = Number(c.req.query("cursor")) || undefined;
   const limit = Number(c.req.query("limit")) || undefined;
   const s = await getSettings(c.env.DB);
-  const result = await queryMoments(c.env.DB, { cursor, limit, voterId, r2Domain: s.r2_domain });
+  const result = await queryMoments(c.env.DB, { cursor, limit, voterId, r2Domain: s.r2_domain, b2Domain: s.b2_domain });
   return ok(c, result);
 });
 
@@ -134,7 +140,7 @@ app.get("/:id", async c => {
   const id = Number(c.req.param("id"));
   if (!Number.isFinite(id)) return fail(c, "无效的 ID", 400);
   const s = await getSettings(c.env.DB);
-  const moment = await queryMomentById(c.env.DB, id, c.req.query("voter_id"), true, s.r2_domain);
+  const moment = await queryMomentById(c.env.DB, id, c.req.query("voter_id"), true, s.r2_domain, s.b2_domain);
   if (!moment) return fail(c, "动态不存在", 404);
   return ok(c, moment);
 });
@@ -147,7 +153,7 @@ app.post("/", requireAdmin, async c => {
     return fail(c, "请求格式错误", 400);
   }
   const s = await getSettings(c.env.DB);
-  const input = validateMomentInput(body, s.r2_domain);
+  const input = validateMomentInput(body, s.r2_domain, s.b2_domain);
   if (typeof input === "string") return fail(c, input);
 
   const now = new Date().toISOString();
@@ -158,7 +164,7 @@ app.post("/", requireAdmin, async c => {
     .bind(input.content, JSON.stringify(input.images), JSON.stringify(input.videos), input.location, now, now)
     .first();
 
-  const created = await queryMomentById(c.env.DB, Number((result as { id: number }).id), undefined, false, s.r2_domain);
+  const created = await queryMomentById(c.env.DB, Number((result as { id: number }).id), undefined, false, s.r2_domain, s.b2_domain);
   return ok(c, created, "发布成功");
 });
 
@@ -172,28 +178,27 @@ app.delete("/:id", requireAdmin, async c => {
   }>();
   if (!row) return fail(c, "动态不存在", 404);
 
-  // 收集本站 R2 对象（图片 + 所有 mp4 视频）
+  // 收集本站对象（图片 + 所有 mp4 视频），B2/R2 由 key 前缀自动区分
+  const s = await getSettings(c.env.DB);
   const keys: string[] = [...parseImages(row.images)];
-  const r2Domain = (await getSettings(c.env.DB)).r2_domain;
   for (const video of parseVideos(row.video)) {
     if (video.kind === "mp4") {
-      const key = mediaKeyFrom(video.src, r2Domain);
+      const key = mediaKeyFrom(video.src, s.r2_domain, s.b2_domain);
       if (key) keys.push(key);
     }
   }
-  const r2Keys = keys.filter(k => k.startsWith("uploads/"));
 
   await c.env.DB.batch([
     c.env.DB.prepare(`DELETE FROM comments WHERE target_type = 'moment' AND target_id = ?`).bind(id),
     c.env.DB.prepare(`DELETE FROM likes WHERE moment_id = ?`).bind(id),
     c.env.DB.prepare(`DELETE FROM moments WHERE id = ?`).bind(id),
   ]);
-  if (r2Keys.length) await c.env.R2.delete(r2Keys);
+  await deleteObjects(c.env.R2, s, keys);
 
   return ok(c, { id }, "删除成功");
 });
 
-/** POST /batch-delete  批量删除说说（连带评论/点赞/R2 媒体），body: { ids: number[] } */
+/** POST /batch-delete  批量删除说说（连带评论/点赞/媒体对象），body: { ids: number[] } */
 app.post("/batch-delete", requireAdmin, async c => {
   let ids: number[];
   try {
@@ -210,14 +215,16 @@ app.post("/batch-delete", requireAdmin, async c => {
     .bind(...ids)
     .all<{ images: string; video: string }>();
 
-  const r2Domain = (await getSettings(c.env.DB)).r2_domain;
-  const r2Keys = new Set<string>();
+  const s = await getSettings(c.env.DB);
+  const keys = new Set<string>();
   for (const r of rows.results) {
-    for (const k of parseImages(r.images)) if (k.startsWith("uploads/")) r2Keys.add(k);
+    for (const k of parseImages(r.images)) {
+      if (k.startsWith("uploads/") || k.startsWith("b2/uploads/")) keys.add(k);
+    }
     for (const v of parseVideos(r.video)) {
       if (v.kind === "mp4") {
-        const k = mediaKeyFrom(v.src, r2Domain);
-        if (k && k.startsWith("uploads/")) r2Keys.add(k);
+        const k = mediaKeyFrom(v.src, s.r2_domain, s.b2_domain);
+        if (k) keys.add(k);
       }
     }
   }
@@ -229,7 +236,7 @@ app.post("/batch-delete", requireAdmin, async c => {
       c.env.DB.prepare(`DELETE FROM moments WHERE id = ?`).bind(id),
     ])
   );
-  if (r2Keys.size) await c.env.R2.delete([...r2Keys]);
+  await deleteObjects(c.env.R2, s, [...keys]);
 
   return ok(c, { deleted: rows.results.length }, `已删除 ${rows.results.length} 条说说`);
 });
@@ -256,7 +263,7 @@ app.put("/:id", requireAdmin, async c => {
     return fail(c, "请求格式错误", 400);
   }
   const s = await getSettings(c.env.DB);
-  const input = validateMomentInput(body, s.r2_domain);
+  const input = validateMomentInput(body, s.r2_domain, s.b2_domain);
   if (typeof input === "string") return fail(c, input);
 
   const now = new Date().toISOString();
@@ -273,7 +280,7 @@ app.put("/:id", requireAdmin, async c => {
     )
     .run();
 
-  const updated = await queryMomentById(c.env.DB, id, undefined, false, s.r2_domain);
+  const updated = await queryMomentById(c.env.DB, id, undefined, false, s.r2_domain, s.b2_domain);
   return ok(c, updated, "已更新");
 });
 

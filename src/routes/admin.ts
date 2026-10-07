@@ -20,6 +20,7 @@ import { keyToSrc } from "../db";
 import { getSettings, updateSettings, normalizeAdminPath } from "../settings";
 import { deleteCommentAnywhere, editCommentAnywhere } from "../comment-service";
 import { ensureAvatar } from "../avatar";
+import { putObject, testB2Storage } from "../storage";
 
 import { ATTACK_RULES, banIp, unbanIp, sendWebhookAlert } from "../security";
 
@@ -231,15 +232,17 @@ app.post("/upload", requireAdmin, async c => {
   const thumb = form.get("thumb");
   if (!(file instanceof File) || file.size === 0) return fail(c, "file 不能为空");
 
+  const s = await getSettings(c.env.DB);
+
   // 缩略图重建专用：前端 canvas 生成的缩略图按指定 key 直存（覆盖）。
   // 仅允许 uploads/ 前缀 + _w1200.jpg 结尾，防路径穿越与滥用；普通上传不带 key 字段不受影响。
   const customKey = String(form.get("key") ?? "");
   if (customKey) {
     if (!/^uploads\/[\w./-]+_w1200\.jpg$/i.test(customKey) || customKey.includes(".."))
       return fail(c, "非法的缩略图 key");
-    await c.env.R2.put(customKey, file.stream(), { httpMetadata: { contentType: "image/jpeg" } });
-    const s0 = await getSettings(c.env.DB);
-    return ok(c, { key: customKey, src: keyToSrc(customKey, s0.r2_domain), content_type: "image/jpeg", size: file.size, has_thumb: false }, "缩略图已写入");
+    const finalKey = s.storage_mode === "b2" ? `b2/${customKey}` : customKey;
+    await putObject(c.env.R2, s, finalKey, file.stream(), "image/jpeg");
+    return ok(c, { key: finalKey, src: keyToSrc(finalKey, s.r2_domain, s.b2_domain), content_type: "image/jpeg", size: file.size, has_thumb: false }, "缩略图已写入");
   }
 
   const date = new Date().toISOString().slice(0, 10);
@@ -267,22 +270,23 @@ app.post("/upload", requireAdmin, async c => {
     return fail(c, "未知的上传类型");
   }
 
-  await c.env.R2.put(key, file.stream(), { httpMetadata: { contentType } });
+  // B2 模式下对象 key 统一加 b2/ 前缀，便于路由与删除
+  const finalKey = s.storage_mode === "b2" ? `b2/${key}` : key;
+  await putObject(c.env.R2, s, finalKey, file.stream(), contentType);
 
   // 若附带缩略图，存储为 _w1200.jpg（不阻塞原图已写入）
   let hasThumb = false;
   if (kind === "image" && thumb instanceof File && thumb.size > 0) {
-    const thumbKey = key.replace(/(\.[^.]+)$/, "_w1200.jpg");
+    const thumbKey = finalKey.replace(/(\.[^.]+)$/, "_w1200.jpg");
     try {
-      await c.env.R2.put(thumbKey, thumb.stream(), { httpMetadata: { contentType: "image/jpeg" } });
+      await putObject(c.env.R2, s, thumbKey, thumb.stream(), "image/jpeg");
       hasThumb = true;
     } catch {
       // 缩略图写入失败不影响原图上传
     }
   }
 
-  const s = await getSettings(c.env.DB);
-  return ok(c, { key, src: keyToSrc(key, s.r2_domain), content_type: contentType, size: file.size, has_thumb: hasThumb }, "上传成功");
+  return ok(c, { key: finalKey, src: keyToSrc(finalKey, s.r2_domain, s.b2_domain), content_type: contentType, size: file.size, has_thumb: hasThumb }, "上传成功");
 });
 
 /**
@@ -344,6 +348,16 @@ app.put("/settings", requireAdmin, async c => {
   }
   const settings = await updateSettings(c.env.DB, patch);
   return ok(c, settings, "已保存");
+});
+
+/**
+ * POST /api/admin/storage/test  测试 B2 存储连接（写入并删除探针对象）
+ * 不修改 storage_mode，仅验证当前填写的 B2 endpoint/bucket/凭证是否可用。
+ */
+app.post("/storage/test", requireAdmin, async c => {
+  const s = await getSettings(c.env.DB);
+  const r = await testB2Storage(s);
+  return ok(c, r);
 });
 
 /**

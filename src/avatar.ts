@@ -4,6 +4,7 @@
  */
 import type { SiteSettings } from "./settings";
 import { keyToSrc } from "./db";
+import { headObject, putObject } from "./storage";
 
 const MAX_BYTES = 5 * 1024 * 1024; // 单张头像上限 5MB
 
@@ -159,15 +160,16 @@ async function fetchAvatarImage(email: string, qq: string, s: SiteSettings): Pro
   return null;
 }
 
-/** 邮箱 → R2 文件名（不含扩展） */
-export function avatarBaseName(email: string): string {
-  return `avatars/${md5hex(email.toLowerCase().trim())}`;
+/** 邮箱 → 头像文件名（不含扩展）；B2 模式自动加 b2/ 前缀便于路由与删除 */
+export function avatarBaseName(email: string, storageMode = "r2"): string {
+  const prefix = storageMode === "b2" ? "b2/avatars/" : "avatars/";
+  return `${prefix}${md5hex(email.toLowerCase().trim())}`;
 }
 
 export interface EnsureResult { src: string; cached: boolean; }
 
 /**
- * 确保某邮箱的头像已存入 R2，返回可访问 src。
+ * 确保某邮箱的头像已存入存储（R2 或 B2），返回可访问 src。
  * @param force 为 true 时跳过缓存、强制重新拉取覆盖（刷新缓存用）
  */
 export async function ensureAvatar(
@@ -179,19 +181,19 @@ export async function ensureAvatar(
 ): Promise<EnsureResult | null> {
   const mail = (email || (qq ? `${qq}@qq.com` : "")).trim().toLowerCase();
   if (!mail) return null;
-  const base = avatarBaseName(mail);
+  const base = avatarBaseName(mail, s.storage_mode);
 
   if (!force) {
     // 已缓存：探测可能的扩展名（jpg/png/gif/webp/svg）
     for (const ext of ["jpg", "png", "gif", "webp", "svg"]) {
-      const obj = await r2.head(`${base}.${ext}`);
-      if (obj) return { src: keyToSrc(`${base}.${ext}`, s.r2_domain), cached: true };
+      const exists = await headObject(r2, s, `${base}.${ext}`);
+      if (exists) return { src: keyToSrc(`${base}.${ext}`, s.r2_domain, s.b2_domain), cached: true };
     }
   }
 
   const img = await fetchAvatarImage(mail, qq, s);
   if (!img) return null;
   const key = `${base}.${img.ext}`;
-  await r2.put(key, img.bytes, { httpMetadata: { contentType: img.type } });
-  return { src: keyToSrc(key, s.r2_domain), cached: false };
+  await putObject(r2, s, key, img.bytes, img.type);
+  return { src: keyToSrc(key, s.r2_domain, s.b2_domain), cached: false };
 }
