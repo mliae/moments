@@ -1688,10 +1688,11 @@
       .map(
         src => {
           const ts = thumbSrc(src);
+          const orig = fullSrc(src);
           return `
-      <a class="bber-content-img" data-lightbox="${esc(src)}" rel="external nofollow noreferrer">
-        <img src="${esc(ts)}" alt="${t("common.image")}" loading="lazy"${ts !== src ? ` data-orig="${esc(src)}"` : ""} />
-        ${ts !== src ? `<span class="img-orig-badge" title="${t("common.view_original")}">${t("common.original_badge")}</span>` : ""}
+      <a class="bber-content-img" data-lightbox="${esc(orig)}" rel="external nofollow noreferrer">
+        <img src="${esc(ts)}" alt="${t("common.image")}" loading="lazy"${ts !== orig ? ` data-orig="${esc(orig)}"` : ""} />
+        ${ts !== orig ? `<span class="img-orig-badge" title="${t("common.view_original")}">${t("common.original_badge")}</span>` : ""}
       </a>`;
         }
       )
@@ -2623,7 +2624,7 @@
           <span class="comment-time">${timeAgo(cm.created_at)}</span>
         </div>
         <div class="comment-text">${formatCommentContent(cm.content)}</div>
-        ${imgs.length ? `<div class="comment-images">${imgs.map(u => `<img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="comment-img" data-lightbox="${esc(u)}" data-comment-img="${esc(u)}" />`).join("")}</div>` : ""}
+        ${imgs.length ? `<div class="comment-images">${imgs.map(u => { const ts = thumbSrc(u); const orig = fullSrc(u); return `<img src="${esc(ts)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="comment-img" data-lightbox="${esc(orig)}" data-comment-img="${esc(orig)}"${ts !== orig ? ` data-orig="${esc(orig)}"` : ""} />`; }).join("")}</div>` : ""}
         <div class="comment-actions">
           <button type="button" class="comment-reply-btn" data-reply-root="${root}" data-reply-name="${esc(cm.nickname)}">${t("common.reply")}</button>
         </div>
@@ -3264,9 +3265,10 @@
             .map(
               p => {
                 const ts = thumbSrc(p.src);
+                const orig = fullSrc(p.src);
                 return `
-            <a class="photo-item" data-lightbox="${esc(p.src)}" rel="external nofollow noreferrer">
-              <img src="${esc(ts)}" alt="${esc(p.title || "")}" loading="lazy" referrerpolicy="no-referrer"${ts !== p.src ? ` data-orig="${esc(p.src)}"` : ""} />
+            <a class="photo-item" data-lightbox="${esc(orig)}" rel="external nofollow noreferrer">
+              <img src="${esc(ts)}" alt="${esc(p.title || "")}" loading="lazy" referrerpolicy="no-referrer"${ts !== orig ? ` data-orig="${esc(orig)}"` : ""} />
               ${p.title ? `<span class="photo-title">${esc(p.title)}</span>` : ""}
             </a>`;
               }
@@ -5625,8 +5627,8 @@
             <div class="photo-admin-card" data-id="${p.id}">
               <div class="photo-admin-thumb">
                 <input type="checkbox" class="admin-check photo-admin-check" value="${p.id}" title="选中用于批量操作" />
-                <a href="${esc(p.src)}" data-lightbox="${esc(p.src)}" data-fancybox="admin-photos" style="display:block;width:100%;height:100%">
-                  <img src="${esc(thumbSrc(p.src))}" alt="" referrerpolicy="no-referrer" loading="lazy" data-orig="${esc(p.src)}" />
+                <a href="${esc(fullSrc(p.src))}" data-lightbox="${esc(fullSrc(p.src))}" data-fancybox="admin-photos" style="display:block;width:100%;height:100%">
+                  <img src="${esc(thumbSrc(p.src))}" alt="" referrerpolicy="no-referrer" loading="lazy" data-orig="${esc(fullSrc(p.src))}" />
                 </a>
                 <span class="photo-admin-src-tag">${sourceLabel(p.source_type)}</span>
               </div>
@@ -6088,7 +6090,7 @@
             <div class="row-title">
               ${c.is_ai ? '<span class="tag-mini tag-ai">AI</span>' : c.is_owner ? '<span class="tag-mini">博主</span>' : ""}<strong>${esc(c.nickname)}</strong>：${esc(c.content) || (c.images && c.images.length ? '<span style="color:var(--anzhiyu-secondtext)">[图片评论]</span>' : "")}
             </div>
-            ${c.images && c.images.length ? `<div class="comment-images admin-cmt-imgs">${c.images.map(u => `<img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="comment-img" data-lightbox="${esc(u)}" />`).join("")}</div>` : ""}
+            ${c.images && c.images.length ? `<div class="comment-images admin-cmt-imgs">${c.images.map(u => { const ts = thumbSrc(u); const orig = fullSrc(u); return `<img src="${esc(ts)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="comment-img" data-lightbox="${esc(orig)}"${ts !== orig ? ` data-orig="${esc(orig)}"` : ""} />`; }).join("")}</div>` : ""}
             <div class="row-sub">
               <span>${timeAgo(c.created_at)}</span>
               <span class="tag-mini">${c.target_type === "post" ? "文章" : "说说"}</span>
