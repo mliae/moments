@@ -34,6 +34,11 @@
   <br><em>相册 · 瀑布流图集</em>
 </p>
 
+<p align="center">
+  <img src="./public/preview-friends.png" alt="友圈预览" width="800">
+  <br><em>友圈 · 友站文章聚合流</em>
+</p>
+
 线上示例：<https://jxe.me/>
 
 ---
@@ -53,9 +58,18 @@
 - **点赞**：访客匿名 uuid 去重，无需登录
 - **@AI 智能回复**：评论 `@小J` 触发 Workers AI 异步生成楼中楼回复（默认关闭，后台「AI 助手」开启）
 
+### 友链与友圈
+
+- **友链**：访客在线申请（站点信息自动抓取回填，可选填订阅地址），后台审核上架，分类管理
+- **友圈**：定时抓取友站 RSS/Atom（Cloudflare cron 每小时一轮，D1 存 12 篇/站），源级平滑加权轮询交错混排防霸屏，文章点击热度统计
+- **feed 探测**：站点无 RSS 声明时自动尝试 `/feed`、`/rss.xml`、`/atom.xml` 等 7 个常见路径兜底
+- **最近更新**：友链卡片显示「今天/昨天/N 天前更新《文章标题》」，可点击直达友站文章
+- **图片容错**：友圈配图 `no-referrer` 绕过防盗链，失败自动走站内图片代理兜底
+- **总开关**：后台一键关闭友圈，导航入口、页面与公开接口同步隐藏
+
 ### 管理后台
 
-- 8 个单职责 Tab：说说 / 文章 / 相册 / 评论 / 外观 / 媒体 / AI 助手 / 安全
+- 单职责 Tab：说说 / 文章 / 相册 / 评论 / 外观 / 媒体 / AI 助手 / 安全 / 友链管理
 - 密码登录 + 暴力破解防护（5 次失败锁 15 分钟）+ 自定义入口路径（`/admin` 或 `/sys-xxx`，未知路径直接 404 伪装）
 - 动态域名配置（`site_domain` / `r2_domain`），媒体路径自动适配 Worker 代理或 R2 直连
 
@@ -81,7 +95,8 @@
 | 前端 | 原生 HTML + JavaScript + CSS（`app.js` / `style.css` / `index.html`） |
 | 编辑器 / 渲染 | marked（Markdown）、contenteditable |
 | 视频 | hls.js（M3U8）、@ffmpeg/ffmpeg + @ffmpeg/core（HEVC 转码） |
-| 平台 | Cloudflare Workers、D1、R2、Workers AI、Assets |
+| 平台 | Cloudflare Workers、D1、R2、Workers AI、Assets、Cron Triggers、KV |
+| 存储（可选） | Backblaze B2（S3 兼容，新上传可切换） |
 | 工程 | Wrangler 4、TypeScript 5 |
 
 ---
@@ -94,10 +109,14 @@
    ▼
 Cloudflare Worker（moments，jxe.me）
    ├─ /api/*                                ─► Hono 路由（src/routes/*）
-   ├─ /media/*                              ─► R2 代理（r2_domain 未配置时）
-   ├─ /imgproxy                             ─► 图片代理
+   ├─ /media/*                              ─► R2/B2 代理（r2_domain 未配置时）
+   ├─ /imgproxy                             ─► 图片代理（友圈防盗链兜底）
+   ├─ /logo.png                             ─► 站点 Logo（R2 site/logo.png）
    ├─ /, /posts, /post/*, /photos, /admin   ─► SSR HTML（src/index.ts）
    └─ 静态文件                              ─► Assets（public/，含 vendor）
+
+Cron 触发器（每小时）
+   └─ __scheduled                           ─► 友圈抓取（src/friendfeed.ts，轮转抓友站 RSS/Atom 入 D1）
 ```
 
 - 前后端**同 Worker**，无 Service Binding 网络跳转
@@ -113,32 +132,42 @@ moments/
 ├── src/
 │   ├── routes/            # Hono 路由
 │   │   ├── admin.ts       # 登录/上传/设置/首次设密码
+│   │   ├── analytics.ts   # 访问统计
+│   │   ├── baidu.ts       # 百度翻译推送
 │   │   ├── feed.ts        # 说说流
+│   │   ├── friends.ts     # 友链 + 友圈公开/管理接口
+│   │   ├── indexnow.ts    # IndexNow 推送
 │   │   ├── misc.ts        # QQ 昵称 / 评论图片上传 / 地理逆解析
 │   │   ├── moments.ts     # 说说 CRUD
 │   │   ├── music.ts       # 音乐播放
+│   │   ├── ops.ts         # 运维通知
 │   │   ├── photos.ts      # 相册
 │   │   ├── posts.ts       # 文章
-│   │   └── social.ts      # 点赞 / 评论
+│   │   ├── search.ts      # 搜索
+│   │   ├── social.ts      # 点赞 / 评论
+│   │   └── translate.ts   # 内容翻译
 │   ├── ai.ts              # Workers AI 封装
 │   ├── ai-reply.ts        # @AI 评论异步回复
 │   ├── auth.ts            # 管理员鉴权（cookie + SHA-256 + 首次设密码）
 │   ├── comment-service.ts # 评论增删改
 │   ├── db.ts              # D1 查询 + 媒体 key 提取 + 自动建表
+│   ├── friendfeed.ts      # 友圈抓取核心（RSS/Atom 解析、配额交错、头像缓存）
 │   ├── markdown.ts        # Markdown 渲染 + 消毒
 │   ├── media.ts           # 媒体处理
 │   ├── seo.ts             # sitemap / rss / robots
 │   ├── settings.ts        # 站点配置
+│   ├── storage.ts         # R2 / B2 存储统一封装
 │   ├── respond.ts         # 统一响应
 │   ├── types.ts
-│   └── index.ts           # Worker 入口
-├── migrations/            # D1 SQL 迁移（0001 ~ 0011，供 wrangler d1 migrations apply）
+│   └── index.ts           # Worker 入口 + cron 定时抓取
+├── migrations/            # D1 SQL 迁移（0001 ~ 0024，供 wrangler d1 migrations apply）
 ├── public/
 │   ├── app.js             # 前端主程序
 │   ├── style.css          # 样式
+│   ├── i18n.js            # 多语言（简/繁/en）
 │   ├── index.html         # 模板（SSR 注入）
 │   ├── preview-*.png      # README 预览图
-│   └── vendor/            # hls.js、marked
+│   └── vendor/            # hls.js、marked、artplayer、ffmpeg.wasm、fancybox
 ├── wrangler.jsonc         # Worker 配置（支持自动资源 provisioning）
 ├── package.json
 └── tsconfig.json
@@ -197,13 +226,14 @@ Cloudflare Dashboard → Workers & Pages → moments → Settings → Domains & 
 
 #### 5. 后台初始化
 
-解锁后进入后台，按需配置 8 个 Tab：
+解锁后进入后台，按需配置各 Tab：
 
 | Tab | 配置项 |
 | --- | --- |
 | 外观 | 站点名、导航、每页条数、品牌头像、横幅、页脚 |
 | 媒体 | R2 直连域名、音乐播放器、视频封面、缩略图重建 |
 | AI 助手 | @AI 机器人开关与模型、QQ 昵称 API 列表 |
+| 友链管理 | 友链审核上架、订阅地址、feed 探测/立即抓取、友圈开关与三池配额 |
 | 安全 | 后台入口路径、修改密码 |
 
 ---
@@ -238,6 +268,7 @@ npm run typecheck    # TypeScript 类型检查
 - @AI 智能回复**默认关闭**，需在后台「AI 助手」手动开启
 - QQ 昵称解析依赖第三方接口，已内置多源容错；失效时可在后台「AI 助手」替换 API 列表
 - 视频转码在浏览器端进行，HEVC 文件较大时耗时较长
+- 友圈抓取依赖目标站点的 RSS 可访问性：部分站点防护会拦截机房 IP，抓取失败会在后台友链管理显示状态，需对方站长放行 feed 路径
 
 ---
 
