@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS comments (
   qq           TEXT NOT NULL DEFAULT '',
   email        TEXT NOT NULL DEFAULT '',
   avatar_url   TEXT NOT NULL DEFAULT '',
-  website      TEXT NOT NULL DEFAULT ''
+  website      TEXT NOT NULL DEFAULT '',
+  avatar_tries INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_comments_target ON comments (target_type, target_id, parent_id, id);
 
@@ -64,6 +65,12 @@ CREATE TABLE IF NOT EXISTS site_config (
   id          INTEGER PRIMARY KEY CHECK (id = 1),
   data        TEXT NOT NULL DEFAULT '{}',
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE TABLE IF NOT EXISTS kv_store (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS admin_auth (
@@ -104,10 +111,31 @@ CREATE TABLE IF NOT EXISTS friends (
   sort_order  INTEGER NOT NULL DEFAULT 0,
   status      TEXT NOT NULL DEFAULT 'approved', -- approved 已上架 / pending 待审核 / rejected 已拒绝
   last_checked TEXT NOT NULL DEFAULT '',
+  feed_url    TEXT NOT NULL DEFAULT '',      -- RSS/Atom 订阅地址（空=不抓取）
+  feed_enabled INTEGER NOT NULL DEFAULT 1,   -- 1=纳入友圈抓取
+  feed_tag    TEXT NOT NULL DEFAULT 'blog',  -- 友圈配额池：blog / community / tech
+  feed_status TEXT NOT NULL DEFAULT '',      -- 最近一轮抓取结果（ok 或错误摘要）
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_friends_status ON friends (status, sort_order ASC, id DESC);
+
+-- 友圈：抓取的友站文章（每源库存上限 12 篇，超出即删；friend_id+link 唯一去重）
+CREATE TABLE IF NOT EXISTS friend_posts (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  friend_id    INTEGER NOT NULL,
+  title        TEXT NOT NULL DEFAULT '',
+  excerpt      TEXT NOT NULL DEFAULT '',
+  link         TEXT NOT NULL DEFAULT '',
+  images       TEXT NOT NULL DEFAULT '[]', -- JSON 数组，最多 9 张
+  published_at TEXT NOT NULL DEFAULT '',
+  clicks       INTEGER NOT NULL DEFAULT 0, -- 点击热度（前端显示 {n}°C）
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  UNIQUE (friend_id, link)
+);
+CREATE INDEX IF NOT EXISTS idx_friend_posts_time ON friend_posts (published_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_friend_posts_friend ON friend_posts (friend_id, published_at DESC, id DESC);
 CREATE TABLE IF NOT EXISTS indexnow_log (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   url        TEXT NOT NULL DEFAULT '',
@@ -268,11 +296,47 @@ CREATE INDEX IF NOT EXISTS idx_translate_rate_ip_time ON translate_rate (ip, cre
 
 let schemaPromise: Promise<void> | null = null;
 
+/** 老库增量升级（幂等）：friends 表补友圈抓取字段 + friend_posts 表。
+ *  全新库已由 SCHEMA_SQL 建好，这里 CREATE IF NOT EXISTS / PRAGMA 判断后 ALTER，重复执行无副作用。
+ *  逐条 prepare().run() 执行：本地 miniflare 的 db.exec 对多语句兼容性差，单语句最稳。 */
+async function ensureIncremental(db: D1Database): Promise<void> {
+  const cols = (await db.prepare("PRAGMA table_info(friends)").all<{ name: string }>()).results ?? [];
+  const names = new Set(cols.map(c => c.name));
+  const stmts: string[] = [];
+  if (!names.has("feed_url")) stmts.push(`ALTER TABLE friends ADD COLUMN feed_url TEXT NOT NULL DEFAULT ''`);
+  if (!names.has("feed_enabled")) stmts.push(`ALTER TABLE friends ADD COLUMN feed_enabled INTEGER NOT NULL DEFAULT 1`);
+  if (!names.has("feed_tag")) stmts.push(`ALTER TABLE friends ADD COLUMN feed_tag TEXT NOT NULL DEFAULT 'blog'`);
+  if (!names.has("feed_status")) stmts.push(`ALTER TABLE friends ADD COLUMN feed_status TEXT NOT NULL DEFAULT ''`);
+  stmts.push(
+    // kv_store 早于本次已进全量 schema，但老库跳过了全量建表，需在增量里兜底（cron 多处依赖）
+    `CREATE TABLE IF NOT EXISTS kv_store (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS friend_posts (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      friend_id    INTEGER NOT NULL,
+      title        TEXT NOT NULL DEFAULT '',
+      excerpt      TEXT NOT NULL DEFAULT '',
+      link         TEXT NOT NULL DEFAULT '',
+      images       TEXT NOT NULL DEFAULT '[]',
+      published_at TEXT NOT NULL DEFAULT '',
+      clicks       INTEGER NOT NULL DEFAULT 0,
+      created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      UNIQUE (friend_id, link)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_friend_posts_time ON friend_posts (published_at DESC, id DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_friend_posts_friend ON friend_posts (friend_id, published_at DESC, id DESC)`
+  );
+  for (const sql of stmts) await db.prepare(sql).run();
+}
+
 /**
  * 幂等建表：首次请求时检测 moments 表是否存在，不存在则执行完整 schema。
  * 模块级 Promise 缓存，同一 Worker 隔离体内只跑一次；失败重置以便下次重试。
- * 对已存在数据的老库，新增表请通过 migrations/ 目录 + `wrangler d1 migrations apply` 应用，
- * 不要依赖这里（此处只在全新库时跑全量 schema）。
+ * 老库的增量升级（新增列/表）走 ensureIncremental，每次首个请求幂等执行。
  */
 export function ensureSchema(db: D1Database): Promise<void> {
   if (!schemaPromise) {
@@ -280,8 +344,8 @@ export function ensureSchema(db: D1Database): Promise<void> {
       const row = await db
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='moments'")
         .first<{ name: string }>();
-      if (row?.name) return; // 已有库，跳过
-      await db.exec(SCHEMA_SQL);
+      if (!row?.name) await db.exec(SCHEMA_SQL); // 全新库：全量建表
+      await ensureIncremental(db); // 老库/新库统一跑幂等增量
     })().catch(err => {
       schemaPromise = null; // 失败重置，下次请求重试
       throw err;

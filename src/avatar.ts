@@ -94,9 +94,14 @@ function extFromType(ct: string): string {
   return "jpg";
 }
 
-async function fetchBytes(url: string): Promise<ImgBytes | null> {
+/** 单个头像源请求超时（毫秒）：海外边缘拉国内源经常静默丢包，必须快速放弃 */
+const FETCH_TIMEOUT_MS = 3500;
+
+async function fetchBytes(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<ImgBytes | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { redirect: "follow" });
+    const res = await fetch(url, { redirect: "follow", signal: ctrl.signal });
     if (!res.ok) return null;
     const ct = res.headers.get("content-type") || "";
     if (ct.includes("json")) {
@@ -115,6 +120,8 @@ async function fetchBytes(url: string): Promise<ImgBytes | null> {
     return { bytes: buf, type: ct.split(";")[0] || "image/jpeg", ext: extFromType(ct) };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -196,4 +203,57 @@ export async function ensureAvatar(
   const key = `${base}.${img.ext}`;
   await putObject(r2, s, key, img.bytes, img.type);
   return { src: keyToSrc(key, s.r2_domain, s.b2_domain), cached: false };
+}
+
+/**
+ * 头像补偿任务（cron 周期调用）：
+ * 扫描近 3 天内、头像拉取失败（avatar_url 为空）的评论重新拉取。
+ * 海外边缘访问国内头像 API 偶发超时，隔几分钟重试成功率很高；
+ * avatar_tries 达到上限后放弃，避免无限消耗第三方 API 配额。
+ */
+export async function backfillMissingAvatars(
+  r2: R2Bucket,
+  db: D1Database,
+  s: SiteSettings
+): Promise<{ checked: number; fixed: number }> {
+  // B2 模式每条评论的 HEAD 探测也走外网子请求且占并发连接，批量更小；R2 绑定操作不计子请求
+  const limit = s.storage_mode === "b2" ? 3 : 5;
+  const rows = await db
+    .prepare(
+      `SELECT id, email, qq FROM comments
+       WHERE is_ai = 0 AND avatar_url = '' AND (email <> '' OR qq <> '')
+         AND avatar_tries < 5
+         AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days')
+       ORDER BY id DESC LIMIT ?`
+    )
+    .bind(limit)
+    .all<{ id: number; email: string; qq: string }>();
+
+  const list = rows.results ?? [];
+  let fixed = 0;
+
+  const handleOne = async (r: { id: number; email: string; qq: string }): Promise<void> => {
+    let src = "";
+    try {
+      // ensureAvatar 内部仍按 QQ → Gravatar → 随机 API 优先级串行拉取
+      const res = await ensureAvatar(r2, s, r.email, r.qq || "");
+      if (res) src = res.src;
+    } catch { /* 单条失败不影响其他评论 */ }
+    // 无论成败都 +1 尝试次数；成功写入头像地址，失败保持空等待下一轮
+    await db
+      .prepare(`UPDATE comments SET avatar_url = ?, avatar_tries = avatar_tries + 1 WHERE id = ?`)
+      .bind(src, r.id)
+      .run();
+    if (src) fixed++;
+  };
+
+  if (s.storage_mode === "b2") {
+    // B2 HEAD 探测占用外网并发连接（免费版同时仅 6 条），串行处理
+    for (const r of list) await handleOne(r);
+  } else {
+    // R2 模式无外网并发压力，并发处理压缩耗时
+    await Promise.all(list.map(handleOne));
+  }
+
+  return { checked: list.length, fixed };
 }

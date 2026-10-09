@@ -58,6 +58,7 @@
     about_enabled: true,
     links_enabled: true,
     photos_enabled: true,
+    friends_enabled: true,
     links_categories: "技术\n设计\n生活随笔\n摄影",
     about_greeting: "先认识一下，再慢慢读。",
     about_greeting_sub: "记录生活中的每一个瞬间，图文、视频与心情。",
@@ -344,6 +345,15 @@
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
   }
+
+  /** 评论头像加载失败兜底：替换为昵称首字圆形占位（对象已删除/外链失效时避免裂图） */
+  window.commentAvatarFail = function (el) {
+    const isAdmin = String(el.className || "").indexOf("admin-cmt-avatar") >= 0;
+    const span = document.createElement("span");
+    span.className = isAdmin ? "admin-cmt-avatar admin-cmt-avatar-txt" : "comment-avatar";
+    span.textContent = (el.dataset.n || "?").slice(0, 1).toUpperCase();
+    el.replaceWith(span);
+  };
 
   /** 相对时间（与原站 formatRelativeTime 一致） */
   function timeAgo(dateString) {
@@ -1909,7 +1919,16 @@
     // 表情包 URL 可能在后台变更，清缓存后下次打开面板重新拉取
     resetOwoCache();
     const iconLink = document.querySelector('link[rel="icon"]');
-    if (iconLink) iconLink.href = iconToHref(s.site_icon);
+    if (iconLink) {
+      const href = iconToHref(s.site_icon);
+      const type = href.endsWith('.png') ? 'image/png'
+        : href.endsWith('.jpg') || href.endsWith('.jpeg') ? 'image/jpeg'
+        : href.endsWith('.svg') ? 'image/svg+xml'
+        : href.endsWith('.ico') ? 'image/x-icon'
+        : 'image/png';
+      iconLink.type = type;
+      iconLink.href = href;
+    }
     document.querySelector(".brand-name").textContent = s.site_title;
     // 首页导航名：开启多语言时走词典；否则用后台自定义名称（桌面 + 移动端两处）
     document.querySelectorAll('[data-route="feed"]').forEach(a => {
@@ -1921,6 +1940,8 @@
     // 「友情链接」「相册」入口独立开关
     document.querySelectorAll(".links-nav-link").forEach(a => { a.hidden = !s.links_enabled; });
     document.querySelectorAll(".photos-nav-link").forEach(a => { a.hidden = !s.photos_enabled; });
+    // 「友圈」入口：friends_enabled 关闭时隐藏（桌面端 + 移动端）
+    document.querySelectorAll(".friends-nav-link").forEach(a => { a.hidden = s.friends_enabled === false; });
     // 品牌头像：http(s) 链接渲染图片，否则用 lucide pen-nib 占位（不再用 emoji/文本）
     const avatarEl = document.querySelector(".brand-avatar");
     if (avatarEl) {
@@ -2600,10 +2621,10 @@
       // AI 机器人：图片 URL 用 img，否则用 lucide bot 图标占位（不再用 emoji）
       const botAv = state.settings?.ai_bot_avatar || "";
       avatarInner = /^https?:\/\//i.test(botAv)
-        ? `<img class="comment-avatar comment-avatar--img comment-avatar--ai" src="${esc(botAv)}" alt="" referrerpolicy="no-referrer" loading="lazy" />`
+        ? `<img class="comment-avatar comment-avatar--img comment-avatar--ai" src="${esc(botAv)}" alt="" referrerpolicy="no-referrer" loading="lazy" data-n="AI" onerror="commentAvatarFail(this)" />`
         : `<span class="comment-avatar comment-avatar--ai">${svgIcon("bot", 20)}</span>`;
     } else if (cm.avatar_url) {
-      avatarInner = `<img class="comment-avatar comment-avatar--img" src="${esc(cm.avatar_url)}" alt="" referrerpolicy="no-referrer" loading="lazy" />`;
+      avatarInner = `<img class="comment-avatar comment-avatar--img" src="${esc(cm.avatar_url)}" alt="" referrerpolicy="no-referrer" loading="lazy" data-n="${esc((cm.nickname || "?").slice(0, 1))}" onerror="commentAvatarFail(this)" />`;
     } else {
       avatarInner = `<span class="comment-avatar">${esc((cm.nickname || "?").slice(0, 1).toUpperCase())}</span>`;
     }
@@ -2638,7 +2659,7 @@
   // 弹窗级 UI 状态：展开的楼集合 / 是否显示全部顶级评论 / 当前回复目标
   const commentUi = { expandedThreads: new Set(), showAll: false, replyRoot: 0, replyName: "" };
 
-  /** 扁平评论 → 两级树（根评论 + replies），均按 id 升序 */
+  /** 扁平评论 → 两级树：根评论新评论在前（倒序），楼中楼回复按 id 升序保证对话可读 */
   function groupComments(list) {
     const roots = [];
     const map = new Map();
@@ -2655,6 +2676,7 @@
         else roots.push({ ...cm, replies: [] }); // 父评论丢失时兜底为顶级
       }
     });
+    roots.reverse(); // 新评论显示在最上方
     roots.forEach(r => r.replies.sort((a, b) => a.id - b.id));
     return roots;
   }
@@ -3532,6 +3554,23 @@
     return `<div class="links-avatar">${img}${fb}</div>`;
   }
 
+  /* 友站最近发文行：今天=主题色高亮 / 昨天 / N 天前 / 超 1 个月灰色；最新文章标题可点击直达友站文章 */
+  function friendLastPostHtml(f) {
+    if (!f.last_post_at) return "";
+    const ts = Date.parse(f.last_post_at);
+    if (!Number.isFinite(ts)) return "";
+    const days = Math.floor((Date.now() - ts) / 864e5);
+    let cls = "", text = "";
+    if (days <= 0) { cls = " is-today"; text = t("links.last_post_today"); }
+    else if (days === 1) { text = t("links.last_post_yesterday"); }
+    else if (days <= 30) { text = t("links.last_post_days", { n: days }); }
+    else { cls = " is-stale"; text = t("links.last_post_stale"); }
+    const post = f.last_post_title
+      ? `<span class="links-card-post" data-post-link="${esc(f.last_post_link || "")}" title="${esc(f.last_post_title)}">《${esc(f.last_post_title)}》</span>`
+      : "";
+    return `<div class="links-card-update${cls}"><span class="links-card-update-text">${text}</span>${post}</div>`;
+  }
+
   async function renderLinks() {
     const activeCat = new URLSearchParams(location.search).get("category") || "全部";
     app.innerHTML = `<div class="essay"><div class="links-wrap"><div class="essay-empty">${t("common.loading")}</div></div></div>`;
@@ -3556,9 +3595,9 @@
                 <span class="links-card-arrow">${svgIcon("arrow-up-right", 16)}</span>
               </div>
               <div class="links-card-desc">${esc(f.description || t("links.no_desc"))}</div>
+              ${friendLastPostHtml(f)}
               <div class="links-card-foot">
                 ${f.category ? `<span class="links-card-cat">${esc(f.category)}</span>` : ""}
-                <span class="links-card-time">${t("links.updated_at", { time: timeAgo(f.last_checked || f.updated_at) })}</span>
               </div>
             </a>`).join("")
         : `<div class="essay-empty">${t("links.empty_apply_tip")}</div>`;
@@ -3592,6 +3631,278 @@
       });
     } catch (e) {
       app.innerHTML = `<div class="essay"><div class="links-wrap"><div class="essay-empty">${esc(e.message)}</div></div></div>`;
+    }
+  }
+
+  /* ================= 友圈（/friends） ================= */
+
+  /* 头像：后端已缓存为稳定 URL（自定义/favicon/qlogo），加载失败降级 RSS 图标（不用首字占位） */
+  function friendAvatarHtml(post) {
+    const src = post.avatar || "";
+    return `
+      <span class="friend-avatar">
+        ${src ? `<img src="${esc(src)}" alt="${esc(post.friend_name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none';var fb=this.parentElement.querySelector('.friend-avatar-fallback');if(fb)fb.style.display='flex'" />` : ""}
+        <span class="friend-avatar-fallback"${src ? ' style="display:none"' : ""}>${svgIcon("rss", 20)}</span>
+      </span>`;
+  }
+
+  /* 文章配图：复用首页九宫格样式（比例盒在图片加载前已确定，不会引起瀑布流重排） */
+  function friendImagesHtml(images) {
+    if (!images || !images.length) return "";
+    const mod = images.length === 1 ? "single" : images.length === 2 ? "double" : "multi";
+    const cells = images.slice(0, 9)
+      .map(src => `<div class="bber-content-img friend-content-img"><img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" /></div>`)
+      .join("");
+    return `<div class="bber-container-img bber-img-${mod} friend-imgs">${cells}</div>`;
+  }
+
+  /* 友圈图片防盗链兜底：直链（no-referrer）加载失败 → 换站内 /imgproxy 反代再试一次。
+     error 事件不冒泡，用捕获阶段委托监听；data-proxied 防止反代也失败时死循环 */
+  document.addEventListener("error", e => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement) || img.dataset.proxied || !img.closest(".friend-imgs")) return;
+    img.dataset.proxied = "1";
+    img.src = "/imgproxy?u=" + encodeURIComponent(img.src);
+  }, true);
+
+  /* 友链卡片「最新文章」标题点击直达友站文章（卡片本身是整卡 <a>，需拦截冒泡） */
+  document.addEventListener("click", e => {
+    const el = e.target && e.target.closest ? e.target.closest(".links-card-post[data-post-link]") : null;
+    if (!el) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const u = el.dataset.postLink || "";
+    if (/^https?:\/\//i.test(u)) window.open(u, "_blank", "noopener");
+  }, true);
+
+  /* 热度档位：>=200 热 / >=80 温 / 其余默认 */
+  function friendHeatHtml(clicks) {
+    const tier = clicks >= 200 ? " is-hot" : clicks >= 80 ? " is-warm" : "";
+    return `<span class="friend-post-heat${tier}" title="热度">${svgIcon("flame", 12)} ${clicks}°C</span>`;
+  }
+
+  /* ---- 友圈瀑布流布局（与首页即刻同一算法：>=1200 三列 / >=768 两列 / 其余一列） ---- */
+  let friendsEls = [];
+  const friendsRO = typeof ResizeObserver !== "undefined"
+    ? new ResizeObserver(() => {
+        if (friendsRafId) return;
+        friendsRafId = requestAnimationFrame(() => {
+          friendsRafId = 0;
+          friendsLayout();
+        });
+      })
+    : null;
+  let friendsRafId = 0;
+  let friendsWrapRO = null; // 容器宽度变化（断点切换）重排
+
+  function friendsLayout() {
+    const container = document.getElementById("friendsWaterfall");
+    if (!container || friendsEls.length === 0) return;
+    const width = container.offsetWidth;
+    if (!width) return;
+
+    const cols = width >= 1200 ? 3 : width >= 768 ? 2 : 1;
+    const colWidth = (width - GAP * (cols - 1)) / cols;
+    const heights = new Array(cols).fill(0);
+
+    // 两阶段：先纯读高度，再纯写位置，避免强制同步布局
+    const measured = friendsEls.map(el => (el ? el.getBoundingClientRect().height : 0));
+    friendsEls.forEach((el, index) => {
+      if (!el) return;
+      let minH = Infinity;
+      let col = 0;
+      for (let i = 0; i < cols; i++) {
+        if (heights[i] < minH) {
+          minH = heights[i];
+          col = i;
+        }
+      }
+      el.style.position = "absolute";
+      el.style.width = `${colWidth}px`;
+      el.style.left = `${col * (colWidth + GAP)}px`;
+      el.style.top = `${heights[col]}px`;
+      el.style.transition = "left .3s ease, top .3s ease, width .3s ease, transform .3s ease, box-shadow .3s ease, border-color .3s ease";
+      heights[col] += measured[index] + GAP;
+    });
+
+    const maxH = Math.max(...heights);
+    container.style.height = `${maxH > 0 ? maxH - GAP : 0}px`;
+  }
+
+  function observeFriendsResize(container) {
+    if (friendsWrapRO) friendsWrapRO.disconnect();
+    if (typeof ResizeObserver === "undefined") return;
+    let lastWidth = container.offsetWidth;
+    friendsWrapRO = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (!entry) return;
+      const width = entry.contentRect.width;
+      if (Math.abs(width - lastWidth) < 1) return;
+      lastWidth = width;
+      friendsLayout();
+    });
+    friendsWrapRO.observe(container);
+  }
+
+  /* 单张友圈卡片 */
+  function friendPostCardHtml(post) {
+    return `
+      <a class="friend-post-item" href="${esc(post.link)}" target="_blank" rel="noopener noreferrer" data-post-id="${post.id}">
+        <div class="friend-head">
+          ${friendAvatarHtml(post)}
+          <div class="friend-meta">
+            <span class="friend-name">${esc(post.friend_name)}</span>
+            <span class="friend-tag friend-tag-${post.tag}">${esc(post.tag_name)}</span>
+          </div>
+        </div>
+        <h3 class="friend-post-title">${esc(post.title)}</h3>
+        <p class="friend-post-summary">${esc(post.excerpt)}</p>
+        ${friendImagesHtml(post.images)}
+        <hr class="friend-post-divider" />
+        <div class="friend-post-footer">
+          <span class="friend-post-time">
+            ${svgIcon("clock", 12)}
+            ${timeAgo(post.published_at)}
+          </span>
+          ${friendHeatHtml(post.clicks)}
+          <span class="friend-post-link">
+            阅读原文
+            ${svgIcon("arrow-up-right", 12)}
+          </span>
+        </div>
+      </a>`;
+  }
+
+  /* 挂载/重排瀑布流（首屏与追加新卡片后调用） */
+  function mountFriendsWaterfall() {
+    const waterfall = document.getElementById("friendsWaterfall");
+    if (!waterfall) return;
+    friendsEls = Array.from(waterfall.children);
+    if (friendsRO) {
+      friendsRO.disconnect();
+      friendsEls.forEach(el => friendsRO.observe(el));
+    }
+    friendsLayout();
+    observeFriendsResize(waterfall);
+  }
+
+  /* 点击热度上报：sendBeacon 不阻塞跳转；不支持时 fetch keepalive 兜底 */
+  function reportFriendClick(postId) {
+    const url = `/api/friends/posts/${postId}/click`;
+    try {
+      if (navigator.sendBeacon && navigator.sendBeacon(url)) return;
+      fetch(url, { method: "POST", keepalive: true }).catch(() => {});
+    } catch { /* 统计失败不影响跳转 */ }
+  }
+
+  function bindFriendCardClicks(container) {
+    if (!container) return;
+    container.querySelectorAll(".friend-post-item").forEach(item => {
+      if (item.dataset.clickBound) return;
+      item.dataset.clickBound = "1";
+      item.addEventListener("click", () => reportFriendClick(item.dataset.postId));
+    });
+  }
+
+  function setFriendsLoadMoreText() {
+    const el = document.getElementById("friendsLoadMore");
+    if (!el) return;
+    if (state.friendsLoading) el.innerHTML = `<span class="spinner"></span><span>${t("feed.loading_more")}</span>`;
+    else if (!state.friendsDone) el.innerHTML = `<span>${t("feed.scroll_more")}</span>`;
+    else el.innerHTML = state.friendsTotal ? `<span>${t("feed.reached_end")}</span>` : "";
+  }
+
+  let friendsLoadMoreObserver = null;
+  function observeFriendsLoadMore() {
+    if (friendsLoadMoreObserver) friendsLoadMoreObserver.disconnect();
+    const sentinel = document.getElementById("friendsLoadMore");
+    if (!sentinel) return;
+    friendsLoadMoreObserver = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && !state.friendsLoading && !state.friendsDone) loadMoreFriends();
+      },
+      { rootMargin: "300px 0px 300px 0px", threshold: 0 }
+    );
+    friendsLoadMoreObserver.observe(sentinel);
+  }
+
+  async function loadMoreFriends() {
+    if (state.friendsLoading || state.friendsDone) return;
+    state.friendsLoading = true;
+    setFriendsLoadMoreText();
+    try {
+      const next = state.friendsPage + 1;
+      const data = await api(`/api/friends/posts?page=${next}`);
+      const waterfall = document.getElementById("friendsWaterfall");
+      if (waterfall && data.list && data.list.length) {
+        waterfall.insertAdjacentHTML("beforeend", data.list.map(friendPostCardHtml).join(""));
+        bindFriendCardClicks(waterfall);
+        mountFriendsWaterfall();
+      }
+      state.friendsPage = next;
+      state.friendsDone = !data.has_more;
+    } catch (e) {
+      state.friendsDone = true; // 失败后停止滚动触发，避免反复报错
+      toast(e.message);
+    } finally {
+      state.friendsLoading = false;
+      setFriendsLoadMoreText();
+    }
+  }
+
+  async function renderFriends() {
+    app.innerHTML = `<div class="essay"><div class="friends-wrap"><div class="essay-empty">${t("common.loading")}</div></div></div>`;
+    try {
+      state.friendsPage = 1;
+      state.friendsLoading = false;
+      state.friendsDone = false;
+      const data = await api("/api/friends/posts?page=1");
+      const posts = data.list || [];
+      state.friendsTotal = Number(data.total || 0);
+      state.friendsDone = !data.has_more;
+
+      // 横幅背景图与全站一致（后台「横幅背景图」设置，同 photos/links 页）
+      const fs = state.settings || {};
+      const fbg = bannerInlineBg(fs);
+      const fHasBg = fs.banner_bg_mode === "random" || /^https?:\/\//i.test(fs.banner_bg_image || "");
+      app.innerHTML = `<div class="essay">
+        <div class="banner-card friends-banner">
+          <div class="banner-inner${fHasBg ? " has-bg" : ""}"${fHasBg ? ` data-banner-bg="1"` : ""}${fbg ? ` style="background-image:url('${esc(fbg).replace(/'/g, "%27")}')"` : ""}>
+            <div class="banner-content">
+              <div>
+                <div class="banner-tips">${esc(fs.essay_tips || "")}</div>
+                <span class="banner-title">友圈</span>
+              </div>
+              <div class="banner-bottom">
+                <div class="banner-desc">朋友们的最新动态 · 共 ${state.friendsTotal} 篇</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="friends-wrap">
+          ${posts.length
+            ? `<div class="friends-list" id="friendsWaterfall">${posts.map(friendPostCardHtml).join("")}</div>
+               <div class="essay-loadmore" id="friendsLoadMore"></div>`
+            : `<div class="essay-empty">友圈还没有动态<br /><small style="color:var(--muted)">站长添加友站订阅后，朋友们的最新文章会出现在这里</small></div>`}
+        </div>
+      </div>`;
+
+      setSeo({
+        title: `友圈 · ${state.settings.site_title}`,
+        description: "朋友们的最新动态",
+        path: "/friends",
+      });
+
+      if (posts.length) {
+        // 挂载瀑布流：头像尺寸固定、文本有 clamp，高度与图片加载无关，可立即布局；
+        // RO 兜底字体晚到/语言切换等高度变化，容器 RO 处理断点切换
+        mountFriendsWaterfall();
+        bindFriendCardClicks(document.getElementById("friendsWaterfall"));
+        setFriendsLoadMoreText();
+        observeFriendsLoadMore();
+      }
+    } catch (e) {
+      app.innerHTML = `<div class="essay"><div class="friends-wrap"><div class="essay-empty">${esc(e.message)}</div></div></div>`;
     }
   }
 
@@ -3642,6 +3953,11 @@
               <button type="button" class="btn" id="linksFetchBtn">${t("links.fetch_auto")}</button>
             </div>
           </div>
+          <div class="field">
+            <label>${t("links.apply_feed_url")}</label>
+            <input name="feed_url" maxlength="500" placeholder="${t("links.apply_feed_ph")}" />
+            <small style="color:var(--anzhiyu-secondtext)">${t("links.apply_feed_hint")}</small>
+          </div>
           <div class="field"><label>${t("links.apply_desc")}</label><input name="description" maxlength="300" placeholder="${t("links.apply_desc_ph")}" /></div>
           <div class="field"><label>${t("links.apply_email")}</label><input name="email" type="email" maxlength="120" placeholder="you@example.com" /></div>
           <div class="field"><label>${t("links.apply_category")}</label><select name="category">${catOpts}</select></div>
@@ -3679,6 +3995,10 @@
           if (info.name) form.querySelector('[name="name"]').value = info.name;
           if (info.description) form.querySelector('[name="description"]').value = info.description;
           if (info.url) form.querySelector('[name="url"]').value = info.url;
+          if (info.feed_url) {
+            const feedEl = form.querySelector('[name="feed_url"]');
+            if (feedEl && !feedEl.value.trim()) feedEl.value = info.feed_url;
+          }
           toast(t("links.fetch_auto_ok"));
         } catch (err) {
           toast(err.message || t("links.fetch_auto_fail"));
@@ -3864,10 +4184,10 @@
 
   function syncBackTop() {
     if (!backTop) return;
-    // 只服务两类长页面：文章详情、首页无限下拉流
+    // 只服务三类长页面：文章详情、首页无限下拉流、友圈无限下拉流
     const p = location.pathname;
     const show =
-      (p === "/" || p.startsWith("/post/")) &&
+      (p === "/" || p.startsWith("/post/") || p === "/friends") &&
       (window.scrollY || document.documentElement.scrollTop || 0) > 480;
     if (show === backTopShown) return;
     backTopShown = show;
@@ -5179,27 +5499,73 @@
   /* ---------- 后台 Tab：访问统计 ---------- */
   let analyticsDays = 7;
   let analyticsSub = "overview";
+  let analyticsStart = ""; // 自定义日期范围起始（YYYY-MM-DD），为空则用 days
+  let analyticsEnd = "";   // 自定义日期范围结束
+
+  // 生成当前查询参数：自定义范围用 start/end，否则用 days
+  function analyticsQS() {
+    return analyticsStart && analyticsEnd
+      ? `start=${encodeURIComponent(analyticsStart)}&end=${encodeURIComponent(analyticsEnd)}`
+      : `days=${analyticsDays}`;
+  }
+  // CSV 导出：headers 为表头数组，rows 为行数组
+  function exportCSV(filename, headers, rows) {
+    const escCell = v => { v = String(v ?? ""); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+    const csv = [headers.map(escCell).join(","), ...rows.map(r => r.map(escCell).join(","))].join("\n");
+    // BOM 让 Excel 正确识别 UTF-8
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   async function renderAdminAnalytics(panel) {
+    const rangeLabel = analyticsStart && analyticsEnd
+      ? `${analyticsStart} ~ ${analyticsEnd}`
+      : `近 ${analyticsDays} 天`;
     const head = `
       <div class="ov-chart-head" style="margin-bottom:1rem">
         <h3>访问统计</h3>
         <span class="an-subtabs">
           <button type="button" class="an-subtab ${analyticsSub === "overview" ? "on" : ""}" data-asub="overview">总览</button>
+          <button type="button" class="an-subtab ${analyticsSub === "daily" ? "on" : ""}" data-asub="daily">每日明细</button>
+          <button type="button" class="an-subtab ${analyticsSub === "sources" ? "on" : ""}" data-asub="sources">来源分析</button>
           <button type="button" class="an-subtab ${analyticsSub === "posts" ? "on" : ""}" data-asub="posts">文章统计</button>
         </span>
         <span class="an-days">
-          ${[7, 30, 90].map(d => `<button type="button" class="an-daybtn ${analyticsDays === d ? "on" : ""}" data-andays="${d}">${d}天</button>`).join("")}
+          ${[7, 30, 90].map(d => `<button type="button" class="an-daybtn ${!analyticsStart && analyticsDays === d ? "on" : ""}" data-andays="${d}">${d}天</button>`).join("")}
         </span>
+        <span class="an-daterange">
+          <input type="date" class="an-date-input" id="anDateStart" value="${analyticsStart}" max="${new Date().toISOString().slice(0,10)}">
+          <span class="an-date-sep">~</span>
+          <input type="date" class="an-date-input" id="anDateEnd" value="${analyticsEnd}" max="${new Date().toISOString().slice(0,10)}">
+          <button type="button" class="btn sm an-date-btn" data-arange>查询</button>
+          ${(analyticsStart && analyticsEnd) ? `<button type="button" class="btn sm an-date-clear" data-aclear>清除</button>` : ""}
+        </span>
+        <span class="an-range-label">${rangeLabel}</span>
       </div>`;
     panel.innerHTML = `${head}<div class="essay-loading"><span class="spinner"></span><span>加载中...</span></div>`;
     panel.querySelectorAll("[data-asub]").forEach(b => b.addEventListener("click", () => { analyticsSub = b.dataset.asub; renderAdminAnalytics(panel); }));
-    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); renderAdminAnalytics(panel); }));
+    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); analyticsStart = ""; analyticsEnd = ""; renderAdminAnalytics(panel); }));
+    panel.querySelector("[data-arange]")?.addEventListener("click", () => {
+      const sv = panel.querySelector("#anDateStart").value;
+      const ev = panel.querySelector("#anDateEnd").value;
+      if (!sv || !ev) { alert("请选择开始和结束日期"); return; }
+      if (sv > ev) { alert("开始日期不能晚于结束日期"); return; }
+      analyticsStart = sv; analyticsEnd = ev;
+      renderAdminAnalytics(panel);
+    });
+    panel.querySelector("[data-aclear]")?.addEventListener("click", () => { analyticsStart = ""; analyticsEnd = ""; renderAdminAnalytics(panel); });
     if (analyticsSub === "posts") return renderAnalyticsPosts(panel, head);
+    if (analyticsSub === "daily") return renderAnalyticsDaily(panel, head);
+    if (analyticsSub === "sources") return renderAnalyticsSources(panel, head);
 
     let s, v;
     try {
       [s, v] = await Promise.all([
-        api(`/api/admin/analytics/summary?days=${analyticsDays}`),
+        api(`/api/admin/analytics/summary?${analyticsQS()}`),
         api(`/api/admin/analytics/visitors?limit=50`),
       ]);
     } catch (e) { panel.innerHTML = `${head}<p>加载失败：${esc(e.message)}</p>`; return; }
@@ -5215,10 +5581,25 @@
       const seg = ip.split(":").filter(Boolean);
       return seg.length > 3 ? seg.slice(0, 3).join(":") + "…" : ip;
     };
+    // 环比对比：箭头 + 百分比
+    const trendPct = (cur, prev) => {
+      if (!prev) return cur > 0 ? { dir: "up", pct: 100 } : null; // 上期为 0
+      const diff = (cur - prev) / prev * 100;
+      if (Math.abs(diff) < 0.1) return null;
+      return { dir: diff > 0 ? "up" : "down", pct: Math.abs(Math.round(diff * 10) / 10) };
+    };
+    const arrowHtml = (cur, prev) => {
+      const t = trendPct(cur, prev);
+      if (!t) return `<span class="an-prev-flat">持平</span>`;
+      return `<span class="an-prev-${t.dir}">${t.dir === "up" ? "↑" : "↓"} ${t.pct}%</span>`;
+    };
     const cards = [
-      { label: "浏览量 PV", val: s.pv },
-      { label: "独立访客 UV", val: s.uv },
-      { label: "平均停留", val: fmtDur(s.avgDuration) },
+      { label: "浏览量 PV", val: s.pv, prev: s.prevPv },
+      { label: "独立访客 UV", val: s.uv, prev: s.prevUv },
+      { label: "人均浏览", val: s.pvPerUv, prev: s.prevPvPerUv },
+      { label: "来源数", val: s.refCount, prev: s.prevRefCount },
+      { label: "访问页面", val: s.pathCount, prev: s.prevPathCount },
+      { label: "平均停留", val: fmtDur(s.avgDuration), prev: s.prevAvgDuration ? fmtDur(s.prevAvgDuration) : 0, raw: [s.avgDuration, s.prevAvgDuration] },
     ];
     const barList = (title, rows) => {
       const max = Math.max(1, ...rows.map(r => r.n));
@@ -5256,19 +5637,26 @@
     }).join("");
     const vStart = (vPage - 1) * vPerPage;
     const vPager = vPages > 1 ? `<div class="an-pager"><button type="button" class="btn sm" data-vprev ${vPage <= 1 ? "disabled" : ""}>上一页</button><span>${vPage} / ${vPages}</span><button type="button" class="btn sm" data-vnext ${vPage >= vPages ? "disabled" : ""}>下一页</button></div>` : "";
+    // 横轴日期标签抽样：数据点多时只显示约 8 个，避免 90 天挤爆
+    const anAxisStep = Math.max(1, Math.ceil(trend.length / 8));
+    const anAxisLabels = trend.map((t, i) => (i % anAxisStep === 0 || i === trend.length - 1) ? `<span>${t.date.slice(5)}</span>` : "").join("");
 
     panel.innerHTML = `
       ${head}
-      <div class="ov-cards">${cards.map(c => `
-        <div class="ov-card"><div class="ov-card-num">${c.val}</div><div class="ov-card-label">${c.label}</div></div>`).join("")}</div>
+      <div class="ov-cards an-cards">${cards.map(c => `
+        <div class="ov-card">
+          <div class="ov-card-num">${c.val}</div>
+          <div class="ov-card-label">${c.label}</div>
+          <div class="ov-card-prev">${arrowHtml(c.raw ? c.raw[0] : c.val, c.raw ? c.raw[1] : c.prev)}</div>
+        </div>`).join("")}</div>
       <div class="ov-chart-card">
-        <div class="ov-chart-head"><h3>浏览趋势</h3><span class="ov-chart-sub">近 ${s.days} 天</span></div>
+        <div class="ov-chart-head"><h3>浏览趋势</h3><span class="ov-chart-sub">${rangeLabel}</span><button type="button" class="btn sm an-export-btn" data-export="overview">导出CSV</button></div>
         <svg class="ov-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">
           ${[0.25, 0.5, 0.75].map(f => `<line x1="${pad}" y1="${(pad + (H - pad * 2) * f).toFixed(1)}" x2="${W - pad}" y2="${(pad + (H - pad * 2) * f).toFixed(1)}" stroke="var(--anzhiyu-card-border)" stroke-dasharray="4 5"/>`).join("")}
           <polyline points="${line(t => t.pv)}" fill="none" stroke="var(--anzhiyu-main)" stroke-width="2.5" stroke-linejoin="round"/>
           <polyline points="${line(t => t.uv)}" fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/>
         </svg>
-        <div class="ov-chart-axis">${trend.map(t => `<span>${t.date.slice(5)}</span>`).join("")}</div>
+        <div class="ov-chart-axis">${anAxisLabels}</div>
         <p class="an-legend"><span><i style="background:var(--anzhiyu-main)"></i>PV</span><span><i style="background:#9ca3af"></i>UV</span></p>
       </div>
       <div class="an-grid">
@@ -5296,7 +5684,264 @@
     bindVPager();
 
     panel.querySelectorAll("[data-asub]").forEach(b => b.addEventListener("click", () => { analyticsSub = b.dataset.asub; renderAdminAnalytics(panel); }));
-    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); renderAdminAnalytics(panel); }));
+    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); analyticsStart = ""; analyticsEnd = ""; renderAdminAnalytics(panel); }));
+    // 总览导出 CSV：趋势 + 排行
+    panel.querySelector("[data-export=\"overview\"]")?.addEventListener("click", () => {
+      const rows = trend.map(t => [t.date, t.pv, t.uv]);
+      // 追加排行榜数据
+      s.topPaths.forEach(r => rows.push([`热门页:${pageName(r.name, r.title)}`, r.n, ""]));
+      exportCSV(`访问统计-总览-${rangeLabel}.csv`, ["日期/类别", "PV", "UV"], rows);
+    });
+  }
+
+  /* ---------- 每日明细子标签 ---------- */
+  async function renderAnalyticsDaily(panel, head) {
+    const fmtDur = sec => { sec = Number(sec) || 0; const m = Math.floor(sec / 60), r = Math.round(sec % 60); return m ? `${m}分${r}秒` : `${r}秒`; };
+    const PAGE_NAMES = { "/": "首页", "/moments": "说说", "/posts": "文章", "/about": "关于", "/links": "友链", "/photos": "相册", "/search": "搜索", "/music": "音乐", "/feed": "订阅" };
+    const pageName = (path, title) => { path = path || "/"; return PAGE_NAMES[path] || (title ? title : path); };
+    const hostOf = url => { try { return new URL(url).host; } catch { return url || "直接访问"; } };
+    const barList = (title, rows) => {
+      const max = Math.max(1, ...rows.map(r => r.n));
+      return `<div class="an-block"><h4>${title}</h4>${rows.length ? rows.map(r => {
+        const nm = r.href ? `<a href="${esc(r.href)}" target="_blank" rel="noopener nofollow" title="${esc(r.href)}">${esc(r.name || "未知")}</a>` : `<span title="${esc(r.name)}">${esc(r.name || "未知")}</span>`;
+        return `<div class="an-barrow"><span class="an-barname">${nm}</span><span class="an-bartrack"><span class="an-barfill" style="width:${(r.n / max * 100).toFixed(1)}%"></span></span><span class="an-barnum">${r.n}</span></div>`;
+      }).join("") : `<p class="an-empty">暂无数据</p>`}</div>`;
+    };
+
+    let data;
+    try {
+      data = await api(`/api/admin/analytics/daily?${analyticsQS()}`);
+    } catch (e) { panel.innerHTML = `${head}<p>加载失败：${esc(e.message)}</p>`; return; }
+    const list = data.list || [];
+    const rangeLabel = analyticsStart && analyticsEnd ? `${analyticsStart} ~ ${analyticsEnd}` : `近 ${analyticsDays} 天`;
+    if (!list.length) { panel.innerHTML = `${head}<p class="an-empty">${rangeLabel} 暂无访问记录</p>`; return; }
+
+    let dPage = 1;
+    const dPerPage = 15;
+    const dPages = Math.ceil(list.length / dPerPage) || 1;
+
+    const rowHtml = rows => rows.map((r, i) => {
+      const idx = (dPage - 1) * dPerPage + i + 1;
+      const devParts = [
+        r.mobile ? `移动 ${r.mobile}` : "",
+        r.desktop ? `桌面 ${r.desktop}` : "",
+        r.tablet ? `平板 ${r.tablet}` : "",
+      ].filter(Boolean).join(" · ") || "—";
+      const topPage = r.topPath ? pageName(r.topPath, r.topTitle) : "—";
+      const d = new Date(r.date);
+      const isToday = r.date === new Date().toISOString().slice(0, 10);
+      return `<tr class="an-day-row" data-date="${esc(r.date)}">
+        <td class="an-day-idx">${idx}</td>
+        <td class="an-day-date">${isToday ? "<strong>" : ""}${d.getMonth() + 1}/${d.getDate()}${isToday ? "</strong>" : ""}<small>${r.date.slice(0, 7)}</small></td>
+        <td class="an-day-pv">${r.pv}</td>
+        <td class="an-day-uv">${r.uv}</td>
+        <td class="an-day-dur">${r.avgDuration ? fmtDur(r.avgDuration) : "—"}</td>
+        <td class="an-day-dev">${devParts}</td>
+        <td class="an-day-ref">${r.refCount || "—"}</td>
+        <td class="an-day-top" title="${esc(r.topPath || "")}">${esc(topPage)}</td>
+        <td class="an-day-toggle"><button type="button" class="btn sm an-day-btn">展开</button></td>
+      </tr>
+      <tr class="an-day-detail" data-date-detail="${esc(r.date)}" hidden><td colspan="9"></td></tr>`;
+    }).join("");
+
+    const pager = dPages > 1 ? `<div class="an-pager"><button type="button" class="btn sm" data-dprev ${dPage <= 1 ? "disabled" : ""}>上一页</button><span>${dPage} / ${dPages}</span><button type="button" class="btn sm" data-dnext ${dPage >= dPages ? "disabled" : ""}>下一页</button></div>` : "";
+
+    // 区间汇总卡片
+    const sum = data.summary || {};
+    const sumCards = [
+      { label: "总浏览量 PV", val: sum.pv || 0 },
+      { label: "独立访客 UV", val: sum.uv || 0 },
+      { label: "日均 PV", val: sum.avgPvPerDay || 0 },
+      { label: "平均停留", val: sum.avgDuration ? fmtDur(sum.avgDuration) : "—" },
+    ];
+
+    panel.innerHTML = `${head}
+      <div class="ov-cards an-cards4">${sumCards.map(c => `
+        <div class="ov-card">
+          <div class="ov-card-num">${c.val}</div>
+          <div class="ov-card-label">${c.label}</div>
+        </div>`).join("")}</div>
+      <div class="an-day-toolbar"><button type="button" class="btn sm an-export-btn" data-export="daily">导出CSV</button></div>
+      <div class="an-day-table-wrap">
+        <table class="an-day-table">
+          <thead><tr>
+            <th>#</th><th>日期</th><th>PV</th><th>UV</th><th>平均停留</th><th>设备分布</th><th>来源数</th><th>热门页面</th><th></th>
+          </tr></thead>
+          <tbody id="anDayBody">${rowHtml(list.slice(0, dPerPage))}</tbody>
+        </table>
+      </div>
+      <div id="anDayPager">${pager}</div>`;
+
+    // innerHTML 被替换后重新绑定子 tab 和天数切换
+    panel.querySelectorAll("[data-asub]").forEach(b => b.addEventListener("click", () => { analyticsSub = b.dataset.asub; renderAdminAnalytics(panel); }));
+    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); analyticsStart = ""; analyticsEnd = ""; renderAdminAnalytics(panel); }));
+    // 每日明细导出 CSV
+    panel.querySelector("[data-export=\"daily\"]")?.addEventListener("click", () => {
+      const rows = list.map(r => [r.date, r.pv, r.uv, r.avgDuration ? fmtDur(r.avgDuration) : "", `${r.mobile ? "移动" + r.mobile : ""} ${r.desktop ? "桌面" + r.desktop : ""} ${r.tablet ? "平板" + r.tablet : ""}`.trim(), r.refCount, r.topPath ? pageName(r.topPath, r.topTitle) : ""]);
+      exportCSV(`访问统计-每日明细-${rangeLabel}.csv`, ["日期", "PV", "UV", "平均停留", "设备分布", "来源数", "热门页面"], rows);
+    });
+
+    const refreshDay = () => {
+      const body = panel.querySelector("#anDayBody");
+      const pg = panel.querySelector("#anDayPager");
+      const start = (dPage - 1) * dPerPage;
+      if (body) body.innerHTML = rowHtml(list.slice(start, start + dPerPage)) || `<tr><td colspan="9" class="an-empty">暂无数据</td></tr>`;
+      if (pg) pg.innerHTML = dPages > 1 ? `<button type="button" class="btn sm" data-dprev ${dPage <= 1 ? "disabled" : ""}>上一页</button><span>${dPage} / ${dPages}</span><button type="button" class="btn sm" data-dnext ${dPage >= dPages ? "disabled" : ""}>下一页</button>` : "";
+      bindRowEvents();
+      bindPager();
+    };
+
+    const bindRowEvents = () => {
+      panel.querySelectorAll(".an-day-row").forEach(row => {
+        const btn = row.querySelector(".an-day-btn");
+        if (!btn) return;
+        const handler = async () => {
+          const date = row.dataset.date;
+          const detail = panel.querySelector(`[data-date-detail="${date}"]`);
+          if (!detail) return;
+          if (row.classList.contains("open")) { row.classList.remove("open"); detail.hidden = true; btn.textContent = "展开"; return; }
+          row.classList.add("open"); detail.hidden = false; btn.textContent = "收起";
+          if (detail.dataset.loaded) return;
+          detail.querySelector("td").innerHTML = `<span class="spinner"></span> 加载中…`;
+          try {
+            const s = await api(`/api/admin/analytics/summary?date=${date}`);
+            const cards = [
+              { label: "浏览量 PV", val: s.pv },
+              { label: "独立访客 UV", val: s.uv },
+              { label: "人均浏览", val: s.pvPerUv || 0 },
+              { label: "平均停留", val: fmtDur(s.avgDuration) },
+            ];
+            detail.querySelector("td").innerHTML = `
+              <div class="an-day-expand">
+                <div class="ov-cards an-cards4">${cards.map(c => `<div class="ov-card"><div class="ov-card-num">${c.val}</div><div class="ov-card-label">${c.label}</div></div>`).join("")}</div>
+                <div class="an-grid">
+                  ${barList("热门页面", (s.topPaths || []).map(r => ({ name: pageName(r.name, r.title), n: r.n })))}
+                  ${barList("来源网站", (s.referrers || []).map(r => ({ name: hostOf(r.name), href: /^https?:\/\//i.test(r.name) ? r.name : "", n: r.n })))}
+                  ${barList("国家/地区", s.countries || [])}
+                  ${barList("设备", s.devices || [])}
+                </div>
+              </div>`;
+            detail.dataset.loaded = "1";
+          } catch (e) { detail.querySelector("td").innerHTML = `<p class="an-empty">加载失败：${esc(e.message)}</p>`; }
+        };
+        btn.addEventListener("click", handler);
+      });
+    };
+
+    const bindPager = () => {
+      const prev = panel.querySelector("[data-dprev]");
+      const next = panel.querySelector("[data-dnext]");
+      if (prev && !prev.disabled) prev.addEventListener("click", () => { dPage = Math.max(1, dPage - 1); refreshDay(); });
+      if (next && !next.disabled) next.addEventListener("click", () => { dPage = Math.min(dPages, dPage + 1); refreshDay(); });
+    };
+
+    bindRowEvents();
+    bindPager();
+  }
+
+  /* ---------- 来源分析子标签 ---------- */
+  async function renderAnalyticsSources(panel, head) {
+    const fmtDur = sec => { sec = Number(sec) || 0; const m = Math.floor(sec / 60), r = Math.round(sec % 60); return m ? `${m}分${r}秒` : `${r}秒`; };
+    const TYPE_COLORS = { search: "#3b82f6", social: "#ec4899", direct: "#6b8e6b", external: "#f59e0b", internal: "#8b5cf6" };
+    const TYPE_LABELS = { search: "搜索引擎", social: "社交媒体", direct: "直接访问", external: "外链", internal: "站内" };
+
+    let data;
+    try {
+      data = await api(`/api/admin/analytics/sources?${analyticsQS()}`);
+    } catch (e) { panel.innerHTML = `${head}<p>加载失败：${esc(e.message)}</p>`; return; }
+
+    const types = data.types || [];
+    const trend = data.trend || [];
+    const refs = data.referrers || [];
+    const totalPv = data.totalPv || 0;
+    const rangeLabel = analyticsStart && analyticsEnd ? `${analyticsStart} ~ ${analyticsEnd}` : `近 ${analyticsDays} 天`;
+
+    if (!totalPv) { panel.innerHTML = `${head}<p class="an-empty">${rangeLabel} 暂无访问记录</p>`; return; }
+
+    // 环形图（SVG donut）
+    const R = 70, cx = 90, cy = 90, strokeW = 22;
+    const C = 2 * Math.PI * R;
+    let acc = 0;
+    const donutSegs = types.map(t => {
+      const len = (t.pv / totalPv) * C;
+      const seg = { color: TYPE_COLORS[t.key] || "#ccc", label: t.label, pct: t.pct, pv: t.pv, dash: `${len} ${C - len}`, offset: -acc };
+      acc += len;
+      return seg;
+    });
+
+    // 趋势堆叠柱状图
+    const tW = 640, tH = 160, pad = 30;
+    const dayCount = trend.length;
+    const barW = dayCount > 1 ? Math.max(4, (tW - pad * 2) / dayCount - 2) : 20;
+    const maxV = Math.max(1, ...trend.map(t => types.reduce((s, ty) => s + (Number(t[ty.key]) || 0), 0)));
+    const x = i => pad + (i * (tW - pad * 2)) / Math.max(1, dayCount - 1) - barW / 2;
+    const y = v => tH - pad - (v / maxV) * (tH - pad * 2);
+    // 横轴日期标签：数据点多时抽样显示，避免 90 天挤爆
+    const maxAxisLabels = 8;
+    const axisStep = Math.max(1, Math.ceil(dayCount / maxAxisLabels));
+    const axisLabels = trend.map((t, i) => (i % axisStep === 0 || i === dayCount - 1) ? `<span>${t.date.slice(5)}</span>` : "").join("");
+    let bars = "";
+    trend.forEach((t, i) => {
+      let stackH = 0;
+      types.forEach(ty => {
+        const v = Number(t[ty.key]) || 0;
+        if (!v) return;
+        const h = (v / maxV) * (tH - pad * 2);
+        bars += `<rect x="${x(i).toFixed(1)}" y="${(y(v) + stackH).toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" fill="${TYPE_COLORS[ty.key]}" opacity="0.85" rx="1.5"><title>${t.date.slice(5)} ${ty.label}: ${v}</title></rect>`;
+        stackH += h;
+      });
+    });
+
+    // 来源明细列表
+    const refList = refs.slice(0, 20);
+    const maxRef = Math.max(1, ...refList.map(r => r.pv));
+
+    panel.innerHTML = `${head}
+      <div class="ov-cards">${types.map(t => `
+        <div class="ov-card" style="border-top:3px solid ${TYPE_COLORS[t.key]}">
+          <div class="ov-card-num">${t.pv}</div>
+          <div class="ov-card-label">${t.label} · ${t.pct}%</div>
+        </div>`).join("")}</div>
+
+      <div class="an-grid" style="grid-template-columns:1fr 1.5fr">
+        <div class="an-block an-src-donut">
+          <h4>来源占比</h4>
+          <svg viewBox="0 0 180 180" class="an-donut" role="img">
+            <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--anzhiyu-secondbg)" stroke-width="${strokeW}"/>
+            ${donutSegs.map(s => `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${s.color}" stroke-width="${strokeW}" stroke-dasharray="${s.dash}" stroke-dashoffset="${s.offset}" transform="rotate(-90 ${cx} ${cy})"><title>${s.label}: ${s.pv} (${s.pct}%)</title></circle>`).join("")}
+            <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="22" font-weight="700" fill="var(--anzhiyu-fontcolor)">${totalPv}</text>
+            <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-size="12" fill="var(--anzhiyu-secondtext)">总 PV</text>
+          </svg>
+          <div class="an-donut-legend">${donutSegs.map(s => `<span><i style="background:${s.color}"></i>${s.label} ${s.pct}%</span>`).join("")}</div>
+        </div>
+        <div class="an-block an-src-trend">
+          <h4>来源趋势 <small>${rangeLabel}</small></h4>
+          <svg viewBox="0 0 ${tW} ${tH}" class="an-trend" preserveAspectRatio="none" role="img">
+            ${[0.25, 0.5, 0.75].map(f => `<line x1="${pad}" y1="${(pad + (tH - pad * 2) * f).toFixed(1)}" x2="${tW - pad}" y2="${(pad + (tH - pad * 2) * f).toFixed(1)}" stroke="var(--anzhiyu-card-border)" stroke-dasharray="4 5"/>`).join("")}
+            ${bars}
+          </svg>
+          <div class="ov-chart-axis">${axisLabels}</div>
+        </div>
+      </div>
+
+      <div class="an-block">
+        <h4>来源明细（Top ${refList.length}） <button type="button" class="btn sm an-export-btn" data-export="sources">导出CSV</button></h4>
+        ${refList.length ? refList.map(r => `
+          <div class="an-barrow">
+            <span class="an-barname"><i class="an-src-tag" style="background:${TYPE_COLORS[r.type] || "#ccc"}" title="${TYPE_LABELS[r.type] || r.type}">${TYPE_LABELS[r.type] || r.type}</i><span title="${esc(r.name)}">${esc(r.name)}</span></span>
+            <span class="an-bartrack"><span class="an-barfill" style="width:${(r.pv / maxRef * 100).toFixed(1)}%"></span></span>
+            <span class="an-barnum">${r.pv}</span>
+          </div>`).join("") : `<p class="an-empty">暂无数据</p>`}
+      </div>`;
+
+    // innerHTML 被替换后重新绑定子 tab 和天数切换
+    panel.querySelectorAll("[data-asub]").forEach(b => b.addEventListener("click", () => { analyticsSub = b.dataset.asub; renderAdminAnalytics(panel); }));
+    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); analyticsStart = ""; analyticsEnd = ""; renderAdminAnalytics(panel); }));
+    // 来源分析导出 CSV
+    panel.querySelector("[data-export=\"sources\"]")?.addEventListener("click", () => {
+      const rows = refs.map(r => [r.name, TYPE_LABELS[r.type] || r.type, r.pv, r.uv, r.avgDur ? fmtDur(r.avgDur) : ""]);
+      exportCSV(`访问统计-来源分析-${rangeLabel}.csv`, ["来源", "类型", "PV", "UV", "平均停留"], rows);
+    });
   }
 
   /* ---------- 文章统计子标签 ---------- */
@@ -5313,11 +5958,26 @@
     };
     let data;
     try {
-      data = await api(`/api/admin/analytics/posts?days=${analyticsDays}`);
+      data = await api(`/api/admin/analytics/posts?${analyticsQS()}`);
     } catch (e) { panel.innerHTML = `${head}<p>加载失败：${esc(e.message)}</p>`; return; }
     const posts = data.posts || [];
-    if (!posts.length) { panel.innerHTML = `${head}<p class="an-empty">近 ${analyticsDays} 天暂无文章访问记录</p>`; return; }
+    const rangeLabel = analyticsStart && analyticsEnd ? `${analyticsStart} ~ ${analyticsEnd}` : `近 ${analyticsDays} 天`;
+    if (!posts.length) { panel.innerHTML = `${head}<p class="an-empty">${rangeLabel} 暂无文章访问记录</p>`; return; }
+    // 文章区汇总卡片
+    const sum = data.summary || {};
+    const sumCards = [
+      { label: "文章数", val: sum.postCount || 0 },
+      { label: "总浏览量 PV", val: sum.pv || 0 },
+      { label: "独立访客 UV", val: sum.uv || 0 },
+      { label: "平均每篇 PV", val: sum.avgPvPerPost || 0 },
+    ];
     panel.innerHTML = `${head}
+      <div class="ov-cards an-cards4">${sumCards.map(c => `
+        <div class="ov-card">
+          <div class="ov-card-num">${c.val}</div>
+          <div class="ov-card-label">${c.label}</div>
+        </div>`).join("")}</div>
+      <div class="an-day-toolbar"><button type="button" class="btn sm an-export-btn" data-export="posts">导出CSV</button></div>
       <div class="an-post-list">${posts.map((p, i) => `
         <div class="an-post-row${p._open ? " open" : ""}" data-apost="${esc(p.path)}">
           <div class="an-post-main">
@@ -5340,10 +6000,12 @@
         if (detail.dataset.loaded) return;
         detail.innerHTML = `<span class="spinner"></span> 加载中…`;
         try {
-          const d = await api(`/api/admin/analytics/post?path=${encodeURIComponent(row.dataset.apost)}&days=${analyticsDays}`);
+          const d = await api(`/api/admin/analytics/post?path=${encodeURIComponent(row.dataset.apost)}&${analyticsQS()}`);
+          const perUv = d.uv ? Math.round(d.pv / d.uv * 10) / 10 : 0;
           const cards = [
-            { label: "浏览量", val: d.pv },
-            { label: "访客数", val: d.uv },
+            { label: "浏览量 PV", val: d.pv },
+            { label: "访客数 UV", val: d.uv },
+            { label: "人均浏览", val: perUv },
             { label: "平均停留", val: fmtDur(d.avgDuration) },
           ];
           const visitorList2 = d.visitors || [];
@@ -5368,7 +6030,7 @@
           const dStart = (dPage - 1) * dPerPage;
           const dPager = dPages > 1 ? `<div class="an-pager"><button type="button" class="btn sm" data-dprev ${dPage <= 1 ? "disabled" : ""}>上一页</button><span>${dPage} / ${dPages}</span><button type="button" class="btn sm" data-dnext ${dPage >= dPages ? "disabled" : ""}>下一页</button></div>` : "";
           detail.innerHTML = `
-            <div class="ov-cards">${cards.map(c => `<div class="ov-card"><div class="ov-card-num">${c.val}</div><div class="ov-card-label">${c.label}</div></div>`).join("")}</div>
+            <div class="ov-cards an-cards4">${cards.map(c => `<div class="ov-card"><div class="ov-card-num">${c.val}</div><div class="ov-card-label">${c.label}</div></div>`).join("")}</div>
             <div class="an-grid">${barList("来源", d.referrers.map(r=>({name:hostOf(r.name),href:/^https?:\/\//i.test(r.name)?r.name:"",n:r.n})))}${barList("地域", d.regions)}</div>
             <div class="an-block"><h4>访客明细（${visitorList2.length} 条）</h4>
               <div class="an-detail-visitors">${visitorHtml2(visitorList2.slice(dStart, dStart + dPerPage)) || `<p class="an-empty">暂无记录</p>`}</div>${dPager}</div>`;
@@ -5390,7 +6052,12 @@
     });
     // 子标签和天数切换按钮需要重新绑定（innerHTML 重写后旧事件丢失）
     panel.querySelectorAll("[data-asub]").forEach(b => b.addEventListener("click", () => { analyticsSub = b.dataset.asub; renderAdminAnalytics(panel); }));
-    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); renderAdminAnalytics(panel); }));
+    panel.querySelectorAll("[data-andays]").forEach(b => b.addEventListener("click", () => { analyticsDays = Number(b.dataset.andays); analyticsStart = ""; analyticsEnd = ""; renderAdminAnalytics(panel); }));
+    // 文章统计导出 CSV
+    panel.querySelector("[data-export=\"posts\"]")?.addEventListener("click", () => {
+      const rows = posts.map(p => [p.title || p.path, p.path, p.pv, p.uv, p.avg_dur ? fmtDur(p.avg_dur) : "", p.last_visit ? p.last_visit.replace("T", " ").slice(0, 16) : ""]);
+      exportCSV(`访问统计-文章统计-${rangeLabel}.csv`, ["标题", "路径", "PV", "UV", "平均停留", "最后访问"], rows);
+    });
   }
 
   // 后台列表分页状态（跨重渲染保留）
@@ -5882,6 +6549,7 @@
     const cats = String(state.settings.links_categories || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const catOpts = cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
     const statusText = { pending: "待审核", approved: "已上架", rejected: "已拒绝" };
+    const feedTagText = { blog: "博客", community: "社区", tech: "技术" };
 
     const rows = list.map(f => `
       <div class="friend-admin-row" data-id="${f.id}">
@@ -5892,13 +6560,18 @@
               ${esc(f.name)}
               ${f.category ? `<span class="links-card-cat">${esc(f.category)}</span>` : ""}
               <span class="friend-admin-status s-${f.status}">${statusText[f.status] || f.status}</span>
+              ${f.feed_url ? `<span class="friend-admin-status ${f.feed_enabled ? "s-approved" : "s-rejected"}">订阅${f.feed_enabled ? " · " + (feedTagText[f.feed_tag] || "博客") : "已停用"}</span>` : ""}
             </div>
             <a class="friend-admin-url" href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.url)}</a>
             <div class="friend-admin-desc">${esc(f.description || "—")}</div>
+            ${f.feed_url ? `<div class="friend-admin-desc">订阅地址：${esc(f.feed_url)}</div>` : ""}
+            ${f.feed_url && f.feed_status ? `<div class="friend-admin-desc">抓取状态：${esc(f.feed_status)}</div>` : ""}
+            ${f.last_post_at ? `<div class="friend-admin-desc">最近更新：${timeAgo(f.last_post_at)}${f.last_post_title ? ` · <a href="${esc(f.last_post_link)}" target="_blank" rel="noopener" style="color:inherit">《${esc(f.last_post_title)}》</a>` : ""}</div>` : ""}
           </div>
         </div>
         <div class="friend-admin-actions">
           ${f.status === "pending" ? `<button class="btn sm" data-act="approve">通过</button><button class="btn sm ghost" data-act="reject">拒绝</button>` : ""}
+          ${f.feed_url && f.feed_enabled ? `<button class="btn sm ghost" data-act="fetch">抓取</button>` : ""}
           <button class="btn sm ghost" data-act="edit">编辑</button>
           <button class="btn sm danger" data-act="del">删除</button>
         </div>
@@ -5907,6 +6580,32 @@
     panel.innerHTML = `
       <h3>友链管理（${list.length}）${data.pending_count ? ` <span class="friend-pending-badge">${data.pending_count} 条待审核</span>` : ""}</h3>
       <div class="field-hint" style="margin-bottom:1rem">访客在 /links/apply 提交的申请会进入「待审核」，通过后自动上架到 /links。也可在此直接新增友站。</div>
+
+      <form class="settings-form" data-settings-form style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc);margin-bottom:1rem">
+        <div class="field">
+          <label>友圈功能<br /><small style="color:var(--anzhiyu-secondtext)">关闭后顶栏「友圈」入口隐藏，/friends 页面与公开文章接口返回 404；下方订阅配置保留，重新开启即恢复</small></label>
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="friends_enabled" ${state.settings.friends_enabled !== false ? "checked" : ""} /><span></span></span>
+            <span>启用友圈</span>
+          </label>
+        </div>
+        <div class="field">
+          <label>友圈抓取<br /><small style="color:var(--anzhiyu-secondtext)">每小时抓一轮，每轮最多 10 个源，每源保留最新 12 篇</small></label>
+          <label class="switch-row">
+            <span class="toggle"><input type="checkbox" name="friends_fetch_enabled" ${state.settings.friends_fetch_enabled ? "checked" : ""} /><span></span></span>
+            <span>启用定时抓取</span>
+          </label>
+        </div>
+        <div class="field">
+          <label>来源配额（%）<br /><small style="color:var(--anzhiyu-secondtext)">友圈按配额交错展示，池内跨源轮转防霸榜；某池文章不足时余量自动让给其他池</small></label>
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:.35rem;font-weight:normal">博客 <input name="friends_quota_blog" type="number" min="0" max="100" value="${esc(state.settings.friends_quota_blog)}" style="width:4.5rem" /></label>
+            <label style="display:flex;align-items:center;gap:.35rem;font-weight:normal">社区 <input name="friends_quota_community" type="number" min="0" max="100" value="${esc(state.settings.friends_quota_community)}" style="width:4.5rem" /></label>
+            <label style="display:flex;align-items:center;gap:.35rem;font-weight:normal">技术 <input name="friends_quota_tech" type="number" min="0" max="100" value="${esc(state.settings.friends_quota_tech)}" style="width:4.5rem" /></label>
+          </div>
+        </div>
+        <button class="btn primary" type="submit">保存友圈设置</button>
+      </form>
 
       <form class="settings-form" data-settings-form style="border:1px solid var(--anzhiyu-card-border,#e3e8ef);border-radius:10px;padding:.9rem 1rem;background:var(--anzhiyu-card-bg,#fafbfc);margin-bottom:1rem">
         <div class="field">
@@ -5932,6 +6631,15 @@
             <div class="field"><label>图标 URL（可选）</label><input name="avatar" maxlength="500" placeholder="留空自动取对方 favicon" /></div>
             <div class="field"><label>分类</label><select name="category"><option value="">未分类</option>${catOpts}</select></div>
             <div class="field"><label>排序（升序）</label><input name="sort_order" type="number" value="0" /></div>
+            <div class="field">
+              <label>订阅地址（RSS/Atom，可选）</label>
+              <div style="display:flex;gap:.5rem">
+                <input name="feed_url" placeholder="留空则仅展示友链" style="flex:1" />
+                <button type="button" class="btn" id="feedDetectBtn">探测</button>
+              </div>
+            </div>
+            <div class="field"><label>友圈分类</label><select name="feed_tag"><option value="blog">博客</option><option value="community">社区</option><option value="tech">技术</option></select></div>
+            <div class="field"><label class="switch-row"><span class="toggle"><input type="checkbox" name="feed_enabled" checked /><span></span></span><span>纳入友圈抓取</span></label></div>
           </div>
           <button class="btn primary" type="submit">添加</button>
         </form>
@@ -5959,14 +6667,31 @@
         finally { fetchBtn.disabled = false; fetchBtn.textContent = "自动获取"; }
       });
     }
+    // 探测订阅地址
+    const detectBtn = panel.querySelector("#feedDetectBtn");
+    if (detectBtn) {
+      detectBtn.addEventListener("click", async () => {
+        const url = addForm.querySelector('[name="url"]').value.trim();
+        if (!url) { toast("请先填写站点地址"); return; }
+        detectBtn.disabled = true; detectBtn.textContent = "探测中…";
+        try {
+          const r = await api(`/api/admin/friends/detect-feed?url=${encodeURIComponent(url)}`);
+          addForm.querySelector('[name="feed_url"]').value = r.feed_url;
+          toast("已发现订阅地址");
+        } catch (err) { toast(err.message || "未发现订阅地址"); }
+        finally { detectBtn.disabled = false; detectBtn.textContent = "探测"; }
+      });
+    }
     if (addForm) {
       addForm.addEventListener("submit", async e => {
         e.preventDefault();
         const fd = new FormData(addForm);
+        const payload = Object.fromEntries(fd);
+        payload.feed_enabled = addForm.querySelector('[name="feed_enabled"]').checked ? "1" : "0";
         const btn = addForm.querySelector('button[type="submit"]');
         btn.disabled = true;
         try {
-          await api("/api/admin/friends", { method: "POST", body: Object.fromEntries(fd) });
+          await api("/api/admin/friends", { method: "POST", body: payload });
           toast("已添加");
           renderAdminFriends(panel);
         } catch (err) { toast(err.message); }
@@ -5981,6 +6706,15 @@
       const a = act("approve"); if (a) a.addEventListener("click", async () => { await api(`/api/admin/friends/${id}/approve`, { method: "POST" }); toast("已通过"); renderAdminFriends(panel); });
       const rj = act("reject"); if (rj) rj.addEventListener("click", async () => { await api(`/api/admin/friends/${id}/reject`, { method: "POST" }); toast("已拒绝"); renderAdminFriends(panel); });
       const dl = act("del"); if (dl) dl.addEventListener("click", async () => { if (!confirm("确定删除该友站？")) return; await api(`/api/admin/friends/${id}`, { method: "DELETE" }); toast("已删除"); renderAdminFriends(panel); });
+      const ft = act("fetch");
+      if (ft) ft.addEventListener("click", async () => {
+        ft.disabled = true; ft.textContent = "抓取中…";
+        try {
+          const r = await api(`/api/admin/friends/${id}/fetch`, { method: "POST" });
+          toast(r.status === "ok" ? "抓取完成" : r.status);
+        } catch (err) { toast(err.message); }
+        finally { renderAdminFriends(panel); }
+      });
       const ed = act("edit"); if (ed) ed.addEventListener("click", () => openFriendEditor(panel, id, list.find(x => String(x.id) === id), cats));
     });
   }
@@ -5991,6 +6725,8 @@
     const row = panel.querySelector(`.friend-admin-row[data-id="${id}"]`);
     if (!row) return;
     const catOpts = ['<option value="">未分类</option>', ...cats.map(c => `<option value="${esc(c)}"${c === f.category ? " selected" : ""}>${esc(c)}</option>`)].join("");
+    const feedTagOpts = [["blog", "博客"], ["community", "社区"], ["tech", "技术"]]
+      .map(([v, n]) => `<option value="${v}"${f.feed_tag === v ? " selected" : ""}>${n}</option>`).join("");
     row.innerHTML = `
       <form class="friend-form friend-edit-form" style="width:100%">
         <div class="friend-form-grid">
@@ -6000,18 +6736,42 @@
           <div class="field"><label>图标 URL</label><input name="avatar" maxlength="500" value="${esc(f.avatar)}" /></div>
           <div class="field"><label>分类</label><select name="category">${catOpts}</select></div>
           <div class="field"><label>排序</label><input name="sort_order" type="number" value="${f.sort_order ?? 0}" /></div>
+          <div class="field">
+            <label>订阅地址（RSS/Atom）</label>
+            <div style="display:flex;gap:.5rem">
+              <input name="feed_url" value="${esc(f.feed_url || "")}" placeholder="留空则仅展示友链" style="flex:1" />
+              <button type="button" class="btn" data-act="detect">探测</button>
+            </div>
+          </div>
+          <div class="field"><label>友圈分类</label><select name="feed_tag">${feedTagOpts}</select></div>
+          <div class="field"><label class="switch-row"><span class="toggle"><input type="checkbox" name="feed_enabled" ${f.feed_enabled ? "checked" : ""} /><span></span></span><span>纳入友圈抓取</span></label></div>
         </div>
         <div style="display:flex;gap:.5rem">
           <button class="btn primary sm" type="submit">保存</button>
           <button class="btn ghost sm" type="button" data-act="cancel">取消</button>
         </div>
       </form>`;
+    const form = row.querySelector(".friend-edit-form");
     row.querySelector('[data-act="cancel"]').addEventListener("click", () => renderAdminFriends(panel));
-    row.querySelector(".friend-edit-form").addEventListener("submit", async e => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
+    row.querySelector('[data-act="detect"]').addEventListener("click", async e => {
+      const url = form.querySelector('[name="url"]').value.trim();
+      if (!url) { toast("请先填写站点地址"); return; }
+      const btn = e.currentTarget;
+      btn.disabled = true; btn.textContent = "探测中…";
       try {
-        await api(`/api/admin/friends/${id}`, { method: "PUT", body: Object.fromEntries(fd) });
+        const r = await api(`/api/admin/friends/detect-feed?url=${encodeURIComponent(url)}`);
+        form.querySelector('[name="feed_url"]').value = r.feed_url;
+        toast("已发现订阅地址");
+      } catch (err) { toast(err.message || "未发现订阅地址"); }
+      finally { btn.disabled = false; btn.textContent = "探测"; }
+    });
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const payload = Object.fromEntries(fd);
+      payload.feed_enabled = form.querySelector('[name="feed_enabled"]').checked ? "1" : "0";
+      try {
+        await api(`/api/admin/friends/${id}`, { method: "PUT", body: payload });
         toast("已保存");
         renderAdminFriends(panel);
       } catch (err) { toast(err.message); }
@@ -6083,25 +6843,59 @@
       </div>` +
             list
               .map(
-                c => `
+                c => {
+                  // 头像：与前台评论区一致直接用 avatar_url（头像是外链/已缓存地址，不能走 thumbSrc 加 _w1200）
+                  const avatarHtml = c.avatar_url
+                    ? `<img class="admin-cmt-avatar" src="${esc(c.avatar_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-n="${esc((c.nickname || "?").slice(0, 1))}" onerror="commentAvatarFail(this)" />`
+                    : `<span class="admin-cmt-avatar admin-cmt-avatar-txt">${esc((c.nickname || "?").slice(0, 1))}</span>`;
+                  // 联系信息：邮箱（mailto）+ 网页（新窗口 nofollow）+ QQ，未填显示灰字
+                  const contactHtml = [
+                    c.email
+                      ? `<a href="mailto:${esc(c.email)}" title="发邮件给 ${esc(c.nickname)}">${esc(c.email)}</a>`
+                      : '<span class="muted">未填邮箱</span>',
+                    c.website
+                      ? `<a href="${esc(c.website)}" target="_blank" rel="nofollow noopener" title="${esc(c.website)}">🌐 ${esc(c.website.replace(/^https?:\/\//, "").replace(/\/$/, "").slice(0, 28))}</a>`
+                      : '<span class="muted">未填网页</span>',
+                    c.qq ? `<span title="QQ 号">QQ ${esc(c.qq)}</span>` : "",
+                  ].filter(Boolean).join('<i class="row-contact-sep"></i>');
+                  return `
         <div class="admin-row">
           <div class="admin-check-cell"><input type="checkbox" class="admin-check" value="${c.id}" /></div>
+          ${avatarHtml}
           <div class="row-main">
             <div class="row-title">
-              ${c.is_ai ? '<span class="tag-mini tag-ai">AI</span>' : c.is_owner ? '<span class="tag-mini">博主</span>' : ""}<strong>${esc(c.nickname)}</strong>：${esc(c.content) || (c.images && c.images.length ? '<span style="color:var(--anzhiyu-secondtext)">[图片评论]</span>' : "")}
+              ${c.is_ai ? '<span class="tag-mini tag-ai">AI</span>' : c.is_owner ? '<span class="tag-mini">博主</span>' : ""}${c.parent_id > 0 ? '<span class="tag-mini tag-reply">回复</span>' : ""}<strong>${esc(c.nickname)}</strong>：${esc(c.content) || (c.images && c.images.length ? '<span style="color:var(--anzhiyu-secondtext)">[图片评论]</span>' : "")}
             </div>
             ${c.images && c.images.length ? `<div class="comment-images admin-cmt-imgs">${c.images.map(u => { const ts = thumbSrc(u); const orig = fullSrc(u); return `<img src="${esc(ts)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="comment-img" data-lightbox="${esc(orig)}"${ts !== orig ? ` data-orig="${esc(orig)}"` : ""} />`; }).join("")}</div>` : ""}
             <div class="row-sub">
               <span>${timeAgo(c.created_at)}</span>
               <span class="tag-mini">${c.target_type === "post" ? "文章" : "说说"}</span>
-              <span>${c.target_type === "post" ? "所属文章" : "所属说说"}：${esc(c.target_excerpt || "#" + c.target_id)}</span>
+              ${(() => {
+                // 所属目标可点击直达：文章 /post/{slug}，说说 /#moment-{id}，均新窗口打开
+                const label = esc(c.target_excerpt || "#" + c.target_id);
+                if (c.target_type === "post") {
+                  const href = c.post_slug ? `/post/${encodeURIComponent(c.post_slug)}` : "/posts";
+                  return `<span>所属文章：<a class="row-target-link" href="${href}" target="_blank" rel="noopener">${label} ↗</a></span>`;
+                }
+                return `<span>所属说说：<a class="row-target-link" href="/#moment-${c.target_id}" target="_blank" rel="noopener">${label} ↗</a></span>`;
+              })()}
+            </div>
+            <div class="row-contact">${contactHtml}</div>
+            <div class="admin-reply-box" data-reply-box="${c.id}" hidden>
+              <textarea maxlength="500" rows="2" placeholder="回复 @${esc(c.nickname)}："></textarea>
+              <div class="admin-reply-ops">
+                <button class="btn primary sm" data-admin-act="send-reply" data-cid="${c.id}">发送回复</button>
+                <button class="btn sm" data-admin-act="cancel-reply" data-cid="${c.id}">取消</button>
+              </div>
             </div>
           </div>
           <div class="row-actions">
+            <button class="btn" data-admin-act="reply-comment" data-cid="${c.id}">回复</button>
             <button class="btn" data-admin-act="edit-comment" data-cid="${c.id}" data-content="${esc((c.content || "").replace(/"/g, "&quot;"))}" data-images='${esc(JSON.stringify(c.images || []))}'>编辑</button>
             <button class="btn danger" data-admin-act="del-comment" data-cid="${c.id}">删除</button>
           </div>
-        </div>`
+        </div>`;
+                }
               )
               .join("")
           : `<div class="essay-empty">还没有评论</div>`
@@ -10941,6 +11735,39 @@
         }
         return;
       }
+      if (act === "reply-comment") {
+        // 后台直接回复：展开该行回复框，收起其他已展开的
+        const cid = adminAct.dataset.cid;
+        const panel = document.getElementById("adminPanel");
+        panel?.querySelectorAll("[data-reply-box]").forEach(b => { if (b.dataset.replyBox !== cid) b.hidden = true; });
+        const box = panel?.querySelector(`[data-reply-box="${cid}"]`);
+        if (box) {
+          box.hidden = !box.hidden;
+          if (!box.hidden) box.querySelector("textarea")?.focus();
+        }
+        return;
+      }
+      if (act === "cancel-reply") {
+        document.getElementById("adminPanel")?.querySelector(`[data-reply-box="${adminAct.dataset.cid}"]`)?.setAttribute("hidden", "");
+        return;
+      }
+      if (act === "send-reply") {
+        const cid = Number(adminAct.dataset.cid);
+        const box = document.getElementById("adminPanel")?.querySelector(`[data-reply-box="${adminAct.dataset.cid}"]`);
+        const ta = box?.querySelector("textarea");
+        const content = (ta?.value || "").trim();
+        if (!content) { toast("请输入回复内容"); return; }
+        adminAct.disabled = true;
+        try {
+          await api(`/api/admin/comments/${cid}/reply`, { method: "POST", body: { content } });
+          toast("回复成功，已通知对方");
+          renderAdminComments(document.getElementById("adminPanel"));
+        } catch (err) {
+          toast(err.message);
+          adminAct.disabled = false;
+        }
+        return;
+      }
       if (act === "edit-comment") {
         const cid = Number(adminAct.dataset.cid);
         const content = adminAct.dataset.content || "";
@@ -11077,7 +11904,7 @@
       e.preventDefault();
       const fd = new FormData(settingsForm);
       const patch = {};
-      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "theme_auto_mode", "theme_dark_start", "theme_dark_end", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "storage_mode", "b2_endpoint", "b2_bucket", "b2_key_id", "b2_app_key", "b2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text"].forEach(k => {
+      ["site_title", "nav_feeds_name", "essay_tips", "essay_title", "essay_subtitle", "essay_button_text", "banner_button_url", "banner_button_target", "banner_bg_image", "banner_bg_mode", "banner_bg_source", "banner_bg_interval", "site_bg_mask", "site_bg_card", "site_bg_footer", "site_bg_blur", "brand_avatar", "author_name", "author_avatar", "post_avatar", "nav_links", "footer_text", "footer_run_since", "theme_auto_mode", "theme_dark_start", "theme_dark_end", "feed_page_size", "video_default_poster", "site_domain", "r2_domain", "storage_mode", "b2_endpoint", "b2_bucket", "b2_key_id", "b2_app_key", "b2_domain", "site_icon", "random_avatar_api", "random_avatar_imgtype", "qq_nick_mode", "apihz_id", "apihz_key", "qq_ckqq", "qq_skey", "qq_pskey", "qq_keepalive_interval", "about_greeting", "about_greeting_sub", "about_avatar", "about_signature", "about_bio", "about_stats", "about_timeline", "about_bigstats", "about_contacts", "about_qr_text", "about_qr_amounts", "links_categories", "comment_emoji_owo_url", "reward_qrcode", "reward_text", "friends_quota_blog", "friends_quota_community", "friends_quota_tech"].forEach(k => {
         // 外观/媒体拆分 Tab 后，只提交当前表单实际包含的字段，
         // 否则表单里不存在的字段会以空串提交，后端视为"恢复默认"，导致跨 Tab 互相清空
         if (!fd.has(k)) return;
@@ -11097,6 +11924,12 @@
       // 全站背景图开关
       const siteBgEl2 = settingsForm.querySelector('[name="site_bg_enabled"]');
       if (siteBgEl2) patch.site_bg_enabled = siteBgEl2.checked;
+      // 友圈功能开关
+      const friendsEnabledEl = settingsForm.querySelector('[name="friends_enabled"]');
+      if (friendsEnabledEl) patch.friends_enabled = friendsEnabledEl.checked;
+      // 友圈定时抓取开关
+      const friendsFetchEl = settingsForm.querySelector('[name="friends_fetch_enabled"]');
+      if (friendsFetchEl) patch.friends_fetch_enabled = friendsFetchEl.checked;
       // 主题自动切换模式（下拉选择，非布尔）
       // 主题时间范围显隐
       const themeModeEl = settingsForm.querySelector('[name="theme_auto_mode"]');
@@ -11643,6 +12476,7 @@
         (key === "posts" && (path === "/posts" || path.startsWith("/post/"))) ||
         (key === "photos" && path === "/photos") ||
         (key === "links" && (path === "/links" || path.startsWith("/links/"))) ||
+        (key === "friends" && path === "/friends") ||
         (key === "about" && path === "/about") ||
         (key === "admin" && (path === state.adminPath || path === "/admin"));
       a.classList.toggle("active", isActive);
@@ -11659,6 +12493,10 @@
       renderAbout();
     } else if (path === "/links") {
       renderLinks();
+    } else if (path === "/friends") {
+      // 友圈功能关闭时按 404 处理（导航入口也已隐藏，这里是直接访问地址的兜底）
+      if (state.settings.friends_enabled === false) renderNotFound();
+      else renderFriends();
     } else if (path === "/links/apply") {
       renderLinksApply();
     } else if (path === "/posts") {

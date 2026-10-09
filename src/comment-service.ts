@@ -109,7 +109,7 @@ export async function createComment(
   targetId: number,
   raw: ParsedCommentInput,
   owner: boolean,
-  opts?: { ip?: string; rateLimit?: number }
+  opts?: { ip?: string; rateLimit?: number; avatarUrl?: string }
 ): Promise<{ error: string; status?: 400 | 404 | 429 | 500 } | { comment: CommentRow }> {
   if (!(await targetExists(db, type, targetId))) {
     return { error: type === "post" ? "文章不存在" : "动态不存在", status: 404 };
@@ -128,6 +128,8 @@ export async function createComment(
 
   // 留了 QQ 但没带邮箱时自动补 @qq.com
   const email = raw.email || (raw.qq ? `${raw.qq}@qq.com` : "");
+  // 管理员可使用自己的站点头像（绕过 parseCommentBody 的 QQ 头像白名单）；普通用户仍只能用 QQ CDN 头像
+  const avatarUrl = owner && opts?.avatarUrl ? opts.avatarUrl.slice(0, 300) : raw.avatarUrl;
 
   // 简单频控：同一昵称同样内容（含同一父评论）60 秒内禁止重复
   const dup = await db.prepare(
@@ -164,7 +166,7 @@ export async function createComment(
       owner ? 1 : 0,
       raw.qq,
       email,
-      raw.avatarUrl,
+      avatarUrl,
       raw.website,
       raw.images
     );

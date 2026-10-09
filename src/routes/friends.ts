@@ -4,6 +4,8 @@
  *   GET  /api/friends              已上架友站（可按 category 筛选），含统计
  *   POST /api/friends/apply        访客提交友链申请（status=pending，待后台审核）
  *   GET  /api/friends/info?url=    抓取目标站点的 名称/描述/图标（用于表单自动回填）
+ *   GET  /api/friends/posts        友圈：友站文章配额交错分页（?page=1）
+ *   POST /api/friends/posts/:id/click  友圈：点击热度 +1
  * 管理（/api/admin/friends）：
  *   GET    /                       全部友站（含待审核/已拒绝）
  *   POST   /                       新增（直接上架）
@@ -11,12 +13,22 @@
  *   DELETE /:id                    删除
  *   POST   /:id/approve            审核通过
  *   POST   /:id/reject             拒绝
+ *   GET    /detect-feed?url=       探测站点 RSS/Atom 订阅地址
+ *   POST   /:id/fetch              立即抓取该友站订阅源
  */
 import { Hono } from "hono";
 import { ok, fail } from "../respond";
 import type { HonoEnv } from "../types";
 import { requireAdmin } from "../auth";
 import { getSettings } from "../settings";
+import {
+  detectFeedFromHtml,
+  probeCommonFeedPaths,
+  quotaInterleave,
+  runFriendsFetch,
+  serializeFriendPost,
+  type FriendPostView,
+} from "../friendfeed";
 
 const app = new Hono<HonoEnv>();
 
@@ -31,8 +43,29 @@ export interface FriendRow {
   sort_order: number;
   status: string;
   last_checked: string;
+  feed_url: string;
+  feed_enabled: number;
+  feed_tag: string;
+  feed_status: string;
+  last_post_at: string; // 友站最近发文时间（friend_posts 聚合，无订阅源为空）
+  last_post_title: string; // 最近发文标题
+  last_post_link: string; // 最近发文链接
   created_at: string;
   updated_at: string;
+}
+
+/** 友站最近发文聚合（SQLite：MAX() 所在行的裸列值即最新一篇的 title/link） */
+const LAST_POST_JOIN = `
+  LEFT JOIN (
+    SELECT friend_id, title AS last_post_title, link AS last_post_link, MAX(published_at) AS last_post_at
+    FROM friend_posts GROUP BY friend_id
+  ) lp ON lp.friend_id = f.id`;
+
+const FEED_TAGS = ["blog", "community", "tech"];
+
+function normalizeFeedTag(v: unknown): string {
+  const t = String(v ?? "").trim();
+  return FEED_TAGS.includes(t) ? t : "blog";
 }
 
 function serializeFriend(row: FriendRow) {
@@ -47,6 +80,13 @@ function serializeFriend(row: FriendRow) {
     sort_order: Number(row.sort_order ?? 0),
     status: row.status ?? "approved",
     last_checked: row.last_checked ?? "",
+    feed_url: row.feed_url ?? "",
+    feed_enabled: Number(row.feed_enabled ?? 0) === 1,
+    feed_tag: row.feed_tag ?? "blog",
+    feed_status: row.feed_status ?? "",
+    last_post_at: row.last_post_at ?? "",
+    last_post_title: row.last_post_title ?? "",
+    last_post_link: row.last_post_link ?? "",
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -68,7 +108,8 @@ app.get("/", async c => {
   const list = (
     await c.env.DB
       .prepare(
-        `SELECT * FROM friends ${where} ORDER BY sort_order ASC, id DESC`
+        `SELECT f.*, lp.last_post_at, lp.last_post_title, lp.last_post_link
+         FROM friends f ${LAST_POST_JOIN} ${where} ORDER BY f.sort_order ASC, f.id DESC`
       )
       .bind(...binds)
       .all<FriendRow>()
@@ -132,11 +173,14 @@ app.post("/apply", async c => {
   if (!url) return fail(c, "请填写正确的站点地址", 400);
   if (!/^https?:\/\//i.test(url)) return fail(c, "站点地址需以 http(s):// 开头", 400);
 
+  const feedUrlRaw = String(body.feed_url ?? "").trim();
+  const feed_url = feedUrlRaw ? normalizeUrl(feedUrlRaw) : "";
+
   const now = new Date().toISOString();
   const info = await fetchSiteInfo(url); // 尽力抓取，失败不阻塞
   const row = await c.env.DB.prepare(
-    `INSERT INTO friends (name, url, description, avatar, category, email, sort_order, status, last_checked, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 0, 'pending', ?, ?, ?) RETURNING *`
+    `INSERT INTO friends (name, url, description, avatar, category, email, sort_order, status, last_checked, feed_url, feed_enabled, feed_tag, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, 'pending', ?, ?, 0, 'blog', ?, ?) RETURNING *`
   )
     .bind(
       info?.name || name,
@@ -146,11 +190,65 @@ app.post("/apply", async c => {
       category,
       email,
       now,
+      feed_url || info?.feed_url || "",
       now,
       now
     )
     .first<FriendRow>();
   return ok(c, { id: row?.id, status: "pending" }, "已提交，站长审核通过后会出现在友链列表");
+});
+
+/* ==================== 友圈公开接口 ==================== */
+
+const FRIENDS_PAGE_SIZE = 10;
+
+/**
+ * 友圈文章流：blog/community/tech 三池按配额交错（后台可调），池内跨源轮转防霸榜。
+ * 库存硬上限 = 源数 × 12，规模可控，全量取出后在 JS 交错分页，保证各页顺序确定。
+ */
+app.get("/posts", async c => {
+  const s = await getSettings(c.env.DB);
+  if (!s.friends_enabled) return fail(c, "友圈功能未启用", 404);
+  const page = Math.max(1, parseInt(c.req.query("page") || "1", 10) || 1);
+  const rows = (
+    await c.env.DB.prepare(
+      `SELECT p.id, p.friend_id, p.title, p.excerpt, p.link, p.images, p.published_at, p.clicks,
+              f.name AS friend_name, f.url AS friend_url, f.avatar, f.feed_tag
+       FROM friend_posts p
+       JOIN friends f ON f.id = p.friend_id
+       WHERE f.status = 'approved' AND f.feed_enabled = 1
+       ORDER BY p.published_at DESC, p.id DESC`
+    ).all<FriendPostView>()
+  ).results;
+
+  const pct = (v: string, dft: number) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : dft;
+  };
+  const ordered = quotaInterleave(rows, {
+    blog: pct(s.friends_quota_blog, 60),
+    community: pct(s.friends_quota_community, 30),
+    tech: pct(s.friends_quota_tech, 10),
+  });
+
+  const total = ordered.length;
+  const list = ordered
+    .slice((page - 1) * FRIENDS_PAGE_SIZE, page * FRIENDS_PAGE_SIZE)
+    .map(r => serializeFriendPost(r, s.r2_domain, s.b2_domain));
+  const res = ok(c, { list, page, page_size: FRIENDS_PAGE_SIZE, total, has_more: page * FRIENDS_PAGE_SIZE < total });
+  res.headers.set("Cache-Control", "public, max-age=60, s-maxage=120");
+  return res;
+});
+
+/** 点击热度 +1（前端 sendBeacon 上报，不阻塞跳转） */
+app.post("/posts/:id/click", async c => {
+  const s = await getSettings(c.env.DB);
+  if (!s.friends_enabled) return fail(c, "友圈功能未启用", 404);
+  const id = Number(c.req.param("id"));
+  if (!Number.isFinite(id)) return fail(c, "无效的 ID", 400);
+  await c.env.DB.prepare(`UPDATE friend_posts SET clicks = clicks + 1 WHERE id = ?`).bind(id).run();
+  const row = await c.env.DB.prepare(`SELECT clicks FROM friend_posts WHERE id = ?`).bind(id).first<{ clicks: number }>();
+  return ok(c, { id, clicks: Number(row?.clicks ?? 0) });
 });
 
 /* ==================== 后台接口 ==================== */
@@ -167,7 +265,7 @@ admin.get("/", requireAdmin, async c => {
   }
   const rows = (
     await c.env.DB
-      .prepare(`SELECT * FROM friends ${where} ORDER BY sort_order ASC, id DESC`)
+      .prepare(`SELECT f.*, lp.last_post_at, lp.last_post_title, lp.last_post_link FROM friends f ${LAST_POST_JOIN} ${where} ORDER BY f.sort_order ASC, f.id DESC`)
       .bind(...binds)
       .all<FriendRow>()
   ).results;
@@ -186,9 +284,10 @@ admin.post("/", requireAdmin, async c => {
   const url = normalizeUrl(String(body.url ?? "").trim());
   if (!name || !url) return fail(c, "名称和地址必填", 400);
   const now = new Date().toISOString();
+  const feedUrl = normalizeUrl(String(body.feed_url ?? "").trim());
   const row = await c.env.DB.prepare(
-    `INSERT INTO friends (name, url, description, avatar, category, email, sort_order, status, last_checked, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?) RETURNING *`
+    `INSERT INTO friends (name, url, description, avatar, category, email, sort_order, status, last_checked, feed_url, feed_enabled, feed_tag, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?) RETURNING *`
   )
     .bind(
       name,
@@ -199,6 +298,9 @@ admin.post("/", requireAdmin, async c => {
       String(body.email ?? "").slice(0, 120),
       Number(body.sort_order) || 0,
       now,
+      feedUrl,
+      body.feed_enabled === false || body.feed_enabled === 0 || body.feed_enabled === "0" ? 0 : 1,
+      normalizeFeedTag(body.feed_tag),
       now,
       now
     )
@@ -224,14 +326,20 @@ admin.put("/:id", requireAdmin, async c => {
   const category = body.category !== undefined ? String(body.category).slice(0, 30) : existing.category;
   const email = body.email !== undefined ? String(body.email).slice(0, 120) : existing.email;
   const sort_order = body.sort_order !== undefined ? Number(body.sort_order) || 0 : existing.sort_order;
+  const feed_url = body.feed_url !== undefined ? normalizeUrl(String(body.feed_url).trim()) : existing.feed_url;
+  const feed_tag = body.feed_tag !== undefined ? normalizeFeedTag(body.feed_tag) : existing.feed_tag;
+  const feed_enabled =
+    body.feed_enabled !== undefined
+      ? body.feed_enabled === false || body.feed_enabled === 0 || body.feed_enabled === "0" ? 0 : 1
+      : existing.feed_enabled;
   let status = existing.status;
   if (body.status !== undefined && ["pending", "approved", "rejected"].includes(String(body.status))) {
     status = String(body.status);
   }
   await c.env.DB.prepare(
-    `UPDATE friends SET name=?, url=?, description=?, avatar=?, category=?, email=?, sort_order=?, status=?, updated_at=? WHERE id=?`
+    `UPDATE friends SET name=?, url=?, description=?, avatar=?, category=?, email=?, sort_order=?, status=?, feed_url=?, feed_enabled=?, feed_tag=?, updated_at=? WHERE id=?`
   )
-    .bind(name, url, description, avatar, category, email, sort_order, status, new Date().toISOString(), id)
+    .bind(name, url, description, avatar, category, email, sort_order, status, feed_url, feed_enabled, feed_tag, new Date().toISOString(), id)
     .run();
   const updated = await c.env.DB.prepare(`SELECT * FROM friends WHERE id = ?`).bind(id).first<FriendRow>();
   return ok(c, serializeFriend(updated as FriendRow), "已更新");
@@ -256,6 +364,47 @@ admin.post("/:id/reject", requireAdmin, async c => {
   const id = Number(c.req.param("id"));
   await c.env.DB.prepare(`UPDATE friends SET status='rejected', updated_at=? WHERE id=?`).bind(new Date().toISOString(), id).run();
   return ok(c, { id, status: "rejected" }, "已拒绝");
+});
+
+/** 探测站点 RSS/Atom 订阅地址（抓首页解析 <link rel="alternate">，不写库） */
+admin.get("/detect-feed", requireAdmin, async c => {
+  const url = normalizeUrl(String(c.req.query("url") || "").trim());
+  if (!url) return fail(c, "请填写正确的站点地址", 400);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  let html = "";
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      signal: ctrl.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+      },
+    });
+    if (!res.ok) return fail(c, `站点无法访问（HTTP ${res.status}）`, 400);
+    html = await res.text();
+  } catch {
+    return fail(c, "站点访问超时或失败", 400);
+  } finally {
+    clearTimeout(timer);
+  }
+  const feedUrl = detectFeedFromHtml(html, url) || (await probeCommonFeedPaths(url));
+  if (!feedUrl) return fail(c, "未在该站发现 RSS/Atom 订阅地址（已尝试 /feed/、/rss.xml 等常见路径）", 404);
+  return ok(c, { feed_url: feedUrl });
+});
+
+/** 立即抓取该友站订阅源（同步执行，返回抓取结果） */
+admin.post("/:id/fetch", requireAdmin, async c => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isFinite(id)) return fail(c, "无效的 ID", 400);
+  const f = await c.env.DB.prepare(`SELECT id, feed_url FROM friends WHERE id = ?`).bind(id).first<{ id: number; feed_url: string }>();
+  if (!f) return fail(c, "友站不存在", 404);
+  if (!f.feed_url) return fail(c, "请先填写订阅地址（feed_url）", 400);
+  const r = await runFriendsFetch(c.env, { friendId: id });
+  const status = r.results[0]?.status || "未知结果";
+  const updated = await c.env.DB.prepare(`SELECT * FROM friends WHERE id = ?`).bind(id).first<FriendRow>();
+  return ok(c, { status, friend: updated ? serializeFriend(updated) : null }, status === "ok" ? "抓取完成" : status);
 });
 
 /* ==================== 抓取站点信息 ==================== */
@@ -292,7 +441,7 @@ function normalizeUrl(raw: string): string {
 }
 
 /** 抓取目标站首页，解析 title / description / favicon。失败返回 null。 */
-async function fetchSiteInfo(rawUrl: string): Promise<{ name: string; description: string; avatar: string; url: string } | null> {
+async function fetchSiteInfo(rawUrl: string): Promise<{ name: string; description: string; avatar: string; url: string; feed_url: string } | null> {
   const url = normalizeUrl(rawUrl);
   if (!url) return null;
   const ctrl = new AbortController();
@@ -347,7 +496,9 @@ async function fetchSiteInfo(rawUrl: string): Promise<{ name: string; descriptio
     try { return new URL("/favicon.ico", base).toString(); } catch { return ""; }
   })();
 
-  return { name, description, avatar, url };
+  const feed_url = detectFeedFromHtml(html, base);
+
+  return { name, description, avatar, url, feed_url };
 }
 
 export default app;

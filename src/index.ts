@@ -10,7 +10,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import type { HonoEnv } from "./types";
 import { ok, fail } from "./respond";
-import { serveMedia } from "./media";
+import { serveMedia, serveSiteLogo } from "./media";
 import adminRoutes from "./routes/admin";
 import momentRoutes from "./routes/moments";
 import socialRoutes from "./routes/social";
@@ -81,9 +81,14 @@ app.use("*", async (c, next) => {
  * workers.dev 调试子域不参与规范化。
  */
 app.use("*", async (c, next) => {
+  // 本地 wrangler dev（workerd 本地运行，无 CF 边缘注入的 cf-ray 头）直接放行：
+  // 配置了 routes 时 wrangler dev 会把请求 URL 改写成路由域名，回环判断失效；
+  // 此时若 301 到 https://域名，wrangler 出口又把 Location 改写回本地源，形成自跳转死循环。
+  // 生产流量必经 CF 边缘（必然携带 cf-ray），不受影响。
+  if (!c.req.header("cf-ray")) return next();
   const url = new URL(c.req.url);
   const host = url.host.toLowerCase();
-  // 本地 wrangler dev 回环地址不做 http→https 规范化跳转
+  // 回环地址兜底（无 routes 配置的裸 wrangler dev 场景）
   if (host.startsWith("127.0.0.1:") || host.startsWith("localhost:") || host === "localhost" || host.startsWith("[::1]")) return next();
   if (url.protocol === "https:" && !host.startsWith("www.")) return next();
   const s = await getSettings(c.env.DB);
@@ -254,6 +259,7 @@ app.route("/api/bg", bgRoutes);
 app.route("/api/analytics", analyticsPublicRoutes);
 app.route("/api/admin/analytics", analyticsAdminRoutes);
 
+app.get("/logo.png", serveSiteLogo);
 app.get("/media/*", serveMedia);
 
 /* ==================== 外链图片反向代理 ====================
@@ -410,7 +416,7 @@ async function getIndexHtml(c: Context<HonoEnv>): Promise<string> {
 }
 
 const TITLE_TAG = "<title>Moments</title>";
-const DESC_TAG = '<meta name="description" content="朋友圈式轻博客：图文动态与文章" />';
+const DESC_TAG = '<meta name="description" content="友圈式轻博客：图文动态与文章" />';
 // favicon 用正则匹配（模板里的默认图标颜色可能被手动改过，固定字符串会匹配不上导致替换静默失败）
 const ICON_RE = /<link rel="icon"[^>]*>/i;
 const HEAD_MARK = "<!--SSR_HEAD-->";
@@ -447,7 +453,15 @@ async function serveSsr(
   const out = html
     .replace(TITLE_TAG, () => `<title>${opts.title}</title>`)
     .replace(DESC_TAG, () => `<meta name="description" content="${opts.description}" />`)
-    .replace(ICON_RE, () => `<link rel="icon" href="${iconToHref(s.site_icon)}" />`)
+    .replace(ICON_RE, () => {
+      const href = iconToHref(s.site_icon);
+      const type = href.endsWith('.png') ? 'image/png'
+        : href.endsWith('.jpg') || href.endsWith('.jpeg') ? 'image/jpeg'
+        : href.endsWith('.svg') ? 'image/svg+xml'
+        : href.endsWith('.ico') ? 'image/x-icon'
+        : 'image/png';
+      return `<link rel="icon" type="${type}" href="${href}" />`;
+    })
     .replace(HEAD_MARK, () => opts.head)
     .replace(I18N_MARK, () => i18nBoot)
     .replace(APP_MARK, () => `<main id="app" class="page-main">${opts.body ?? ""}</main>`);
@@ -701,6 +715,50 @@ async function handleScheduled(env: HonoEnv["Bindings"]): Promise<void> {
       await preheatBg(env);
     } catch (e) {
       console.error("[bg-preheat] error:", e);
+    }
+
+    // 头像补偿：每 10 分钟重试近期头像拉取失败的评论（海外边缘拉国内头像 API 偶发超时）
+    try {
+      const avLastRow = await env.DB.prepare(
+        `SELECT value FROM kv_store WHERE key = 'avatar_backfill_last'`
+      ).first<{ value: string }>();
+      const avLastTs = avLastRow?.value ? new Date(avLastRow.value).getTime() : 0;
+      if (Date.now() - avLastTs >= 10 * 60_000) {
+        const { backfillMissingAvatars } = await import("./avatar");
+        const r = await backfillMissingAvatars(env.R2, env.DB, s);
+        await env.DB.prepare(
+          `INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+        ).bind("avatar_backfill_last", new Date().toISOString()).run();
+        if (r.checked > 0) {
+          console.log(`[avatar-backfill] checked=${r.checked} fixed=${r.fixed}`);
+        }
+      }
+    } catch (e) {
+      console.error("[avatar-backfill] error:", e);
+    }
+
+    // 友圈抓取：每小时一轮，每轮最多 10 个源（kv 游标跨轮轮转覆盖全部源）
+    try {
+      if (s.friends_fetch_enabled) {
+        const ffRow = await env.DB.prepare(
+          `SELECT value FROM kv_store WHERE key = 'friends_fetch_last'`
+        ).first<{ value: string }>();
+        const ffLast = ffRow?.value ? new Date(ffRow.value).getTime() : 0;
+        if (Date.now() - ffLast >= 60 * 60_000) {
+          const { runFriendsFetch } = await import("./friendfeed");
+          const r = await runFriendsFetch(env, { limit: 10 });
+          await env.DB.prepare(
+            `INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+          ).bind("friends_fetch_last", new Date().toISOString()).run();
+          if (r.fetched > 0) {
+            console.log(`[friends-fetch] fetched=${r.fetched} ok=${r.ok}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[friends-fetch] error:", e);
     }
 
     if (!s.qq_ckqq || !s.qq_pskey) return; // 未配置 QQ Cookie，跳过

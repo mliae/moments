@@ -18,7 +18,8 @@ import {
 } from "../auth";
 import { keyToSrc } from "../db";
 import { getSettings, updateSettings, normalizeAdminPath } from "../settings";
-import { deleteCommentAnywhere, editCommentAnywhere } from "../comment-service";
+import { createComment, deleteCommentAnywhere, editCommentAnywhere } from "../comment-service";
+import { handleCommentMailNotifications } from "../mail";
 import { ensureAvatar } from "../avatar";
 import { putObject, testB2Storage } from "../storage";
 
@@ -433,6 +434,7 @@ app.get("/comments", requireAdmin, async c => {
   const limit = Math.min(200, Math.max(1, Number(c.req.query("limit")) || 100));
   const rows = await c.env.DB.prepare(
     `SELECT c.id, c.target_type, c.target_id, c.parent_id, c.nickname, c.content, c.images, c.is_owner, c.is_ai, c.created_at,
+            c.qq, c.email, c.avatar_url, c.website,
             CASE WHEN c.target_type = 'post' THEN p.title
                  ELSE substr(replace(replace(m.content, char(10), ' '), char(13), ''), 1, 60)
             END AS target_excerpt,
@@ -454,6 +456,10 @@ app.get("/comments", requireAdmin, async c => {
       is_owner: number;
       is_ai: number;
       created_at: string;
+      qq: string;
+      email: string;
+      avatar_url: string;
+      website: string;
       target_excerpt: string;
       post_slug: string | null;
     }>();
@@ -468,6 +474,94 @@ app.get("/comments", requireAdmin, async c => {
     return { ...r, images, is_owner: r.is_owner === 1 };
   });
   return ok(c, { list });
+});
+
+/**
+ * POST /api/admin/comments/:cid/reply  管理员直接回复某条评论（博主身份）
+ * 自动归一楼中楼到根评论；异步给被回复者发邮件（跳过管理员自通知）
+ */
+app.post("/comments/:cid/reply", requireAdmin, async c => {
+  const commentId = Number(c.req.param("cid"));
+  if (!Number.isFinite(commentId)) return fail(c, "无效的 ID", 400);
+  let content = "";
+  try {
+    const body = await c.req.json<{ content?: unknown }>();
+    content = String(body.content ?? "").trim().slice(0, 500);
+  } catch {
+    return fail(c, "请求格式错误", 400);
+  }
+  if (!content) return fail(c, "回复内容不能为空", 400);
+
+  // 取被回复评论（确定目标与根评论）
+  const parent = await c.env.DB
+    .prepare(`SELECT id, target_type, target_id, parent_id, nickname FROM comments WHERE id = ?`)
+    .bind(commentId)
+    .first<{ id: number; target_type: "moment" | "post"; target_id: number; parent_id: number; nickname: string }>();
+  if (!parent) return fail(c, "评论不存在", 404);
+
+  const s = await getSettings(c.env.DB);
+  // 博主头像：兼容完整 URL 与 R2/B2 key（key 经 keyToSrc 补全域名），无头像则空（前台显示昵称首字）
+  const ownerAvatar = s.author_avatar
+    ? keyToSrc(s.author_avatar, s.r2_domain, s.b2_domain)
+    : "";
+  // 博主网站：取后台设置的站点主域名；留空时回退当前请求 origin
+  const origin = new URL(c.req.url).origin;
+  const ownerWebsite = s.site_domain || origin;
+  // 博主身份：昵称取站点作者名，邮箱取管理员收件箱（用于自通知去重）
+  const input = {
+    nickname: s.author_name || "博主",
+    content,
+    qq: "",
+    email: s.mail_admin_to || "",
+    avatarUrl: ownerAvatar,
+    website: ownerWebsite,
+    parentId: commentId, // createComment 内部会归一到根评论
+    images: "",
+    notifyReply: false,
+  };
+  const result = await createComment(c.env.DB, parent.target_type, parent.target_id, input, true, {
+    avatarUrl: ownerAvatar,
+  });
+  if ("error" in result) return fail(c, result.error, result.status ?? 400);
+
+  // 邮件/联合通知（异步，失败静默）：只通知被回复者，跳过"新评论通知管理员"
+  const targetType = parent.target_type;
+  const targetId = parent.target_id;
+  c.executionCtx.waitUntil(
+    (async () => {
+      try {
+        let targetLabel = `#${targetId}`;
+        let url = `${origin}/#moment-${targetId}`;
+        if (targetType === "post") {
+          const p = await c.env.DB.prepare(`SELECT title, slug FROM posts WHERE id = ?`).bind(targetId).first<{ title: string; slug: string }>();
+          targetLabel = p?.title || targetLabel;
+          // 前台文章详情路由为 /post/{slug}，锚点定位评论区
+          if (p?.slug) url = `${origin}/post/${encodeURIComponent(p.slug)}#comments`;
+        } else {
+          const m = await c.env.DB.prepare(`SELECT content FROM moments WHERE id = ?`).bind(targetId).first<{ content: string }>();
+          targetLabel = (m?.content ?? "").replace(/\s+/g, " ").slice(0, 60) || targetLabel;
+        }
+        await handleCommentMailNotifications({
+          mail: {
+            enabled: s.mail_enabled,
+            apiKey: s.mail_resend_key,
+            from: s.mail_from,
+            adminTo: s.mail_admin_to,
+            notifyAdmin: false, // 博主自己回复，不通知管理员
+            replyNotify: s.mail_reply_notify,
+          },
+          db: c.env.DB,
+          site: s.site_title || "Moments",
+          comment: result.comment,
+          targetTypeLabel: targetType === "post" ? "文章" : "说说",
+          targetLabel,
+          url,
+        });
+      } catch { /* 静默 */ }
+    })()
+  );
+
+  return ok(c, { ...result.comment, is_owner: true }, "回复成功");
 });
 
 /** DELETE /api/admin/comments/:cid 按 id 删除评论（自动识别说说/文章及整楼回复） */

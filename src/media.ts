@@ -49,12 +49,35 @@ function resolveKey(pathname: string): string | null {
     if (sub.startsWith("uploads/") || sub.startsWith("avatars/")) return key;
     return null;
   }
-  // R2：只允许访问上传/表情/音乐目录
-  if (!key.startsWith("uploads/") && !key.startsWith("emoji/") && !key.startsWith("music/")) return null;
+  // R2：只允许访问上传/表情/音乐/头像目录
+  if (!key.startsWith("uploads/") && !key.startsWith("emoji/") && !key.startsWith("music/") && !key.startsWith("avatars/")) return null;
   return key;
 }
 
 const IMMUTABLE = "public, max-age=31536000, immutable";
+
+/** 站点 Logo 在 R2 中的固定对象 key；换 Logo 只需覆盖该对象（无需改代码） */
+export const SITE_LOGO_KEY = "site/logo.png";
+
+/**
+ * /logo.png —— 站点 Logo 固定短链输出（favicon/品牌头像/友链头像等外部引用用）。
+ * Logo 可能更换，不用 immutable：浏览器 1h + 边缘 1 天，ETag 兜底协商缓存。
+ */
+export async function serveSiteLogo(c: Context<HonoEnv>): Promise<Response> {
+  const cache = (caches as unknown as { default: Cache }).default;
+  const cacheKey = new Request(c.req.url, { method: "GET" });
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+
+  const obj = await c.env.R2.get(SITE_LOGO_KEY);
+  if (!obj) return fail(c, "资源不存在", 404);
+  const headers = baseHeaders(obj, SITE_LOGO_KEY);
+  headers.set("Cache-Control", "public, max-age=3600, s-maxage=86400");
+  headers.set("Content-Length", String(obj.size));
+  const res = new Response(obj.body, { status: 200, headers });
+  c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));
+  return res;
+}
 
 export async function serveMedia(c: Context<HonoEnv>): Promise<Response> {
   const key = resolveKey(new URL(c.req.url).pathname);

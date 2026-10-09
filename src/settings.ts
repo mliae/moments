@@ -133,6 +133,12 @@ export interface SiteSettings {
   comment_rate_limit: string; // 同 IP 每分钟评论上限（1-100，默认 5）
   // 运维监控
   uptime_check_interval: string; // 可用性检测间隔（分钟，1-720，默认 5）
+  // 友圈（/friends）
+  friends_enabled: boolean; // 是否启用友圈功能（顶栏入口、/friends 页面、公开文章流 API；关闭后友链订阅配置保留）
+  friends_fetch_enabled: boolean; // 是否启用 cron 定时抓取友站订阅源（每小时一轮）
+  friends_quota_blog: string; // 博客池配额百分比（0-100，默认 60）
+  friends_quota_community: string; // 社区池配额百分比（0-100，默认 30）
+  friends_quota_tech: string; // 技术池配额百分比（0-100，默认 10）
   // 多语言（i18n）
   i18n_enabled: boolean; // 是否启用多语言（关闭后全站仅默认语言，顶栏切换器隐藏）
   i18n_default: string; // 默认语言：zh-CN | zh-TW | en
@@ -265,6 +271,11 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   mail_reply_notify: true,
   comment_rate_limit: "5",
   uptime_check_interval: "5",
+  friends_enabled: true,
+  friends_fetch_enabled: true,
+  friends_quota_blog: "60",
+  friends_quota_community: "30",
+  friends_quota_tech: "10",
   i18n_enabled: false,
   i18n_default: "zh-CN",
   i18n_langs: "zh-CN,zh-TW,en",
@@ -360,6 +371,9 @@ const STRING_LIMITS: Partial<Record<keyof SiteSettings, number>> = {
   reward_qrcode: 500,
   reward_text: 300,
   uptime_check_interval: 3,
+  friends_quota_blog: 3,
+  friends_quota_community: 3,
+  friends_quota_tech: 3,
   i18n_default: 10,
   i18n_langs: 40,
   baidu_translate_appid: 32,
@@ -404,6 +418,8 @@ const BOOLEAN_KEYS: (keyof SiteSettings)[] = [
   "i18n_enabled",
   "i18n_auto_detect",
   "i18n_content_translate",
+  "friends_enabled",
+  "friends_fetch_enabled",
 ];
 
 export function clampSetting(value: unknown, max: number): string {
@@ -480,6 +496,14 @@ export function normalizeSettings(raw: Record<string, unknown> | null | undefine
   out.uptime_check_interval = Number.isFinite(ui)
     ? String(Math.max(1, Math.min(720, ui)))
     : DEFAULT_SETTINGS.uptime_check_interval;
+  // 友圈配额：0-100 整数，非法回退默认（总和不要求=100，交错算法按权重归一）
+  const clampQuota = (v: string, dft: string): string => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? String(Math.max(0, Math.min(100, n))) : dft;
+  };
+  out.friends_quota_blog = clampQuota(out.friends_quota_blog, DEFAULT_SETTINGS.friends_quota_blog);
+  out.friends_quota_community = clampQuota(out.friends_quota_community, DEFAULT_SETTINGS.friends_quota_community);
+  out.friends_quota_tech = clampQuota(out.friends_quota_tech, DEFAULT_SETTINGS.friends_quota_tech);
   if (out.banner_bg_mode !== "static" && out.banner_bg_mode !== "random") out.banner_bg_mode = DEFAULT_SETTINGS.banner_bg_mode;
   // 存储模式：r2=Cloudflare R2 / b2=Backblaze B2，非法回退默认
   if (out.storage_mode !== "r2" && out.storage_mode !== "b2") out.storage_mode = DEFAULT_SETTINGS.storage_mode;
