@@ -95,6 +95,69 @@ function serializeFriend(row: FriendRow) {
 
 /* ==================== 公开接口 ==================== */
 
+/** 友链申请状态公开流水（访客在 /links/apply 查看所有申请审核进度） */
+app.get("/all-applications", async c => {
+  const statusParam = String(c.req.query("status") || "").trim();
+  const validStatuses = ["pending", "approved", "rejected"] as const;
+  const status = validStatuses.includes(statusParam as typeof validStatuses[number])
+    ? (statusParam as typeof validStatuses[number])
+    : "";
+  const page = Math.max(1, parseInt(c.req.query("page") || "1", 10) || 1);
+  const per_page = Math.max(1, Math.min(50, parseInt(c.req.query("per_page") || "10", 10) || 10));
+
+  // 状态计数（不受 status 过滤影响，tab 栏始终显示全部状态数量）
+  const countBatch = await c.env.DB.batch([
+    c.env.DB.prepare("SELECT COUNT(*) AS n FROM friends WHERE status = 'pending'"),
+    c.env.DB.prepare("SELECT COUNT(*) AS n FROM friends WHERE status = 'approved'"),
+    c.env.DB.prepare("SELECT COUNT(*) AS n FROM friends WHERE status = 'rejected'"),
+  ]);
+  const counts = {
+    all: Number((countBatch[0].results[0] as { n: number })?.n ?? 0)
+      + Number((countBatch[1].results[0] as { n: number })?.n ?? 0)
+      + Number((countBatch[2].results[0] as { n: number })?.n ?? 0),
+    pending: Number((countBatch[0].results[0] as { n: number })?.n ?? 0),
+    approved: Number((countBatch[1].results[0] as { n: number })?.n ?? 0),
+    rejected: Number((countBatch[2].results[0] as { n: number })?.n ?? 0),
+  };
+
+  let where = "";
+  const binds: (string | number)[] = [];
+  if (status) {
+    where = "WHERE status = ?";
+    binds.push(status);
+  }
+
+  const totalRow = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM friends ${where}`
+  ).bind(...binds).first<{ n: number }>();
+  const total = Number(totalRow?.n ?? 0);
+  const has_more = page * per_page < total;
+
+  const rows = (
+    await c.env.DB
+      .prepare(
+        `SELECT id, name, url, description, category, status, created_at, updated_at
+         FROM friends ${where} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
+      )
+      .bind(...binds, per_page, (page - 1) * per_page)
+      .all<FriendRow>()
+  ).results;
+
+  // 只返回公开字段（email / feed_url / feed_status / avatar 等隐私/内部字段不暴露）
+  const list = rows.map(r => ({
+    id: r.id,
+    name: r.name ?? "",
+    url: r.url ?? "",
+    description: r.description ?? "",
+    category: r.category ?? "",
+    status: r.status ?? "pending",
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  }));
+
+  return ok(c, { list, total, page, per_page, has_more, counts });
+});
+
 /** 已上架友站列表 + 统计（友站总数 / 分类数 / 本月新增） */
 app.get("/", async c => {
   const category = String(c.req.query("category") || "").trim();

@@ -3982,6 +3982,20 @@
           </div>
         </form>
       </div>
+      <div class="links-apply-status">
+        <div class="links-info-card">
+          <div class="links-info-title">${svgIcon("list", 18)} ${t("links.apply_status_title")}</div>
+          <p style="margin:.2rem 0 .8rem">${t("links.apply_status_sub")}</p>
+          <div class="las-tabs" data-las-tabs>
+            <button class="las-tab is-active" data-las-tab="all">${t("links.tab_all")} <span class="las-tab-count" data-las-count="all">0</span></button>
+            <button class="las-tab" data-las-tab="pending">${t("links.tab_pending")} <span class="las-tab-count" data-las-count="pending">0</span></button>
+            <button class="las-tab" data-las-tab="approved">${t("links.tab_approved")} <span class="las-tab-count" data-las-count="approved">0</span></button>
+            <button class="las-tab" data-las-tab="rejected">${t("links.tab_rejected")} <span class="las-tab-count" data-las-count="rejected">0</span></button>
+          </div>
+          <div class="las-list" data-las-list></div>
+          <div class="las-pager" data-las-pager></div>
+        </div>
+      </div>
     </div></div>`;
 
     // 同步浏览器标签页标题与 SEO
@@ -4032,6 +4046,123 @@
         }
       });
     }
+
+    // ===== 申请状态列表（tab + 分页 + 懒加载） =====
+    const lasState = { tab: "all", page: 1, per_page: 10, counts: null };
+
+    function lasTime(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      const now = new Date();
+      const diff = (now - d) / 86400000;
+      const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      if (diff < 1) return `${t("links.time_today")} ${hhmm}`;
+      if (diff < 2) return `${t("links.time_yesterday")} ${hhmm}`;
+      if (diff < 365) return `${d.getMonth() + 1}-${d.getDate()} ${hhmm}`;
+      return d.toISOString().slice(0, 10);
+    }
+
+    function lasStatusTag(status) {
+      const cls = status === "approved" ? "is-approved" : status === "rejected" ? "is-rejected" : "is-pending";
+      const label = t(`links.status_${status}`) || status;
+      return `<span class="las-status ${cls}">${label}</span>`;
+    }
+
+    function lasListItem(row) {
+      const approved = row.status === "approved";
+      const linkEl = approved
+        ? `<a href="${esc(row.url)}" target="_blank" rel="noopener nofollow" title="${esc(row.url)}" class="las-name-link">${esc(row.name)}</a>`
+        : `<span class="las-name-text">${esc(row.name)}</span>`;
+      const catTag = row.category ? `<span class="las-cat">${esc(row.category)}</span>` : "";
+      const desc = row.description ? `<div class="las-desc">${esc(row.description)}</div>` : "";
+      return `<div class="las-item">
+        <div class="las-row1">${linkEl} ${lasStatusTag(row.status)}</div>
+        <div class="las-row2">${catTag} <span class="las-time">${lasTime(row.created_at)}</span></div>
+        ${desc}
+      </div>`;
+    }
+
+    function lasPagerHTML(total, page, per_page) {
+      const pages = Math.ceil(total / per_page);
+      if (pages <= 1) return "";
+      const cur = page;
+      const show = 5;
+      let start = Math.max(1, cur - Math.floor(show / 2));
+      let end = Math.min(pages, start + show - 1);
+      start = Math.max(1, end - show + 1);
+      const nums = [];
+      if (start > 1) { nums.push(1); if (start > 2) nums.push("..."); }
+      for (let i = start; i <= end; i++) nums.push(i);
+      if (end < pages) { if (end < pages - 1) nums.push("..."); nums.push(pages); }
+      const prev = `<button class="las-page-btn" data-las-page="${cur - 1}" ${cur <= 1 ? "disabled" : ""}>‹</button>`;
+      const next = `<button class="las-page-btn" data-las-page="${cur + 1}" ${cur >= pages ? "disabled" : ""}>›</button>`;
+      return `<div class="las-pager-inner">${prev}${nums.map(n => typeof n === "string" ? `<span class="las-ell">${n}</span>` : `<button class="las-page-btn${n === cur ? " is-active" : ""}" data-las-page="${n}">${n}</button>`).join("")}${next}</div>`;
+    }
+
+    async function lasLoad() {
+      const listEl = document.querySelector("[data-las-list]");
+      const pagerEl = document.querySelector("[data-las-pager]");
+      if (!listEl) return;
+      listEl.innerHTML = `<div class="las-loading">${t("links.fetching")}</div>`;
+      try {
+        const params = new URLSearchParams({ page: String(lasState.page), per_page: String(lasState.per_page) });
+        if (lasState.tab !== "all") params.set("status", lasState.tab);
+        const d = await api(`/api/friends/all-applications?${params}`);
+        lasState.counts = d.counts;
+        Object.keys(d.counts).forEach(k => {
+          const c = document.querySelector(`[data-las-count="${k}"]`);
+          if (c) c.textContent = d.counts[k];
+        });
+        if (!d.list || d.list.length === 0) {
+          const emptyKey = lasState.tab === "all" ? "links.no_records" : lasState.tab === "pending" ? "links.no_pending" : lasState.tab === "approved" ? "links.no_approved" : "links.no_rejected";
+          listEl.innerHTML = `<div class="las-empty">${t(emptyKey)}</div>`;
+        } else {
+          listEl.innerHTML = d.list.map(lasListItem).join("");
+        }
+        if (pagerEl) pagerEl.innerHTML = lasPagerHTML(d.total, d.page, d.per_page);
+      } catch (e) {
+        listEl.innerHTML = `<div class="las-empty">${esc(e.message || "加载失败")}</div>`;
+      }
+    }
+
+    document.querySelectorAll("[data-las-tab]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-las-tab]").forEach(b => b.classList.remove("is-active"));
+        btn.classList.add("is-active");
+        lasState.tab = btn.dataset.lasTab;
+        lasState.page = 1;
+        lasLoad();
+      });
+    });
+
+    document.addEventListener("click", e => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.matches("[data-las-page]")) {
+        const p = parseInt(target.dataset.lasPage, 10);
+        if (!Number.isFinite(p)) return;
+        lasState.page = p;
+        lasLoad();
+      }
+    });
+
+    (async () => {
+      try {
+        const d = await api("/api/friends/all-applications?page=1&per_page=1");
+        lasState.counts = d.counts;
+        Object.keys(d.counts).forEach(k => {
+          const c = document.querySelector(`[data-las-count="${k}"]`);
+          if (c) c.textContent = d.counts[k];
+        });
+        if (d.counts.pending > 0) {
+          document.querySelectorAll("[data-las-tab]").forEach(b => b.classList.remove("is-active"));
+          const tb = document.querySelector('[data-las-tab="pending"]');
+          if (tb) tb.classList.add("is-active");
+          lasState.tab = "pending";
+        }
+        lasLoad();
+      } catch {}
+    })();
   }
 
   /** 联系方式 → lucide 图标名映射，未知类型回退 link */
