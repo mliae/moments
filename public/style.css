@@ -239,8 +239,7 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
   min-height: 600px; position: absolute; top: 0; left: 0;
 }
 .essay-loading, .essay-empty {
-  display: flex; color: var(--anzhiyu-secondtext); flex-direction: column;
-  justify-content: center; align-items: center; gap: 1rem; padding: 3rem 0;
+  text-align: center; color: var(--anzhiyu-secondtext); line-height: 2; padding: 3rem 0;
 }
 .essay-loadmore {
   display: flex; color: var(--anzhiyu-secondtext); justify-content: center;
