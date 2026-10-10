@@ -2600,7 +2600,7 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 /* 友链申请状态列表 */
 .las-card .las-tabs { gap: .25rem; margin-bottom: .55rem; }
 .las-card .las-tab { font-size: .72rem; padding: .15rem .5rem; }
-.las-card .las-list { gap: 1.4rem; }
+.las-card .las-list { display: flex; flex-direction: column; gap: 1rem; }
 .las-apply-card { padding: .5rem .75rem; border-radius: 12px; }
 .las-apply-card .links-card-top { margin-bottom: 0; gap: .5rem; }
 .las-apply-card .links-avatar { width: 32px; height: 32px; }
