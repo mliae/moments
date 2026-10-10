@@ -2571,7 +2571,7 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
   margin-left: auto;
 }
 
-.links-apply-banner { margin-top: 1.6rem; background: linear-gradient(120deg, var(--anzhiyu-secondbg), var(--anzhiyu-secondbg)); border: 1px solid var(--anzhiyu-card-border); border-radius: 16px; padding: 1.4rem 1.6rem; display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+.links-apply-banner { margin-top: 1rem; margin-bottom: 1.2rem; background: linear-gradient(120deg, var(--anzhiyu-secondbg), var(--anzhiyu-secondbg)); border: 1px solid var(--anzhiyu-card-border); border-radius: 16px; padding: 1.4rem 1.6rem; display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
 .links-apply-title { font-weight: 700; color: var(--anzhiyu-main); font-size: 1.05rem; margin-bottom: .25rem; }
 .links-apply-desc { font-size: .84rem; color: var(--anzhiyu-secondtext); line-height: 1.6; max-width: 520px; }
 .links-apply-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .55rem 1.2rem; border-radius: 999px; background: var(--anzhiyu-main, var(--anzhiyu-main)); color: #fff; text-decoration: none; font-size: .88rem; font-weight: 600; margin-left: auto; transition: opacity .2s; }
