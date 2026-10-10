@@ -136,19 +136,20 @@ app.get("/all-applications", async c => {
   const rows = (
     await c.env.DB
       .prepare(
-        `SELECT id, name, url, description, category, status, created_at, updated_at
+        `SELECT id, name, url, description, avatar, category, status, created_at, updated_at
          FROM friends ${where} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
       )
       .bind(...binds, per_page, (page - 1) * per_page)
       .all<FriendRow>()
   ).results;
 
-  // 只返回公开字段（email / feed_url / feed_status / avatar 等隐私/内部字段不暴露）
+  // 只返回公开字段（email / feed_url / feed_status 等内部字段不暴露）
   const list = rows.map(r => ({
     id: r.id,
     name: r.name ?? "",
     url: r.url ?? "",
     description: r.description ?? "",
+    avatar: r.avatar ?? "",
     category: r.category ?? "",
     status: r.status ?? "pending",
     created_at: r.created_at,

@@ -3930,29 +3930,39 @@
         <p class="links-subtitle">${t("links.apply_subtitle")}</p>
       </div>
       <div class="links-apply-grid">
-        <div class="links-apply-side">
-          <div class="links-info-card">
-            <div class="links-info-title">${svgIcon("scroll-text", 18)} ${t("links.rules_title")}</div>
-            <p>${t("links.rules_intro")}</p>
-            <ol class="links-rules">
-              <li>${t("links.rules_1")}</li>
-              <li>${t("links.rules_2")}</li>
-              <li>${t("links.rules_3")}</li>
-              <li>${t("links.rules_4")}</li>
-              <li>${t("links.rules_5")}</li>
-            </ol>
-          </div>
-          <div class="links-info-card">
-            <div class="links-info-title">${svgIcon("info", 18)} ${t("links.site_info_title")}</div>
-            <p>${t("links.site_info_desc")}</p>
-            <div class="links-siteinfo">
-              <div><span>${t("links.apply_site_name")}</span><b data-copy="${esc(s.site_title || "")}">${esc(s.site_title || "")}</b></div>
-              <div><span>${t("links.apply_site_url")}</span><b data-copy="${esc(siteUrl)}">${esc(siteUrl)}</b></div>
-              <div><span>${t("links.apply_site_brief")}</span><b data-copy="${esc(s.essay_subtitle || "")}">${esc(s.essay_subtitle || "")}</b></div>
-            </div>
+        <div class="links-info-card">
+          <div class="links-info-title">${svgIcon("info", 18)} ${t("links.site_info_title")}</div>
+          <p>${t("links.site_info_desc")}</p>
+          <div class="links-siteinfo">
+            <div><span>${t("links.apply_site_name")}</span><b data-copy="${esc(s.site_title || "")}">${esc(s.site_title || "")}</b></div>
+            <div><span>${t("links.apply_site_url")}</span><b data-copy="${esc(siteUrl)}">${esc(siteUrl)}</b></div>
+            <div><span>${t("links.apply_site_brief")}</span><b data-copy="${esc(s.essay_subtitle || "")}">${esc(s.essay_subtitle || "")}</b></div>
           </div>
         </div>
-        <form class="links-info-card links-apply-form" id="linksApplyForm">
+        <div class="links-info-card las-card">
+          <div class="links-info-title">${svgIcon("list", 18)} ${t("links.apply_status_title")}</div>
+          <p style="margin:.2rem 0 .8rem">${t("links.apply_status_sub")}</p>
+          <div class="las-tabs" data-las-tabs>
+            <button class="las-tab is-active" data-las-tab="all">${t("links.tab_all")} <span class="las-tab-count" data-las-count="all">0</span></button>
+            <button class="las-tab" data-las-tab="pending">${t("links.tab_pending")} <span class="las-tab-count" data-las-count="pending">0</span></button>
+            <button class="las-tab" data-las-tab="approved">${t("links.tab_approved")} <span class="las-tab-count" data-las-count="approved">0</span></button>
+            <button class="las-tab" data-las-tab="rejected">${t("links.tab_rejected")} <span class="las-tab-count" data-las-count="rejected">0</span></button>
+          </div>
+          <div class="las-list" data-las-list></div>
+          <div class="las-pager" data-las-pager></div>
+        </div>
+        <div class="links-info-card">
+          <div class="links-info-title">${svgIcon("scroll-text", 18)} ${t("links.rules_title")}</div>
+          <p>${t("links.rules_intro")}</p>
+          <ol class="links-rules">
+            <li>${t("links.rules_1")}</li>
+            <li>${t("links.rules_2")}</li>
+            <li>${t("links.rules_3")}</li>
+            <li>${t("links.rules_4")}</li>
+            <li>${t("links.rules_5")}</li>
+          </ol>
+        </div>
+        <form class="links-info-card" id="linksApplyForm">
           <div class="links-info-title">${svgIcon("send", 18)} ${t("links.apply_form_title")}</div>
           <p style="margin:.2rem 0 1rem">${t("links.apply_form_tip")}</p>
           <div class="field"><label>${t("links.apply_site_name")} *</label><input name="name" maxlength="60" placeholder="${t("links.apply_name_ph")}" required /></div>
@@ -3981,20 +3991,6 @@
             </ol>
           </div>
         </form>
-      </div>
-      <div class="links-apply-status">
-        <div class="links-info-card">
-          <div class="links-info-title">${svgIcon("list", 18)} ${t("links.apply_status_title")}</div>
-          <p style="margin:.2rem 0 .8rem">${t("links.apply_status_sub")}</p>
-          <div class="las-tabs" data-las-tabs>
-            <button class="las-tab is-active" data-las-tab="all">${t("links.tab_all")} <span class="las-tab-count" data-las-count="all">0</span></button>
-            <button class="las-tab" data-las-tab="pending">${t("links.tab_pending")} <span class="las-tab-count" data-las-count="pending">0</span></button>
-            <button class="las-tab" data-las-tab="approved">${t("links.tab_approved")} <span class="las-tab-count" data-las-count="approved">0</span></button>
-            <button class="las-tab" data-las-tab="rejected">${t("links.tab_rejected")} <span class="las-tab-count" data-las-count="rejected">0</span></button>
-          </div>
-          <div class="las-list" data-las-list></div>
-          <div class="las-pager" data-las-pager></div>
-        </div>
       </div>
     </div></div>`;
 
@@ -4070,16 +4066,24 @@
 
     function lasListItem(row) {
       const approved = row.status === "approved";
-      const linkEl = approved
-        ? `<a href="${esc(row.url)}" target="_blank" rel="noopener nofollow" title="${esc(row.url)}" class="las-name-link">${esc(row.name)}</a>`
-        : `<span class="las-name-text">${esc(row.name)}</span>`;
-      const catTag = row.category ? `<span class="las-cat">${esc(row.category)}</span>` : "";
-      const desc = row.description ? `<div class="las-desc">${esc(row.description)}</div>` : "";
-      return `<div class="las-item">
-        <div class="las-row1">${linkEl} ${lasStatusTag(row.status)}</div>
-        <div class="las-row2">${catTag} <span class="las-time">${lasTime(row.created_at)}</span></div>
-        ${desc}
-      </div>`;
+      const cardOpen = approved ? `<a class="links-card las-apply-card" href="${esc(row.url)}" target="_blank" rel="noopener nofollow">` : `<div class="links-card las-apply-card">`;
+      const cardClose = approved ? `</a>` : `</div>`;
+      const domain = (row.url || "").replace(/^https?:\/\//i, "").replace(/\/$/, "");
+      return `${cardOpen}
+        <div class="links-card-top">
+          ${friendAvatar(row.name, row.avatar)}
+          <div class="links-card-info">
+            <div class="links-card-name">${esc(row.name)}</div>
+            <div class="links-card-domain">${esc(domain)}</div>
+          </div>
+          ${lasStatusTag(row.status)}
+        </div>
+        ${row.description ? `<div class="links-card-desc">${esc(row.description)}</div>` : ""}
+        <div class="las-apply-foot">
+          ${row.category ? `<span class="links-card-cat">${esc(row.category)}</span>` : ""}
+          <span class="las-apply-time">${lasTime(row.created_at)}</span>
+        </div>
+      ${cardClose}`;
     }
 
     function lasPagerHTML(total, page, per_page) {
