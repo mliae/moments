@@ -47,17 +47,13 @@ import {
 
 const app = new Hono<HonoEnv>();
 
-/* 首次请求时自动建表（一键部署场景：自动 provisioning 只创建空 D1，不跑 migrations）。
- * 幂等：表已存在时跳过；模块级 Promise 缓存，同一 Worker 隔离体内只跑一次。 */
-app.use("*", async (c, next) => {
-  await ensureSchema(c.env.DB);
-  await next();
-});
-
 /* ==================== 性能监控 ====================
  * 仅统计 /api/* 请求总耗时，异步采样写入 perf_log：
  * - 耗时 ≥ 300ms 的慢请求必记（用于发现劣化接口）
  * - 其余请求以 10% 概率采样（控制 D1 写入量，避免浪费免费额度）
+ *
+ * 注意：ensureSchema 已从全局中间件移出，只在 cron（/__scheduled）和 admin/setup 调用。
+ * 现网 schema 一旦建好就一直存在，冷启动不再拖慢首个请求。
  */
 app.use("*", async (c, next) => {
   const url = new URL(c.req.url);
@@ -689,6 +685,7 @@ app.onError((err, c) => {
  * 保活间隔在后台「设置 - QQ 昵称资料」中配置（小时）。
  */
 async function handleScheduled(env: HonoEnv["Bindings"]): Promise<void> {
+  await ensureSchema(env.DB); // cron 作为首个请求建表（全局中间件已移除）
   try {
     const s = await getSettings(env.DB);
 
