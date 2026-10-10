@@ -2602,9 +2602,11 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 .las-card .las-tabs { gap: .25rem; margin-bottom: .55rem; }
 .las-card .las-tab { font-size: .72rem; padding: .15rem .5rem; }
 .las-card .las-list { gap: .5rem; }
-.las-apply-card .links-card-desc { -webkit-line-clamp: 2; }
-.las-apply-foot { display: flex; align-items: center; gap: .5rem; margin-top: .4rem; }
-.las-apply-time { font-size: .72rem; color: var(--anzhiyu-secondtext); margin-left: auto; }
+.las-apply-card { padding: .85rem .95rem; }
+.las-apply-card .links-card-top { margin-bottom: .2rem; }
+.las-apply-card .links-card-desc { font-size: .78rem; line-height: 1.5; margin-bottom: .15rem; -webkit-line-clamp: 2; }
+.las-apply-foot { display: flex; align-items: center; gap: .5rem; }
+.las-apply-time { font-size: .7rem; color: var(--anzhiyu-secondtext); margin-left: auto; }
 .las-status {
   flex-shrink: 0; font-size: .65rem; padding: 0 .45rem; border-radius: 4px;
   font-weight: 500; line-height: 1.55;

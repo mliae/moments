@@ -3624,7 +3624,6 @@
           </div>
         </div>
         <div class="links-cats">${filterHtml}</div>
-        <div class="links-grid">${gridHtml}</div>
         <div class="links-apply-banner">
           <div>
             <div class="links-apply-title">${t("links.apply_banner_title")}</div>
@@ -3632,6 +3631,7 @@
           </div>
           <a class="links-apply-btn" href="/links/apply">${t("links.apply")} ${svgIcon("arrow-right", 16)}</a>
         </div>
+        <div class="links-grid">${gridHtml}</div>
       </div></div>`;
       // 同步浏览器标签页标题与 SEO
       setSeo({
