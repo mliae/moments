@@ -1049,20 +1049,32 @@
     const toolbar = isMobile
       ? { left: [], middle: ["zoomIn", "zoomOut"], right: ["slideshow", "fullscreen", "close"] }
       : { left: [], middle: ["zoomIn", "zoomOut", "actualSize", "rotateCCW", "rotateCW", "flipX", "flipY"], right: ["slideshow", "fullscreen", "close"] };
-    Fancybox.show(
-      list.map(s => ({ src: s })),
-      {
-        startIndex: index,
-        infinite: true,              // 循环切换
-        dragToClose: false,          // 避免误触关闭
-        Images: { zoom: true },      // 滚轮/双击缩放
-        Toolbar: { display: toolbar },
-        on: {
-          done: () => { fbOpen = true; lockBodyScroll(); },
-          destroy: () => { fbOpen = false; unlockBodyScroll(); },
-        },
-      }
-    );
+    // Fancybox v5 的 Fancybox.show() 传纯对象 slides（{src}）时 startIndex 完全失效，
+    // 灯箱永远从第 1 张打开；元素节点路径正常 —— 动态构建隐藏 a>img 节点后走 fromNodes
+    const holder = document.createElement("div");
+    holder.style.cssText = "position:absolute;left:-9999px;top:0;width:1px;height:1px;overflow:hidden";
+    const nodes = list.map(s => {
+      const a = document.createElement("a");
+      a.href = s;
+      a.setAttribute("data-fancybox", "lightbox");
+      const img = document.createElement("img");
+      img.src = s;
+      a.appendChild(img);
+      holder.appendChild(a);
+      return a;
+    });
+    document.body.appendChild(holder);
+    Fancybox.fromNodes(nodes, {
+      startIndex: index,
+      infinite: true,              // 循环切换
+      dragToClose: false,          // 避免误触关闭
+      Images: { zoom: true },      // 滚轮/双击缩放
+      Toolbar: { display: toolbar },
+      on: {
+        done: () => { fbOpen = true; lockBodyScroll(); },
+        destroy: () => { fbOpen = false; unlockBodyScroll(); holder.remove(); },
+      },
+    });
   }
 
   function closeLightbox() { if (typeof Fancybox !== "undefined") { try { Fancybox.close(); } catch (_) {} } }
