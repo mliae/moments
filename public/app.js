@@ -3594,7 +3594,7 @@
       }).join("");
 
       const gridHtml = list.length
-        ? list.map(f => `
+        ? `<div class="links-grid">${list.map(f => `
             <a class="links-card" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer nofollow">
               <div class="links-card-top">
                 ${friendAvatar(f.name, f.avatar)}
@@ -3609,7 +3609,7 @@
               <div class="links-card-foot">
                 ${f.category ? `<span class="links-card-cat">${esc(f.category)}</span>` : ""}
               </div>
-            </a>`).join("")
+            </a>`).join("")}</div>`
         : `<div class="essay-empty">${t("links.empty_apply_tip")}</div>`;
 
       app.innerHTML = `<div class="essay"><div class="links-wrap">
@@ -3631,7 +3631,7 @@
           </div>
           <a class="links-apply-btn" href="/links/apply">${t("links.apply")} ${svgIcon("arrow-right", 16)}</a>
         </div>
-        <div class="links-grid">${gridHtml}</div>
+        ${gridHtml}
       </div></div>`;
       // 同步浏览器标签页标题与 SEO
       setSeo({
