@@ -2579,9 +2579,9 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 /* 申请友链页 */
 .links-apply-wrap { max-width: 1100px; margin: 0 auto; }
 .links-apply-grid {
-  column-count: 2; column-gap: 1.2rem; margin-top: 1.2rem;
+  column-count: 2; column-gap: 1.6rem; margin-top: 1.2rem;
 }
-.links-apply-grid > * { break-inside: avoid; margin-bottom: 1.2rem; display: block; }
+.links-apply-grid > * { break-inside: avoid; margin-bottom: 1.6rem; display: block; }
 .links-info-card { background: var(--anzhiyu-card-bg); border: var(--style-border); border-radius: 14px; padding: 1.2rem 1.3rem; box-shadow: var(--anzhiyu-shadow-border); }
 .links-info-title { display: flex; align-items: center; gap: .5rem; font-weight: 700; color: var(--anzhiyu-main); font-size: 1rem; margin-bottom: .7rem; }
 .links-info-card p { font-size: .84rem; color: var(--anzhiyu-secondtext); line-height: 1.65; margin: 0 0 .8rem; }
