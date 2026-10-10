@@ -21,6 +21,7 @@ import { ok, fail } from "../respond";
 import type { HonoEnv } from "../types";
 import { requireAdmin } from "../auth";
 import { getSettings } from "../settings";
+import { notify } from "../security";
 import {
   detectFeedFromHtml,
   probeCommonFeedPaths,
@@ -195,6 +196,18 @@ app.post("/apply", async c => {
       now
     )
     .first<FriendRow>();
+
+  // Webhook 通知（走「新评论」开关，异步不阻塞）
+  const s = await getSettings(c.env.DB);
+  c.executionCtx.waitUntil(
+    notify(
+      s,
+      "comment",
+      "🔗 新友链申请",
+      `站点：${info?.name || name}\n地址：${url}\n描述：${(info?.description || description || "(无)").slice(0, 120)}\n订阅：${feed_url || info?.feed_url || "(未填)"}\n邮箱：${email || "(未填)"}`
+    )
+  );
+
   return ok(c, { id: row?.id, status: "pending" }, "已提交，站长审核通过后会出现在友链列表");
 });
 

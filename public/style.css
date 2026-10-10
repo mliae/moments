@@ -792,6 +792,9 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
   display: inline-flex; align-items: center; gap: 3px;
 }
 .bber-post-tag--pinned svg { display: block; }
+.bber-post-tag--moment {
+  color: var(--anzhiyu-secondtext); background: var(--anzhiyu-background); border: 1px solid var(--anzhiyu-card-border, var(--anzhiyu-secondbg));
+}
 
 .post-layout {
   display: flex;
@@ -2433,6 +2436,9 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 .links-card-update-text { flex-shrink: 0; }
 .links-card-update.is-today .links-card-update-text { color: var(--anzhiyu-main); font-weight: 600; }
 .links-card-update.is-stale { opacity: .7; }
+.links-card-update.is-unsubscribed .links-card-update-text { color: var(--anzhiyu-red, #e53935); font-weight: 600; }
+.links-card-update.is-error .links-card-update-text { color: var(--anzhiyu-orange, #f59e0b); font-weight: 600; }
+.links-card-update.is-pending .links-card-update-text { opacity: .6; }
 .links-card-post { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .links-card-post:hover { color: var(--anzhiyu-main); }
 
@@ -2784,7 +2790,7 @@ a.about-contact-item:hover { background: var(--anzhiyu-main-deep); }
 .an-vpages { margin-top: .4rem; display: flex; flex-wrap: wrap; gap: .35rem; }
 .an-page { display: inline-flex; align-items: center; gap: .25rem; background: var(--anzhiyu-secondbg); border-radius: 6px; padding: .18rem .5rem; font-size: .74rem; color: var(--anzhiyu-fontcolor); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .an-page i { font-style: normal; color: var(--anzhiyu-secondtext); font-size: .68rem; }
-@media (max-width: 720px) { .an-grid { grid-template-columns: 1fr; } .an-vdur { margin-left: 0; } }
+@media (max-width: 720px) { .an-grid { grid-template-columns: 1fr !important; } .an-vdur { margin-left: 0; } }
 
 /* ==================== 每日明细表格 ==================== */
 .an-day-table-wrap { overflow-x: auto; border-radius: 12px; border: var(--style-border); background: var(--anzhiyu-card-bg); }

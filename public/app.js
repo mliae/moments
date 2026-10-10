@@ -1738,6 +1738,7 @@
             ${avatarSpanHtml(s.author_avatar, (s.author_name || "M").charAt(0))}
             <span class="bber-author-nickname">${esc(s.author_name || "Moments")}</span>
           </span>
+          <span class="bber-post-tag bber-post-tag--moment">${t("feed.moment_tag")}</span>
         </div>
         <div class="datacont"><div class="m-xlate-content" data-mcontent>${renderContentHtml(m.content)}</div>${videosHtml(m)}</div>
         ${imagesGridHtml(m)}
@@ -3556,7 +3557,16 @@
 
   /* 友站最近发文行：今天=主题色高亮 / 昨天 / N 天前 / 超 1 个月灰色；最新文章标题可点击直达友站文章 */
   function friendLastPostHtml(f) {
-    if (!f.last_post_at) return "";
+    if (!f.feed_url) {
+      return `<div class="links-card-update is-unsubscribed"><span class="links-card-update-text">${t("links.not_subscribed")}</span></div>`;
+    }
+    if (!f.last_post_at) {
+      const st = String(f.feed_status || "");
+      if (st && st !== "ok") {
+        return `<div class="links-card-update is-error"><span class="links-card-update-text">${t("links.fetch_error")}</span></div>`;
+      }
+      return `<div class="links-card-update is-pending"><span class="links-card-update-text">${t("links.fetch_pending")}</span></div>`;
+    }
     const ts = Date.parse(f.last_post_at);
     if (!Number.isFinite(ts)) return "";
     const days = Math.floor((Date.now() - ts) / 864e5);
