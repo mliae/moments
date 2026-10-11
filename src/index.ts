@@ -427,6 +427,11 @@ function iconToHref(v: string): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
+/** SSR 注入文本的最小 HTML 转义（& < > "） */
+function escHtml(v: string): string {
+  return String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 async function serveSsr(
   c: Context<HonoEnv>,
   html: string,
@@ -458,6 +463,16 @@ async function serveSsr(
         : 'image/png';
       return `<link rel="icon" type="${type}" href="${href}" />`;
     })
+    // 首帧顶栏真实化：品牌名/首页导航文字/头像直出后台配置值，爬虫与首次访问者首帧即真实值
+    .replace(/(data-ssr-text="(site_title|nav_feeds_name)"[^>]*>)[^<]*/g, (m, p1: string, key: string) => {
+      const val = key === "site_title" ? s.site_title : s.nav_feeds_name;
+      return val ? p1 + escHtml(val) : m;
+    })
+    .replace(/(<span class="brand-avatar"[^>]*>)[\s\S]*?(<\/span>)/, (m, p1: string, p2: string) =>
+      /^https?:\/\//i.test(s.brand_avatar || "")
+        ? `${p1}<img src="${escHtml(s.brand_avatar)}" alt="" referrerpolicy="no-referrer" />${p2}`
+        : m
+    )
     .replace(HEAD_MARK, () => opts.head)
     .replace(I18N_MARK, () => i18nBoot)
     .replace(APP_MARK, () => `<main id="app" class="page-main">${opts.body ?? ""}</main>`);
