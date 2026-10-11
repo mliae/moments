@@ -12369,7 +12369,10 @@
     const qq = (form.dataset.qq || "").trim();
     const parentId = Number(form.dataset.parentId) || 0;
     const btn = form.querySelector('button[type="submit"]');
+    const btnLabel = btn.textContent;
     btn.disabled = true;
+    btn.textContent = t("comment.submitting");
+    toast(t("comment.submitting"));
     try {
       const endpoint = ctype === "post"
         ? `/api/posts/${encodeURIComponent(target.slug)}/comments`
@@ -12418,6 +12421,7 @@
       } else {
         updateArticleCommentCount(target.comment_count);
       }
+      toast(t("comment.reply_success"));
       // @机器人：提示并轻量轮询异步生成的 AI 回复
       const botName = state.settings.ai_bot_name || "小J";
       if (state.settings?.ai_reply_enabled && content.includes(`@${botName}`)) {
@@ -12428,6 +12432,7 @@
       toast(err.message);
     } finally {
       btn.disabled = false;
+      btn.textContent = btnLabel;
     }
   });
 
