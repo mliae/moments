@@ -5,16 +5,9 @@
   "compatibility_date": "2025-09-01",
   // 一键部署：默认启用 workers.dev 子域名；自定义域名请在 Cloudflare
   // Dashboard → Workers & Pages → moments → Settings → Domains & Routes 绑定
-  // （Dashboard 绑定的自定义域名不受部署影响，不会被此处覆盖）
+  // Custom Domain（会自动创建橙云 DNS 记录，绑定后不受部署影响、不被此处覆盖）。
+  // 注意：不要再在此声明 routes —— 与面板 Custom Domain 同 pattern 会冲突。
   "workers_dev": true,
-  // 区域路由（非 Custom Domain）：边缘按 Host 匹配，把流量交给本 Worker。
-  // DNS 由手动管理的灰云 CNAME（→ cloudflare.seeck.cn 优选域名）解析，
-  // 因此这里不能用 custom_domain=true（那会锁定橙云记录、无法 CNAME 优选）。
-  // 注意：同 pattern 不能与面板的 Custom Domain 并存，部署前需先在面板删除。
-  "routes": [
-    { "pattern": "jxe.me/*", "zone_name": "jxe.me" },
-    { "pattern": "www.jxe.me/*", "zone_name": "jxe.me" }
-  ],
   // 静态前端（含 vendor）：命中静态文件直接由 assets 服务，其余请求落到 Worker
   "assets": {
     "directory": "./public",
