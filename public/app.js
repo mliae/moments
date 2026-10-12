@@ -8297,7 +8297,7 @@
     const items = [
       { label: "站点地图 sitemap.xml", url: `${origin}/sitemap.xml`, tip: "提交给搜索引擎，列出所有可收录页面" },
       { label: "爬虫规则 robots.txt", url: `${origin}/robots.txt`, tip: "声明允许/禁止抓取的路径与 sitemap 位置" },
-      { label: "RSS 订阅 rss.xml", url: `${origin}/rss.xml`, tip: "文章更新源，也可用于订阅与部分平台抓取" },
+      { label: "RSS 订阅 feed", url: `${origin}/feed`, tip: "文章更新源，也可用于订阅与部分平台抓取" },
     ];
     panel.innerHTML = `
       <div class="admin-panel-head"><h3>搜索收录</h3></div>
