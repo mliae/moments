@@ -175,12 +175,30 @@ export function renderPostSsr(row: PostRow, commentCount: number, defaultPoster 
 export function renderMomentListSsr(rows: MomentRow[], r2Domain?: string, b2Domain?: string): string {
   const items = rows.map(row => {
     const m = serializeMoment(row, undefined, r2Domain, b2Domain);
-    const text = (m.content || "").replace(/[#*`>_\-!\[\]]/g, "").replace(/\n+/g, " ").trim().slice(0, 300);
-    const imgs = (m.images || []).slice(0, 3)
-      .map(src => `        <img src="${esc(src)}" alt="" loading="lazy" />`)
-      .join("\n");
+    // 先摘掉自定义块指令，否则 @[video](/domains) 会被下面的符号清洗成
+    // "@video(/domains)" 这样的漏网文字（爬虫与首屏都会看到）
+    const text = (m.content || "")
+      .replace(/@\[video\]\([^)]*\)/g, " ")
+      .replace(/\[music=t?\d+\]/gi, " ")
+      .replace(/[#*`>_\-!\[\]]/g, "")
+      .replace(/\n+/g, " ")
+      .trim()
+      .slice(0, 300);
+    const imgs = (m.images || []).slice(0, 3);
+    const mod = imgs.length === 1 ? "single" : imgs.length === 2 ? "double" : "multi";
+    // 类名必须与前端 imagesGridHtml/momentCardHtml 一致：style.css 只认
+    // .bber-container-img/.bber-content-img（九宫格 + 绝对定位裁切）。自造类名的图片
+    // 只剩全局 img{max-width:100%}，水合前的首屏会被 2048 方图撑满整屏。
+    const grid = imgs.length
+      ? `\n        <div class="bber-container-img bber-img-${mod}">\n${imgs
+          .map(src => `          <div class="bber-content-img"><img src="${esc(src)}" alt="" loading="lazy" /></div>`)
+          .join("\n")}\n        </div>`
+      : "";
+    const meta = `\n        <div class="bber-bottom"><div class="bber-info"><div class="bber-info-time"><time class="datatime" datetime="${escAttr(m.created_at)}">${esc(fmtDate(m.created_at))}</time></div>${m.location ? `<div class="bber-info-from">${esc(m.location)}</div>` : ""}</div></div>`;
+    const para = text ? `<p>${esc(text)}</p>` : "";
     return `      <article class="bber-item" data-ssr-moment="${m.id}">
-        <div class="bber-content"><p>${esc(text)}</p></div>${imgs ? `\n        <div class="bber-images">\n${imgs}\n        </div>` : ""}${m.location ? `\n        <div class="bber-meta"><time datetime="${escAttr(m.created_at)}">${esc(fmtDate(m.created_at))}</time> · ${esc(m.location)}</div>` : `\n        <div class="bber-meta"><time datetime="${escAttr(m.created_at)}">${esc(fmtDate(m.created_at))}</time></div>`}
+        <div class="bber-content">${para}${grid}</div>
+        <hr />${meta}
       </article>`;
   }).join("\n");
   return `    <div class="bber" data-ssr-list>

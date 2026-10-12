@@ -255,6 +255,10 @@ select option { background: var(--anzhiyu-card-bg); color: var(--anzhiyu-fontcol
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==================== 即刻卡片 ==================== */
+/* SSR 首屏（前端瀑布流接管前）：瀑布流靠 JS 绝对定位，此刻 SSR 直出的列表是整宽堆叠，
+   .bber-content-img 的百分比 padding 按整屏宽算 → 2048 方图撑成近一屏高的图块。
+   先给一个卡片列宽，让首屏观感接近接管后。 */
+.bber[data-ssr-list] { max-width: 420px; margin: 0 auto; }
 .bber-item {
   display: flex; background: var(--anzhiyu-card-bg);
   border: var(--style-border-always); box-shadow: var(--anzhiyu-shadow-border);

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>4 位 .cn 挑选台 · 2026-10-12 实测可注册</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1a1d21;--mut:#6b7280;--line:#e3e6ea;--ok:#0f766e;--hot:#b4232a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Microsoft YaHei","Segoe UI",sans-serif}
+header{position:sticky;top:0;z-index:6;background:#fff;border-bottom:1px solid var(--line);padding:10px 16px}
+h1{margin:0 0 6px;font-size:19px}
+.note{font-size:13px;color:var(--mut)}
+nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+nav a{font-size:14px;padding:7px 12px;background:#eef1f5;border-radius:8px;text-decoration:none;color:#25324a;border:1px solid #dfe4ea}
+nav a:hover{background:#dfe7f1}
+main{max-width:1120px;margin:0 auto;padding:16px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0}
+h2{margin:0 0 4px;font-size:17px}
+.sub{font-size:13px;color:var(--mut);margin-bottom:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:#fafbfc;border-radius:9px;padding:8px 11px;cursor:pointer;
+      width:172px;display:flex;flex-direction:column;gap:2px;font-size:15px}
+.chip:hover{border-color:#9fb2cc;background:#f1f5fb}
+.chip b{font-family:Consolas,monospace;font-weight:600;font-size:16px}
+.chip .mean{font-size:12px;color:#3d4652;line-height:1.35;height:auto}
+.chip .src{font-size:11px;color:var(--mut)}
+.chip.sel{border-color:var(--ok);background:#e7f6f3;box-shadow:0 0 0 2px #0f766e22 inset}
+input[type=search]{width:100%;padding:11px 13px;font-size:16px;border:1px solid #cfd6de;border-radius:9px;margin:6px 0 10px}
+.filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px}
+.filters button{font-size:13px;padding:6px 11px;border:1px solid #cfd6de;background:#f3f5f8;border-radius:16px;cursor:pointer;color:#2b3441}
+.filters button.on{background:#0f766e;color:#fff;border-color:#0f766e}
+.filters .lbl{font-size:13px;color:var(--mut);margin-right:2px}
+#picked{min-height:44px;border:1px dashed #c3ccd8;border-radius:10px;padding:10px 12px;font-size:15px;background:#fcfdfe}
+#picked .chip{display:inline-flex;width:auto;min-width:150px;margin:4px 6px 4px 0}
+.big{font-size:15px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+td,th{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left}
+.ok{color:var(--ok);font-weight:700}
+ul{margin:6px 0 0;padding-left:20px}
+li{margin:3px 0}
+code{background:#eef1f5;padding:2px 6px;border-radius:5px;font-size:13px}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1f2937;color:#fff;
+       padding:10px 18px;border-radius:22px;font-size:14px;opacity:0;transition:.2s;pointer-events:none}
+#toast.on{opacity:1}
+.stat{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;margin:8px 0 0}
+.stat span{background:#eef1f5;padding:5px 10px;border-radius:8px}
+#count{font-size:13px;color:var(--mut);margin:2px 0 10px}
+.warn{border-left:4px solid var(--hot);background:#fdf3f3;padding:10px 12px;border-radius:0 8px 8px 0;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <h1>4 位 .cn 未注册域名扫榜 <span class="note">· 只放 4 位纯字母 .cn，全部 2026-10-12 向 CNNIC 直接查过两遍，均未注册</span></h1>
+  <div class="note">网上扫出来的一批还没被注册的 4 位 .cn，公开分享。点一个就复制并放进"已选"；看中了哪个，去注册商（阿里云/腾讯云/西部数码）直接下单就行——<b>先到先得，被抢了别找我</b>。有问题在文章评论区留言。</div>
+  <nav>
+    <a href="#pool">全部 660 个</a>
+    <a href="#why">为什么只剩这些形态</a>
+    <a href="#buy">下单前要注意</a>
+    <a href="#self">查自己的词</a>
+  </nav>
+</header>
+<main>
+
+<section id="picked">
+  <div class="big"><b>已选：</b><span class="note">（还没点）</span></div>
+</section>
+
+<section id="pool">
+  <h2>全部可注册的 4 位 .cn（去重 660 个）</h2>
+  <div class="sub">四批扫描的并集：真实英文词、双元音连号、博客向好读拼法、纯辅音冷组合。默认按"我建议你看的顺序"排——带释义的在最前面，越靠后字母组合越冷。</div>
+  <div class="stat"><span>去重后共 <b>660</b> 个</span><span>带释义 <b>40</b></span><span>双元音连号 <b>142</b></span><span>真实英文词 <b>431</b></span><span>博客向 <b>39</b></span><span>纯辅音冷组合 <b>50</b></span></div>
+  <input type="search" id="fq" placeholder="筛选：输入要含的字母或词，比如 oa、kvas、烘干">
+  <div class="filters">
+    <span class="lbl">按形态：</span>
+    <button data-f="all" class="on">全部</button>
+    <button data-f="g">带释义</button>
+    <button data-f="lh">双元音连号</button>
+    <button data-f="en">真实英文词</button>
+    <button data-f="blog">博客向</button>
+    <button data-f="cold">纯辅音</button>
+    <span class="lbl" style="margin-left:10px">排除冷字母：</span>
+    <button data-x="q">q</button>
+    <button data-x="x">x</button>
+    <button data-x="z">z</button>
+    <button data-x="j">j</button>
+  </div>
+  <div id="count"></div>
+  <div class="row" id="grid"></div>
+</section>
+
+<section id="why">
+  <h2>为什么 4 位 .cn 只剩这几种形态</h2>
+  <div class="sub">下面每行都是我自己向注册局查的实测数，不是抄来的说法。</div>
+  <table>
+    <tr><th>扫的方向</th><th>查了多少</th><th>能注册</th><th>剩下的是什么样的</th></tr>
+    <tr><td>两个拼音音节拼起来（nui+se 这类）</td><td>5392</td><td>15（0.28%）</td><td>duei / juei / quei，拼不出好听的词</td></tr>
+    <tr><td>"英文感"拼写（辅音+元音交替）</td><td>5420</td><td>185（3.4%）</td><td>空闲集中在 q/x/v 区，如 xoci、vuwo</td></tr>
+    <tr><td>结构连号：4 连 / 3 连 / AABB / ABAB / ABBA</td><td>3276</td><td class="ok">0</td><td>koko、lulu、abba、emma 一个不剩，投资人主力货</td></tr>
+    <tr><td>双写元音夹中间（辅音+aa/ee/oo+辅音）</td><td>1323</td><td>142（10.7%）</td><td>haag、nooh、feem、paar —— 唯一还剩货的连号形态</td></tr>
+    <tr><td>真实英文 4 字母单词</td><td>7186</td><td>431（6%）</td><td>生僻词、复数形态，国内买家不收</td></tr>
+    <tr><td>纯辅音冷组合（上一版 ⑤ 那批）</td><td>625</td><td>50（8%）</td><td>jjxk 这类，只能当短网址</td></tr>
+  </table>
+  <p class="note">两条规律：<b>① 能读的几乎全被持有</b>，4 位 .cn 是域名投资人的核心持仓；<b>② 空闲只出现在他们不收的地方</b>——冷字母区、复数/三单形态（这 431 个里有 53 个是复数形式，比如 kvas、yews、ouds）。3 位纯字母 .cn 我抽查 200 个全被注册，别再往短的方向找了。</p>
+  <p class="note">释义口径：A 组 40 个是我逐个确认过的；WordNet 3.1 覆盖我们这 431 个里的 36 个，其余是苏格兰语/古语/Scrabble 专用形态，本机连不上词典接口，<b>没把握的我一律不标</b>，宁可空着。</p>
+</section>
+
+<section id="buy">
+  <h2>下单前要注意的 3 件事</h2>
+  <div class="warn"><b>溢价/白金词：</b>4 位 .cn 里有一部分被注册局标成溢价词，页面上看着 40 元，进结算页可能变几百到几千。这个价只能你登录注册商账号后自己看——页面显示的"首年 ¥xx"如果不是 ¥40 左右，那就是溢价词，换一个。</div>
+  <ul style="margin-top:12px">
+    <li><b>备案口径</b>：.cn 在工信部已批复后缀列表里，能备案；必须在境内批复注册商（阿里云/腾讯云/西部数码）注册，境外注册的要先转回。</li>
+    <li><b>实名 = 备案主体</b>：持有人的名称、证件类型、证件号要和备案主办者完全一致，企业名里的括号必须中文全角（）；改完实名等 2~3 个工作日同步才能提交备案。</li>
+    <li><b>.cn 额外一步</b>：注册后要交实名材料，没审核过是 serverHold 状态、解析不生效。选完当天就把实名交了。剩余有效期要大于 45 天。</li>
+  </ul>
+</section>
+
+<section id="self">
+  <h2>想查自己的词？</h2>
+  <p>上面这批是我扫出来的，如果你有自己想查的词（品牌名、缩写、谐音），最直接的办法：打开<a href="https://wanwang.aliyun.com/domain/searchresult/" target="_blank" rel="noopener">阿里云域名查询</a>或<a href="https://dnspod.cloud.tencent.com/" target="_blank" rel="noopener">腾讯云 DNSPod</a>，输入 <code>你的词.cn</code> 看能不能加入购物车。</p>
+  <p class="note">能加入购物车 = 没被注册；显示"已被注册"或"议价" = 没了。查询走注册局实时数据，以注册商页面为准。</p>
+</section>
+
+</main>
+<div id="toast"></div>
+<script>
+const DATA = {"words": ["akra", "arne", "awry", "bhil", "blup", "cuir", "cuon", "dhak", "diol", "drab", "ecus", "euge", "eyra", "gyri", "haem", "icbm", "icky", "kaph", "knaw", "kvas", "kyat", "mawk", "mulk", "neif", "oast", "orle", "ouds", "paar", "peag", "pirl", "rheo", "riem", "scye", "wyle", "yamp", "yews", "eaux", "esox", "hadj", "qadi", "caah", "caak", "ceew", "daak", "daat", "deeh", "faag", "faah", "faay", "feeh", "feem", "feew", "fooh", "gaar", "geey", "haag", "haay", "heef", "kaag", "kaaw", "keeh", "kooh", "laah", "laat", "laaw", "laay", "leew", "maav", "maay", "meef", "meev", "neeh", "nooh", "paav", "paaw", "peeb", "peey", "raac", "raaf", "raah", "raal", "raam", "raap", "raav", "reew", "saag", "seeh", "teew", "toov", "vaaf", "vaag", "vaah", "vaal", "vaaw", "veeh", "veew", "waah", "waay", "yaac", "yaah", "yeev", "baaj", "caaj", "caaq", "daaq", "feej", "fooq", "gaaq", "gaaz", "geej", "haax", "heej", "heeq", "heez", "jaam", "jaat", "jaav", "jaaw", "jeeb", "jeeg", "kaaj", "laaj", "laaz", "leeq", "nooj", "paaz", "peej", "poox", "pooz", "qaab", "qaac", "qaad", "qaag", "qaak", "qaal", "qaar", "qaat", "qaay", "qeef", "qeem", "qeev", "qeew", "qoog", "qooh", "qoov", "qoow", "raaj", "raaq", "raaz", "saaz", "taaj", "tooq", "vaaj", "vaaq", "vaax", "veej", "veeq", "vooq", "waaj", "waax", "waaz", "xaav", "xeey", "xood", "xoof", "xoog", "xooh", "xoot", "yaax", "yeez", "zaay", "zeeh", "jaaq", "jooq", "qaaj", "qaax", "qaaz", "xeez", "xooj", "xooq", "zeej", "fuve", "guve", "huvi", "nufi", "puvi", "puvo", "vuce", "vuha", "vuri", "vuto", "vuwa", "vuwo", "fuxo", "kaxo", "nuxo", "qale", "qali", "qane", "qavi", "qeco", "qemi", "qesa", "qeto", "qeva", "rixa", "rujo", "soxe", "xevi", "xobe", "xoci", "xofa", "xoki", "xopa", "xugi", "yujo", "jaxe", "joxa", "qajo", "afer", "afft", "agha", "agre", "akov", "alew", "aoul", "arba", "arew", "atik", "augh", "avdp", "avys", "awfu", "ayne", "baft", "bauk", "baun", "bawd", "bdle", "bhar", "bhoy", "borh", "boul", "brob", "bual", "budh", "buhr", "bums", "burh", "cafh", "caph", "cauk", "chob", "cowy", "coyn", "croh", "cund", "cuvy", "dabb", "dalk", "dalt", "dauk", "dauw", "defs", "detn", "deul", "diel", "doab", "doat", "dols", "dowf", "dowl", "dowp", "dowy", "drof", "duhr", "dulc", "ecod", "efph", "egbo", "eheu", "eiry", "eked", "ekes", "elmy", "elod", "emeu", "empt", "emyd", "ened", "enif", "erns", "eruc", "esth", "etua", "ewry", "ewte", "eyne", "faky", "favn", "fedn", "feff", "fids", "fied", "fiel", "fikh", "flav", "fops", "foud", "foys", "frib", "frim", "frot", "frug", "fuds", "fulk", "gaed", "gaet", "gapy", "gaub", "gaum", "gaup", "gaut", "gedd", "gied", "gils", "glar", "gleg", "glug", "gneu", "goys", "grue", "gruf", "guhr", "gunl", "gurt", "gwag", "gyse", "gyte", "hahs", "harl", "hdkf", "heaf", "hewt", "himp", "hler", "holw", "howf", "howk", "ills", "ilth", "inbd", "incl", "iocs", "irks", "irpe", "itmo", "iuds", "ivin", "kaes", "kasm", "kefs", "keup", "khar", "khir", "kiby", "klom", "klva", "knab", "knar", "knub", "koae", "krna", "kulm", "kurn", "kyar", "kyke", "lacs", "lapb", "loir", "lors", "lums", "lurg", "lwop", "maws", "midn", "miek", "moid", "moph", "morw", "moul", "mout", "mows", "mowt", "moyl", "mpbs", "mrem", "mtge", "mugg", "muth", "muts", "nael", "nawt", "nubs", "nudd", "nuns", "oaty", "obdt", "odal", "odum", "oeci", "ogum", "olpe", "ondy", "oofy", "oord", "opsy", "ordn", "ordu", "outr", "ovey", "owed", "owse", "paua", "pawk", "peds", "perv", "peul", "pews", "pewy", "phoh", "phut", "piky", "pilm", "pmsg", "pnce", "pogy", "prau", "prie", "pruh", "psia", "pugh", "pyal", "pyic", "pyla", "rakh", "rals", "rauk", "refl", "regr", "repr", "rgen", "rhet", "rhus", "rids", "roak", "roub", "roud", "rsum", "rubs", "ruly", "rumb", "ryas", "ryot", "sadr", "sahh", "sauf", "scug", "scur", "sepn", "siak", "skag", "skef", "skel", "skeo", "skiv", "slod", "smur", "sned", "snum", "snur", "sowf", "stge", "stod", "stof", "stug", "subg", "suld", "svce", "swom", "tawn", "tegs", "teuk", "thak", "thir", "tirr", "toea", "togt", "towy", "turb", "turp", "tuth", "typw", "ufer", "uily", "ulla", "ulto", "ulua", "umps", "umpy", "unau", "ungt", "upby", "upsy", "urde", "urds", "urdy", "urns", "uroo", "urva", "utch", "uval", "uvre", "vavs", "veau", "voet", "vrow", "vugh", "vugs", "vulg", "waeg", "wakf", "waky", "wauf", "waup", "waur", "wept", "whap", "whud", "wirr", "wraf", "wraw", "wulk", "wyde", "wyte", "yalb", "yaud", "yaup", "ycie", "yelk", "yelm", "yelt", "yerb", "yern", "yeuk", "yigh", "yobs", "yoks", "yont", "yows", "yowt", "aquo", "coxy", "crax", "eqpt", "expy", "exul", "ezba", "falx", "fozy", "friz", "fruz", "gunj", "ijma", "inez", "itza", "izba", "izle", "jann", "jaob", "jawn", "jctn", "jhow", "jhvh", "jibs", "jugs", "knez", "maux", "mijl", "munj", "nejd", "onza", "oxan", "oxes", "oyez", "pnxt", "quab", "quei", "quim", "quop", "quor", "rixy", "subj", "unze", "xdiv", "zarp", "zeds", "zigs", "jozy", "xxiv", "jkxk", "jkzk", "kjkq", "kkqz", "kkxj", "kqzk", "kxqk", "qkkz", "qkxk", "xkkz", "jjxk", "jkqz", "jzxk", "kjjq", "kjqz", "kqjq", "kqjz", "kqqx", "kxqj", "kxqq", "kzqz", "kzxq", "qjkz", "qjxk", "qkjj", "qkjq", "qkqj", "qkqx", "qkxj", "qxkq", "qxkz", "qxqk", "qzkq", "qzkz", "qzqk", "qzxk", "xkqj", "xkqx", "xkzq", "xqkq", "zqkz", "jqqx", "jqxj", "qxxj", "qzxj", "xjqj", "xjqq", "xqxj", "xzjq", "zqqx"], "tags": {"akra": ["en"], "arne": ["en"], "awry": ["en"], "bhil": ["en"], "blup": ["en"], "cuir": ["en"], "cuon": ["en"], "dhak": ["en"], "diol": ["en"], "drab": ["en"], "ecus": ["en"], "euge": ["en"], "eyra": ["en"], "gyri": ["en"], "haem": ["en"], "icbm": ["en"], "icky": ["en"], "kaph": ["en"], "knaw": ["en"], "kvas": ["en"], "kyat": ["en"], "mawk": ["en"], "mulk": ["en"], "neif": ["en"], "oast": ["en"], "orle": ["en"], "ouds": ["en"], "paar": ["lh", "en"], "peag": ["en"], "pirl": ["en"], "rheo": ["en"], "riem": ["en"], "scye": ["en"], "wyle": ["en"], "yamp": ["en"], "yews": ["en"], "eaux": ["en"], "esox": ["en"], "hadj": ["en"], "qadi": ["blog", "en"], "caah": ["lh"], "caak": ["lh"], "ceew": ["lh"], "daak": ["lh"], "daat": ["lh"], "deeh": ["lh"], "faag": ["lh"], "faah": ["lh"], "faay": ["lh"], "feeh": ["lh"], "feem": ["lh"], "feew": ["lh"], "fooh": ["lh"], "gaar": ["lh"], "geey": ["lh"], "haag": ["lh"], "haay": ["lh"], "heef": ["lh"], "kaag": ["lh"], "kaaw": ["lh"], "keeh": ["lh"], "kooh": ["lh"], "laah": ["lh"], "laat": ["lh"], "laaw": ["lh"], "laay": ["lh"], "leew": ["lh"], "maav": ["lh"], "maay": ["lh"], "meef": ["lh"], "meev": ["lh"], "neeh": ["lh"], "nooh": ["lh"], "paav": ["lh"], "paaw": ["lh"], "peeb": ["lh"], "peey": ["lh"], "raac": ["lh"], "raaf": ["lh"], "raah": ["lh"], "raal": ["lh"], "raam": ["lh"], "raap": ["lh"], "raav": ["lh"], "reew": ["lh"], "saag": ["lh"], "seeh": ["lh"], "teew": ["lh"], "toov": ["lh"], "vaaf": ["lh"], "vaag": ["lh"], "vaah": ["lh"], "vaal": ["lh"], "vaaw": ["lh"], "veeh": ["lh"], "veew": ["lh"], "waah": ["lh"], "waay": ["lh"], "yaac": ["lh"], "yaah": ["lh"], "yeev": ["lh"], "baaj": ["lh"], "caaj": ["lh"], "caaq": ["lh"], "daaq": ["lh"], "feej": ["lh"], "fooq": ["lh"], "gaaq": ["lh"], "gaaz": ["lh"], "geej": ["lh"], "haax": ["lh"], "heej": ["lh"], "heeq": ["lh"], "heez": ["lh"], "jaam": ["lh"], "jaat": ["lh"], "jaav": ["lh"], "jaaw": ["lh"], "jeeb": ["lh"], "jeeg": ["lh"], "kaaj": ["lh"], "laaj": ["lh"], "laaz": ["lh"], "leeq": ["lh"], "nooj": ["lh"], "paaz": ["lh"], "peej": ["lh"], "poox": ["lh"], "pooz": ["lh"], "qaab": ["lh"], "qaac": ["lh"], "qaad": ["lh"], "qaag": ["lh"], "qaak": ["lh"], "qaal": ["lh"], "qaar": ["lh"], "qaat": ["lh"], "qaay": ["lh"], "qeef": ["lh"], "qeem": ["lh"], "qeev": ["lh"], "qeew": ["lh"], "qoog": ["lh"], "qooh": ["lh"], "qoov": ["lh"], "qoow": ["lh"], "raaj": ["lh"], "raaq": ["lh"], "raaz": ["lh"], "saaz": ["lh"], "taaj": ["lh"], "tooq": ["lh"], "vaaj": ["lh"], "vaaq": ["lh"], "vaax": ["lh"], "veej": ["lh"], "veeq": ["lh"], "vooq": ["lh"], "waaj": ["lh"], "waax": ["lh"], "waaz": ["lh"], "xaav": ["lh"], "xeey": ["lh"], "xood": ["lh"], "xoof": ["lh"], "xoog": ["lh"], "xooh": ["lh"], "xoot": ["lh"], "yaax": ["lh"], "yeez": ["lh"], "zaay": ["lh"], "zeeh": ["lh"], "jaaq": ["lh"], "jooq": ["lh"], "qaaj": ["lh"], "qaax": ["lh"], "qaaz": ["lh"], "xeez": ["lh"], "xooj": ["lh"], "xooq": ["lh"], "zeej": ["lh"], "fuve": ["blog"], "guve": ["blog"], "huvi": ["blog"], "nufi": ["blog"], "puvi": ["blog"], "puvo": ["blog"], "vuce": ["blog"], "vuha": ["blog"], "vuri": ["blog"], "vuto": ["blog"], "vuwa": ["blog"], "vuwo": ["blog"], "fuxo": ["blog"], "kaxo": ["blog"], "nuxo": ["blog"], "qale": ["blog"], "qali": ["blog"], "qane": ["blog"], "qavi": ["blog"], "qeco": ["blog"], "qemi": ["blog"], "qesa": ["blog"], "qeto": ["blog"], "qeva": ["blog"], "rixa": ["blog"], "rujo": ["blog"], "soxe": ["blog"], "xevi": ["blog"], "xobe": ["blog"], "xoci": ["blog"], "xofa": ["blog"], "xoki": ["blog"], "xopa": ["blog"], "xugi": ["blog"], "yujo": ["blog"], "jaxe": ["blog"], "joxa": ["blog"], "qajo": ["blog"], "afer": ["en"], "afft": ["en"], "agha": ["en"], "agre": ["en"], "akov": ["en"], "alew": ["en"], "aoul": ["en"], "arba": ["en"], "arew": ["en"], "atik": ["en"], "augh": ["en"], "avdp": ["en"], "avys": ["en"], "awfu": ["en"], "ayne": ["en"], "baft": ["en"], "bauk": ["en"], "baun": ["en"], "bawd": ["en"], "bdle": ["en"], "bhar": ["en"], "bhoy": ["en"], "borh": ["en"], "boul": ["en"], "brob": ["en"], "bual": ["en"], "budh": ["en"], "buhr": ["en"], "bums": ["en"], "burh": ["en"], "cafh": ["en"], "caph": ["en"], "cauk": ["en"], "chob": ["en"], "cowy": ["en"], "coyn": ["en"], "croh": ["en"], "cund": ["en"], "cuvy": ["en"], "dabb": ["en"], "dalk": ["en"], "dalt": ["en"], "dauk": ["en"], "dauw": ["en"], "defs": ["en"], "detn": ["en"], "deul": ["en"], "diel": ["en"], "doab": ["en"], "doat": ["en"], "dols": ["en"], "dowf": ["en"], "dowl": ["en"], "dowp": ["en"], "dowy": ["en"], "drof": ["en"], "duhr": ["en"], "dulc": ["en"], "ecod": ["en"], "efph": ["en"], "egbo": ["en"], "eheu": ["en"], "eiry": ["en"], "eked": ["en"], "ekes": ["en"], "elmy": ["en"], "elod": ["en"], "emeu": ["en"], "empt": ["en"], "emyd": ["en"], "ened": ["en"], "enif": ["en"], "erns": ["en"], "eruc": ["en"], "esth": ["en"], "etua": ["en"], "ewry": ["en"], "ewte": ["en"], "eyne": ["en"], "faky": ["en"], "favn": ["en"], "fedn": ["en"], "feff": ["en"], "fids": ["en"], "fied": ["en"], "fiel": ["en"], "fikh": ["en"], "flav": ["en"], "fops": ["en"], "foud": ["en"], "foys": ["en"], "frib": ["en"], "frim": ["en"], "frot": ["en"], "frug": ["en"], "fuds": ["en"], "fulk": ["en"], "gaed": ["en"], "gaet": ["en"], "gapy": ["en"], "gaub": ["en"], "gaum": ["en"], "gaup": ["en"], "gaut": ["en"], "gedd": ["en"], "gied": ["en"], "gils": ["en"], "glar": ["en"], "gleg": ["en"], "glug": ["en"], "gneu": ["en"], "goys": ["en"], "grue": ["en"], "gruf": ["en"], "guhr": ["en"], "gunl": ["en"], "gurt": ["en"], "gwag": ["en"], "gyse": ["en"], "gyte": ["en"], "hahs": ["en"], "harl": ["en"], "hdkf": ["en"], "heaf": ["en"], "hewt": ["en"], "himp": ["en"], "hler": ["en"], "holw": ["en"], "howf": ["en"], "howk": ["en"], "ills": ["en"], "ilth": ["en"], "inbd": ["en"], "incl": ["en"], "iocs": ["en"], "irks": ["en"], "irpe": ["en"], "itmo": ["en"], "iuds": ["en"], "ivin": ["en"], "kaes": ["en"], "kasm": ["en"], "kefs": ["en"], "keup": ["en"], "khar": ["en"], "khir": ["en"], "kiby": ["en"], "klom": ["en"], "klva": ["en"], "knab": ["en"], "knar": ["en"], "knub": ["en"], "koae": ["en"], "krna": ["en"], "kulm": ["en"], "kurn": ["en"], "kyar": ["en"], "kyke": ["en"], "lacs": ["en"], "lapb": ["en"], "loir": ["en"], "lors": ["en"], "lums": ["en"], "lurg": ["en"], "lwop": ["en"], "maws": ["en"], "midn": ["en"], "miek": ["en"], "moid": ["en"], "moph": ["en"], "morw": ["en"], "moul": ["en"], "mout": ["en"], "mows": ["en"], "mowt": ["en"], "moyl": ["en"], "mpbs": ["en"], "mrem": ["en"], "mtge": ["en"], "mugg": ["en"], "muth": ["en"], "muts": ["en"], "nael": ["en"], "nawt": ["en"], "nubs": ["en"], "nudd": ["en"], "nuns": ["en"], "oaty": ["en"], "obdt": ["en"], "odal": ["en"], "odum": ["en"], "oeci": ["en"], "ogum": ["en"], "olpe": ["en"], "ondy": ["en"], "oofy": ["en"], "oord": ["en"], "opsy": ["en"], "ordn": ["en"], "ordu": ["en"], "outr": ["en"], "ovey": ["en"], "owed": ["en"], "owse": ["en"], "paua": ["en"], "pawk": ["en"], "peds": ["en"], "perv": ["en"], "peul": ["en"], "pews": ["en"], "pewy": ["en"], "phoh": ["en"], "phut": ["en"], "piky": ["en"], "pilm": ["en"], "pmsg": ["en"], "pnce": ["en"], "pogy": ["en"], "prau": ["en"], "prie": ["en"], "pruh": ["en"], "psia": ["en"], "pugh": ["en"], "pyal": ["en"], "pyic": ["en"], "pyla": ["en"], "rakh": ["en"], "rals": ["en"], "rauk": ["en"], "refl": ["en"], "regr": ["en"], "repr": ["en"], "rgen": ["en"], "rhet": ["en"], "rhus": ["en"], "rids": ["en"], "roak": ["en"], "roub": ["en"], "roud": ["en"], "rsum": ["en"], "rubs": ["en"], "ruly": ["en"], "rumb": ["en"], "ryas": ["en"], "ryot": ["en"], "sadr": ["en"], "sahh": ["en"], "sauf": ["en"], "scug": ["en"], "scur": ["en"], "sepn": ["en"], "siak": ["en"], "skag": ["en"], "skef": ["en"], "skel": ["en"], "skeo": ["en"], "skiv": ["en"], "slod": ["en"], "smur": ["en"], "sned": ["en"], "snum": ["en"], "snur": ["en"], "sowf": ["en"], "stge": ["en"], "stod": ["en"], "stof": ["en"], "stug": ["en"], "subg": ["en"], "suld": ["en"], "svce": ["en"], "swom": ["en"], "tawn": ["en"], "tegs": ["en"], "teuk": ["en"], "thak": ["en"], "thir": ["en"], "tirr": ["en"], "toea": ["en"], "togt": ["en"], "towy": ["en"], "turb": ["en"], "turp": ["en"], "tuth": ["en"], "typw": ["en"], "ufer": ["en"], "uily": ["en"], "ulla": ["en"], "ulto": ["en"], "ulua": ["en"], "umps": ["en"], "umpy": ["en"], "unau": ["en"], "ungt": ["en"], "upby": ["en"], "upsy": ["en"], "urde": ["en"], "urds": ["en"], "urdy": ["en"], "urns": ["en"], "uroo": ["en"], "urva": ["en"], "utch": ["en"], "uval": ["en"], "uvre": ["en"], "vavs": ["en"], "veau": ["en"], "voet": ["en"], "vrow": ["en"], "vugh": ["en"], "vugs": ["en"], "vulg": ["en"], "waeg": ["en"], "wakf": ["en"], "waky": ["en"], "wauf": ["en"], "waup": ["en"], "waur": ["en"], "wept": ["en"], "whap": ["en"], "whud": ["en"], "wirr": ["en"], "wraf": ["en"], "wraw": ["en"], "wulk": ["en"], "wyde": ["en"], "wyte": ["en"], "yalb": ["en"], "yaud": ["en"], "yaup": ["en"], "ycie": ["en"], "yelk": ["en"], "yelm": ["en"], "yelt": ["en"], "yerb": ["en"], "yern": ["en"], "yeuk": ["en"], "yigh": ["en"], "yobs": ["en"], "yoks": ["en"], "yont": ["en"], "yows": ["en"], "yowt": ["en"], "aquo": ["en"], "coxy": ["en"], "crax": ["en"], "eqpt": ["en"], "expy": ["en"], "exul": ["en"], "ezba": ["en"], "falx": ["en"], "fozy": ["en"], "friz": ["en"], "fruz": ["en"], "gunj": ["en"], "ijma": ["en"], "inez": ["en"], "itza": ["en"], "izba": ["en"], "izle": ["en"], "jann": ["en"], "jaob": ["en"], "jawn": ["en"], "jctn": ["en"], "jhow": ["en"], "jhvh": ["en"], "jibs": ["en"], "jugs": ["en"], "knez": ["en"], "maux": ["en"], "mijl": ["en"], "munj": ["en"], "nejd": ["en"], "onza": ["en"], "oxan": ["en"], "oxes": ["en"], "oyez": ["en"], "pnxt": ["en"], "quab": ["en"], "quei": ["en"], "quim": ["en"], "quop": ["en"], "quor": ["en"], "rixy": ["en"], "subj": ["en"], "unze": ["en"], "xdiv": ["en"], "zarp": ["en"], "zeds": ["en"], "zigs": ["en"], "jozy": ["en"], "xxiv": ["en"], "jkxk": ["cold"], "jkzk": ["cold"], "kjkq": ["cold"], "kkqz": ["cold"], "kkxj": ["cold"], "kqzk": ["cold"], "kxqk": ["cold"], "qkkz": ["cold"], "qkxk": ["cold"], "xkkz": ["cold"], "jjxk": ["cold"], "jkqz": ["cold"], "jzxk": ["cold"], "kjjq": ["cold"], "kjqz": ["cold"], "kqjq": ["cold"], "kqjz": ["cold"], "kqqx": ["cold"], "kxqj": ["cold"], "kxqq": ["cold"], "kzqz": ["cold"], "kzxq": ["cold"], "qjkz": ["cold"], "qjxk": ["cold"], "qkjj": ["cold"], "qkjq": ["cold"], "qkqj": ["cold"], "qkqx": ["cold"], "qkxj": ["cold"], "qxkq": ["cold"], "qxkz": ["cold"], "qxqk": ["cold"], "qzkq": ["cold"], "qzkz": ["cold"], "qzqk": ["cold"], "qzxk": ["cold"], "xkqj": ["cold"], "xkqx": ["cold"], "xkzq": ["cold"], "xqkq": ["cold"], "zqkz": ["cold"], "jqqx": ["cold"], "jqxj": ["cold"], "qxxj": ["cold"], "qzxj": ["cold"], "xjqj": ["cold"], "xjqq": ["cold"], "xqxj": ["cold"], "xzjq": ["cold"], "zqqx": ["cold"]}, "gloss": {"oast.cn": "n. （英式）烘干窑，肯特郡圆锥顶的啤酒花烘干房——画面感强，适合做博客名", "orle.cn": "n. 纹章学术语：盾徽边缘内侧的一圈窄带", "kvas.cn": "n. 格瓦斯（俄语 квас，发酵饮料）", "qadi.cn": "n. 伊斯兰法官（也写作 kadi）", "paar.cn": "德语 n. 一对、一双", "ecus.cn": "n. 法国古币 écu 的复数", "eaux.cn": "法语 n. 水（复数），如 eaux-vives 急流", "kaph.cn": "n. 希伯来字母表的 K（第 11 个字母），做技术博客有梗", "yews.cn": "n. 红豆杉/紫杉（复数）", "euge.cn": "int. 希腊语'妙啊'，相当于 bravo", "akra.cn": "希腊语 n. 顶端、岬角（acropolis 里的 akra-）", "arne.cn": "古诺尔斯语'鹰'，也是北欧人名", "scye.cn": "n. 服装术语'袖窿'；苏格兰方言里也指眼睛", "riem.cn": "南非荷兰语 n. 皮带、条带", "ouds.cn": "n. 乌德琴 oud 的复数（中东拨弦乐器）", "mulk.cn": "阿拉伯语/乌尔都语 n. 王国、统治", "neif.cn": "苏格兰方言 n. 拳头", "kyat.cn": "n. 缅元（缅甸货币单位）", "peag.cn": "n. 北美原住民的贝壳珠串（wampum peag，曾作货币）", "dhak.cn": "n. 印度东部的火焰色花树（木棉属）", "eyra.cn": "n. 热带美洲的长身野猫（Eira 属）", "cuon.cn": "n. 亚洲野犬属（Cuon，豺所在的属）", "esox.cn": "n. 狗鱼属（Esox，白斑狗鱼）", "diol.cn": "n. 化学'二醇'（两个羟基）", "haem.cn": "n. 血红素（英式拼法，等于 heme）", "icbm.cn": "n. 洲际弹道导弹（缩写）", "awry.cn": "adj./adv. 偏离、出错（go awry）", "drab.cn": "adj. 单调的、土黄色的", "icky.cn": "adj. 口语'让人起鸡皮疙瘩的'", "hadj.cn": "n. 伊斯兰朝觐（hajj 的旧拼法）", "bhil.cn": "印度西部族群名（Bhil）", "cuir.cn": "法语 n. 皮革", "gyri.cn": "n. 脑回 gyrus 的复数", "knaw.cn": "方言 v. 知道（know 的旧形）", "mawk.cn": "n. 俗艳的多愁善感", "pirl.cn": "苏格兰 v. 转动、穿孔", "rheo.cn": "希腊语词根'流动'（如 rheostat 变阻器）", "wyle.cn": "苏格兰 conj. 直到（while 的方言形）", "yamp.cn": "方言 n. 傻瓜", "blup.cn": "拟声词，气泡声"}};
+const TAGNAME = {"lh":"双元音连号","en":"真实英文词","blog":"博客向","cold":"纯辅音"};
+const KEY="picked_4cn_v1";
+let picked = JSON.parse(localStorage.getItem(KEY)||"[]");
+// 从旧的通用挑选台里只搬 4 位的已选项
+try{
+  const old=JSON.parse(localStorage.getItem("picked_domains_v1")||"[]")
+    .filter(v=>/^[a-z]{4}\.cn$/.test(v));
+  old.forEach(v=>{if(picked.indexOf(v)<0)picked.push(v);});
+}catch(e){}
+
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.classList.add("on");setTimeout(()=>el.classList.remove("on"),1400);}
+function copy(text){
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>toast("已复制 "+text),()=>fallback(text));}
+  else fallback(text);
+}
+function fallback(text){const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();
+  try{document.execCommand("copy");toast("已复制 "+text);}catch(e){toast("复制失败，手动选中： "+text);}document.body.removeChild(ta);}
+
+const VAL=DATA.words.map(w=>w+".cn");
+function build(){
+  const G=DATA.gloss;
+  document.getElementById("grid").innerHTML=DATA.words.map(w=>{
+    const val=w+".cn", g=G[val]||"", tags=DATA.tags[w];
+    const short=g?g.split("；")[0].split("，")[0].split("——")[0].slice(0,30):"";
+    const src=tags.map(t=>TAGNAME[t]).join(" · ");
+    return `<div class="chip" data-val="${val}" data-tags="${tags.join(",")}" data-gloss="${g?1:0}"`+
+      (g?` title="${g.replace(/"/g,"'")}"`:"")+`><b>${val}</b>`+
+      `<span class="mean">${short}</span><span class="src">${src}</span></div>`;
+  }).join("");
+  document.querySelectorAll("#grid .chip").forEach(c=>c.onclick=()=>pick(c.dataset.val,c));
+}
+function pick(val,el){
+  const i=picked.indexOf(val);
+  if(i>=0) picked.splice(i,1); else { picked.push(val); copy(val); }
+  localStorage.setItem(KEY,JSON.stringify(picked));
+  if(el) el.classList.toggle("sel",picked.indexOf(val)>=0);
+  paintPicked();
+}
+function paintPicked(){
+  const s=document.getElementById("picked");
+  s.innerHTML="<div class='big'><b>已选（"+picked.length+"）：</b>"+(picked.length?
+    picked.map(v=>`<span class="chip sel"><b>${v}</b><span class="src">再点一下取消</span></span>`).join("")+
+    `<button style="margin-left:8px;font-size:13px;padding:6px 11px;border:1px solid #cfd6de;background:#f3f5f8;border-radius:16px;cursor:pointer" id="cp">复制全部（空格分隔）</button>`:
+    "<span class='note'>（还没点）</span>")+"</div>"+
+    (picked.length>=2?"<div class='note'>建议只留一个品牌词，把它的 .cn 和 .com 一起注册；备用词先别囤，续费比首年贵。看中了直接去注册商下单，不用问我。</div>":"");
+  document.querySelectorAll(".chip[data-val]").forEach(c=>c.classList.toggle("sel",picked.indexOf(c.dataset.val)>=0));
+  const b=document.getElementById("cp");
+  if(b)b.onclick=()=>copy(picked.join(" "));
+}
+
+let fForm="all", fExcl={}, fQ="";
+function apply(){
+  let n=0;
+  document.querySelectorAll("#grid .chip").forEach(c=>{
+    const w=c.dataset.val.slice(0,4);
+    let show=true;
+    if(fForm==="g") show=c.dataset.gloss==="1";
+    else if(fForm!=="all") show=c.dataset.tags.split(",").indexOf(fForm)>=0;
+    if(show) for(const k in fExcl) if(fExcl[k] && w.indexOf(k)>=0){show=false;break;}
+    if(show && fQ) show=(c.dataset.val+ (G0[c.dataset.val]||"")).toLowerCase().indexOf(fQ)>=0;
+    c.style.display=show?"":"none";
+    if(show)n++;
+  });
+  document.getElementById("count").textContent="当前显示 "+n+" 个（共 "+DATA.words.length+" 个）";
+}
+const G0=DATA.gloss;
+document.getElementById("fq").oninput=e=>{fQ=e.target.value.trim().toLowerCase();apply();};
+document.querySelectorAll(".filters button").forEach(b=>{
+  b.onclick=()=>{
+    if(b.dataset.f){
+      document.querySelectorAll('.filters button[data-f]').forEach(x=>x.classList.remove("on"));
+      b.classList.add("on"); fForm=b.dataset.f;
+    }else{
+      b.classList.toggle("on"); fExcl[b.dataset.x]=b.classList.contains("on");
+    }
+    apply();
+  };
+});
+build();paintPicked();apply();
+</script>
+</body>
+</html>

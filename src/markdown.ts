@@ -61,9 +61,13 @@ function musicBlock(label: string): string {
 /** @[video](url) 或 @[video](url "封面URL") 视频块（m3u8 输出占位 video，前端水合挂 HLS；mp4 直出 src）。
  *  无封面时使用站点统一封面 defaultPoster（后台设置） */
 function videoBlock(url: string, poster: string, defaultPoster = "", r2Domain?: string, b2Domain?: string): string {
+  const rawUrl = url.replace(/&amp;/g, "&");
+  // 站内 iframe 白名单（如 /domains 工具页）：输出占位容器，前端 hydrateVideos 注入 iframe
+  if (/^\//.test(rawUrl) && /^\/domains/.test(rawUrl)) {
+    return `<div class="article-video"><div class="page-embed" data-embed-src="${escapeHtml(rawUrl)}"></div></div>`;
+  }
   // 站外嵌入（B站/YouTube）：输出带 provider/vid 的占位容器，前端 hydrateVideos 注入 iframe。
   // 不能直出 <iframe>——客户端 sanitizeHtml 会过滤掉 iframe。
-  const rawUrl = url.replace(/&amp;/g, "&");
   const emb = parseEmbed(rawUrl);
   if (emb) {
     return `<div class="article-video"><div class="video-embed" data-embed-provider="${emb.provider}" data-embed-vid="${escapeHtml(emb.vid)}"></div></div>`;
