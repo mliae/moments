@@ -29,7 +29,7 @@ import { analyticsPublicRoutes, analyticsAdminRoutes } from "./routes/analytics"
 import opsRoutes, { runUptimeCheck, recordPerf } from "./routes/ops";
 import { getSettings } from "./settings";
 import { detectLang, parseLangs } from "./i18n";
-import { keyToSrc, ensureSchema, type PostRow } from "./db";
+import { keyToSrc, ensureSchema, type PostRow, type MomentRow } from "./db";
 import { isAdmin, hasAdminPassword, ADMIN_COOKIE } from "./auth";
 import { detectAttack, isBlocked, recordAttack, recordError } from "./security";
 import {
@@ -39,6 +39,8 @@ import {
   collectionJsonLd,
   postJsonLd,
   renderPostSsr,
+  renderMomentListSsr,
+  renderPostListSsr,
   robotsTxt,
   sitemapXml,
   rssXml,
@@ -500,7 +502,12 @@ app.get("/", async c => {
     siteName: s.site_title,
     jsonLd: websiteJsonLd(origin, s),
   });
-  return serveSsr(c, html, { title: s.site_title, description: s.essay_subtitle, head });
+  // SSR body：爬虫首页可见说说内容（前端接管后自动替换）
+  const momentRows = await c.env.DB
+    .prepare(`SELECT * FROM moments ORDER BY id DESC LIMIT 20`)
+    .all<MomentRow>();
+  const body = renderMomentListSsr(momentRows.results ?? [], s.r2_domain, s.b2_domain);
+  return serveSsr(c, html, { title: s.site_title, description: s.essay_subtitle, head, body });
 });
 
 app.get("/posts", async c => {
@@ -517,7 +524,9 @@ app.get("/posts", async c => {
     jsonLd: blogJsonLd(origin, s, posts),
   });
   const html = await getIndexHtml(c);
-  return serveSsr(c, html, { title, description, head });
+  // SSR body：爬虫可见全部文章列表（前端接管后自动替换）
+  const body = renderPostListSsr(posts, s.r2_domain, s.b2_domain);
+  return serveSsr(c, html, { title, description, head, body });
 });
 
 app.get("/photos", async c => {

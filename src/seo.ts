@@ -5,8 +5,8 @@
  * - robots / sitemap / rss
  */
 import type { SiteSettings } from "./settings";
-import type { PostRow } from "./db";
-import { keyToSrc, serializePost } from "./db";
+import type { PostRow, MomentRow } from "./db";
+import { keyToSrc, serializePost, serializeMoment } from "./db";
 import { renderMarkdownSafe } from "./markdown";
 
 const esc = (s: string) =>
@@ -169,6 +169,39 @@ export function renderPostSsr(row: PostRow, commentCount: number, defaultPoster 
         </div>
         </div>
       </div>`;
+}
+
+/** 说说列表 SSR：爬虫视角首页可见真实内容（前端接管后自动替换） */
+export function renderMomentListSsr(rows: MomentRow[], r2Domain?: string, b2Domain?: string): string {
+  const items = rows.map(row => {
+    const m = serializeMoment(row, undefined, r2Domain, b2Domain);
+    const text = (m.content || "").replace(/[#*`>_\-!\[\]]/g, "").replace(/\n+/g, " ").trim().slice(0, 300);
+    const imgs = (m.images || []).slice(0, 3)
+      .map(src => `        <img src="${esc(src)}" alt="" loading="lazy" />`)
+      .join("\n");
+    return `      <article class="bber-item" data-ssr-moment="${m.id}">
+        <div class="bber-content"><p>${esc(text)}</p></div>${imgs ? `\n        <div class="bber-images">\n${imgs}\n        </div>` : ""}${m.location ? `\n        <div class="bber-meta"><time datetime="${escAttr(m.created_at)}">${esc(fmtDate(m.created_at))}</time> · ${esc(m.location)}</div>` : `\n        <div class="bber-meta"><time datetime="${escAttr(m.created_at)}">${esc(fmtDate(m.created_at))}</time></div>`}
+      </article>`;
+  }).join("\n");
+  return `    <div class="bber" data-ssr-list>
+${items}
+    </div>`;
+}
+
+/** 文章列表 SSR：爬虫视角 /posts 可见全部文章（前端接管后自动替换） */
+export function renderPostListSsr(rows: PostRow[], r2Domain?: string, b2Domain?: string): string {
+  const items = rows.map(row => {
+    const p = serializePost(row, false, r2Domain, b2Domain);
+    const href = "/post/" + encodeURIComponent(p.slug);
+    return `      <a class="post-item${p.pinned ? " post-item--pinned" : ""}" href="${escAttr(href)}" data-ssr-post="${escAttr(p.slug)}">
+        <h2>${p.pinned ? PIN_BADGE : ""}${esc(p.title)}</h2>
+        <p class="post-excerpt">${esc(p.excerpt || "")}</p>
+        <time datetime="${escAttr(p.created_at)}">${esc(fmtDate(p.created_at))}</time>
+      </a>`;
+  }).join("\n");
+  return `    <div class="post-list" data-ssr-list>
+${items}
+    </div>`;
 }
 
 /* ==================== robots / sitemap / rss ==================== */
