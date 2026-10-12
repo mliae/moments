@@ -186,11 +186,6 @@
         },
         renderer(token) {
           const url = String(token.url || "");
-          // 站内页面嵌入（如 /domains 工具页）：与 markdown.ts videoBlock 保持一致，
-          // 输出占位容器交给 hydrateVideos 注入 iframe。缺这一分支时客户端重绘
-          // （SPA 内导航/说说/译文/预览）会退化成 <video src="/domains"> 黑盒。
-          if (/^\/domains/.test(url))
-            return `<div class="article-video"><div class="page-embed" data-embed-src="${esc(url)}"></div></div>`;
           const emb = parseEmbedUrl(url);
           if (emb) return `<div class="article-video">${embedBoxHtml(emb)}</div>`;
           const poster = resolveVideoPoster(token.poster);
@@ -1295,17 +1290,6 @@
   }
 
   function hydrateVideos(root) {
-    // 站内页面嵌入（如 /domains 工具页）：占位容器 → 注入 iframe
-    root.querySelectorAll(".page-embed[data-embed-src]:not([data-embed-ready])").forEach(el => {
-      el.dataset.embedReady = "1";
-      const src = el.dataset.embedSrc;
-      if (!src) return;
-      const iframe = document.createElement("iframe");
-      iframe.src = src;
-      iframe.style.cssText = "width:100%;min-height:80vh;border:1px solid var(--border-color,#e5e7eb);border-radius:12px;background:#fff;";
-      iframe.loading = "lazy";
-      el.appendChild(iframe);
-    });
     // 站外嵌入视频：占位容器 → 注入真正的 iframe（用 createElement，避开 sanitizeHtml 过滤）
     root.querySelectorAll(".video-embed[data-embed-provider]:not([data-embed-ready])").forEach(el => {
       el.dataset.embedReady = "1";
