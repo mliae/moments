@@ -9704,6 +9704,12 @@
     }
     const btn = e.target.closest("[data-music-prev]");
     if (btn) { takeAutoplayMute(); prevSong(); return; }
+    // 展开态：点封面 → 播放/暂停（封面上本来就有播放/暂停图标，点击语义一致）
+    if (e.target.closest(".music-cover-wrap")) {
+      takeAutoplayMute();
+      togglePlay();
+      return;
+    }
     if (e.target.closest("[data-music-mode]")) { cyclePlayMode(); return; }
     if (e.target.closest("[data-music-play]")) { takeAutoplayMute(); togglePlay(); return; }
     if (e.target.closest("[data-music-next]")) { takeAutoplayMute(); nextSong(); return; }
@@ -9718,6 +9724,27 @@
       return;
     }
   });
+
+  // hover 展开/收起（仅桌面端：有悬停能力且指针精确的设备）
+  // 绑在 #musicPlayer（含胶囊 + 播放列表 + 歌词面板），鼠标在三者间移动算"还在里面"不会闪。
+  // 触屏设备保持原来的"点球展开 / 点 X 收起"。
+  if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+    let hoverTimer = null;
+    musicEl.addEventListener("mouseenter", () => {
+      if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+      if (musicCapsule.classList.contains("collapsed")) setCapsuleCollapsed(false);
+    });
+    musicEl.addEventListener("mouseleave", () => {
+      // 延迟收起，期间移回即取消；收起时顺手关闭歌词/播放列表面板（和点 X 一致）
+      hoverTimer = setTimeout(() => {
+        hoverTimer = null;
+        if (musicCapsule.classList.contains("collapsed")) return;
+        setCapsuleCollapsed(true);
+        if (musicLyric) musicLyric.hidden = true;
+        if (musicPlaylist) musicPlaylist.hidden = true;
+      }, 260);
+    });
+  }
 
   // 播放列表关闭
   musicPlaylist.querySelector("[data-music-close-list]").addEventListener("click", () => {
