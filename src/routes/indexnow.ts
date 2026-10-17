@@ -10,13 +10,14 @@ import type { HonoEnv } from "../types";
 import { requireAdmin } from "../auth";
 import { getSettings } from "../settings";
 import { pingIndexNow, getIndexNowLog } from "../indexnow";
+import { canonicalOrigin } from "../seo";
 
 const app = new Hono<HonoEnv>();
 app.use("*", requireAdmin);
 
-function originOf(c: Context): string {
+function originOf(c: Context, siteDomain: string): string {
   try {
-    return new URL(c.req.url).origin;
+    return canonicalOrigin(siteDomain, new URL(c.req.url).origin);
   } catch {
     return "";
   }
@@ -44,7 +45,7 @@ app.post("/push", async c => {
   if (!relUrls.length) return fail(c, "没有可推送的已发布文章", 400);
   const s = await getSettings(c.env.DB);
   if (!s.indexnow_key?.trim()) return fail(c, "请先在上方填写 IndexNow key 并保存", 400);
-  const results = await pingIndexNow(c.env.DB, s, relUrls, originOf(c));
+  const results = await pingIndexNow(c.env.DB, s, relUrls, originOf(c, s.site_domain));
   const okN = results.filter(r => r.status === "ok").length;
   return ok(c, { pushed: relUrls.length, urls: relUrls, results, ok: okN, total: results.length }, `已推送 ${relUrls.length} 篇，${okN}/${results.length} 个端点成功`);
 });
@@ -60,7 +61,7 @@ app.post("/push-urls", async c => {
   if (!urls.length) return fail(c, "urls 不能为空", 400);
   const s = await getSettings(c.env.DB);
   if (!s.indexnow_key?.trim()) return fail(c, "请先填写 IndexNow key", 400);
-  const results = await pingIndexNow(c.env.DB, s, urls, originOf(c));
+  const results = await pingIndexNow(c.env.DB, s, urls, originOf(c, s.site_domain));
   return ok(c, { results });
 });
 

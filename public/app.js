@@ -1038,6 +1038,8 @@
     const list = group.filter(Boolean);
     if (!list.length) return;
     const index = Math.max(0, list.indexOf(src));
+    // 记录打开前的滚动位置，关闭灯箱后恢复（Fancybox 关闭可能重置滚动）
+    const savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
     try {
       await loadLightboxAssets();
     } catch (e) {
@@ -1068,11 +1070,20 @@
       startIndex: index,
       infinite: true,              // 循环切换
       dragToClose: false,          // 避免误触关闭
+      Hash: false,                 // 禁用 hash 插件：防止打开/关闭灯箱改动 URL 触发 SPA 路由重载
+      hideScrollbar: false,        // 不让 Fancybox 改 body 滚动条，避免关闭后滚动位置丢失
+      placeFocusBack: false,       // 关闭后不把焦点放回图片，消除"跳顶再跳回"的根源
       Images: { zoom: true },      // 滚轮/双击缩放
       Toolbar: { display: toolbar },
       on: {
         done: () => { fbOpen = true; lockBodyScroll(); },
-        destroy: () => { fbOpen = false; unlockBodyScroll(); holder.remove(); },
+        destroy: () => {
+          fbOpen = false;
+          unlockBodyScroll();
+          holder.remove();
+          // 兜底：等 Fancybox 清理完再恢复打开前的滚动位置，确保位置不动
+          setTimeout(() => window.scrollTo(0, savedScrollY), 80);
+        },
       },
     });
   }
@@ -4507,7 +4518,6 @@
           }
           <section class="article-comments" data-comment-section>
             <h3 class="comment-section-title">${t("comment.title")}<span class="comment-count-badge" data-article-comments-count></span></h3>
-            <div class="comment-list" data-comment-list><span class="spinner"></span></div>
             <form class="comment-form-wrap comment-form-inline" data-comment-form data-ctype="post" data-cid="${p.id}" data-slug="${esc(p.slug)}">
               <div class="comment-form-row comment-user-row">
                 <span class="qq-avatar" data-qq-avatar>${esc((localStorage.getItem("moments_nick") || "?").slice(0, 1).toUpperCase())}</span>
@@ -4531,6 +4541,7 @@
                 <button class="btn primary" type="submit">${t("comment.submit")}</button>
               </div>
             </form>
+            <div class="comment-list" data-comment-list><span class="spinner"></span></div>
           </section>
         </div>
         </div>
@@ -9726,29 +9737,34 @@
   });
 
   // hover 展开/收起（仅桌面端：有悬停能力且指针精确的设备）
-  // 绑在 #musicPlayer（含胶囊 + 播放列表 + 歌词面板），鼠标在三者间移动算"还在里面"不会闪。
+  // 混合模式：鼠标进入胶囊本体立即展开、移出立即收起；
+  // 播放列表/歌词面板可见时视为"钉住"——移出不收，可放心操作列表/歌词。
   // 触屏设备保持原来的"点球展开 / 点 X 收起"。
   if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
-    let hoverTimer = null;
-    musicEl.addEventListener("mouseenter", () => {
-      if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+    const isMusicPinned = () =>
+      (musicPlaylist && !musicPlaylist.hidden) || (musicLyric && !musicLyric.hidden);
+    musicCapsule.addEventListener("mouseenter", () => {
       if (musicCapsule.classList.contains("collapsed")) setCapsuleCollapsed(false);
     });
-    musicEl.addEventListener("mouseleave", () => {
-      // 延迟收起，期间移回即取消；收起时顺手关闭歌词/播放列表面板（和点 X 一致）
-      hoverTimer = setTimeout(() => {
-        hoverTimer = null;
-        if (musicCapsule.classList.contains("collapsed")) return;
-        setCapsuleCollapsed(true);
-        if (musicLyric) musicLyric.hidden = true;
-        if (musicPlaylist) musicPlaylist.hidden = true;
-      }, 260);
+    musicCapsule.addEventListener("mouseleave", () => {
+      if (isMusicPinned()) return; // 钉住中（列表/歌词可见）：不收起
+      if (musicCapsule.classList.contains("collapsed")) return;
+      setCapsuleCollapsed(true);
+      if (musicLyric) musicLyric.hidden = true;
+      if (musicPlaylist) musicPlaylist.hidden = true;
     });
   }
 
   // 播放列表关闭
   musicPlaylist.querySelector("[data-music-close-list]").addEventListener("click", () => {
     musicPlaylist.hidden = true;
+    // 混合模式：关闭列表后鼠标不在胶囊上则收起（仅桌面 hover 设备；触屏保持展开）
+    if (
+      window.matchMedia("(hover: hover) and (pointer: fine)").matches &&
+      !musicCapsule.matches(":hover")
+    ) {
+      setCapsuleCollapsed(true);
+    }
   });
   // 播放列表选歌
   musicPlaylistList.addEventListener("click", e => {

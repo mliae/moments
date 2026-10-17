@@ -17,6 +17,7 @@ import { maybeScheduleAiReply } from "../ai-reply";
 import { getSettings } from "../settings";
 import { ensureAvatar } from "../avatar";
 import { handleCommentMailNotifications } from "../mail";
+import { canonicalOrigin } from "../seo";
 
 const app = new Hono<HonoEnv>();
 
@@ -106,7 +107,7 @@ app.post("/:id/comments", async c => {
     .bind(id)
     .first<{ content: string }>();
   const targetLabel = (moment?.content ?? "").replace(/\s+/g, " ").slice(0, 60) || `说说 #${id}`;
-  const origin = new URL(c.req.url).origin;
+  const origin = canonicalOrigin(s.site_domain, new URL(c.req.url).origin);
   c.executionCtx.waitUntil(
     handleCommentMailNotifications({
       mail: {

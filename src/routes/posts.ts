@@ -14,6 +14,7 @@ import type { HonoEnv } from "../types";
 import { requireAdmin, isAdmin } from "../auth";
 import { getSettings } from "../settings";
 import { pingIndexNow, baiduPush } from "../indexnow";
+import { canonicalOrigin } from "../seo";
 import { serializePost, mediaKeyFrom, type PostRow } from "../db";
 import {
   parseCommentBody,
@@ -175,7 +176,7 @@ app.post("/", requireAdmin, async c => {
   if (!row) return fail(c, "保存失败", 500);
 
   const url = `/post/${encodeURIComponent(slug)}`;
-  const origin = new URL(c.req.url).origin;
+  const origin = canonicalOrigin(s.site_domain, new URL(c.req.url).origin);
   // 发布即自动推送（best-effort，失败不影响保存）
   if (input.status === "published") {
     if (s.indexnow_auto && s.indexnow_key?.trim()) pingIndexNow(c.env.DB, s, [url], origin).catch(() => {});
@@ -218,7 +219,7 @@ app.put("/:id", requireAdmin, async c => {
   const s = await getSettings(c.env.DB);
   const url = `/post/${encodeURIComponent(slug)}`;
   if (input.status === "published") {
-    const origin = new URL(c.req.url).origin;
+    const origin = canonicalOrigin(s.site_domain, new URL(c.req.url).origin);
     if (s.indexnow_auto && s.indexnow_key?.trim()) pingIndexNow(c.env.DB, s, [url], origin).catch(() => {});
     if (s.baidu_push_enabled && s.baidu_push_site?.trim() && s.baidu_push_token?.trim()) baiduPush(c.env.DB, s, [url], origin).catch(() => {});
   }
@@ -256,7 +257,7 @@ app.post("/:id/publish", requireAdmin, async c => {
   if (nextStatus === "published") {
     const s = await getSettings(c.env.DB);
     const url = `/post/${encodeURIComponent(row.slug)}`;
-    const origin = new URL(c.req.url).origin;
+    const origin = canonicalOrigin(s.site_domain, new URL(c.req.url).origin);
     if (s.indexnow_auto && s.indexnow_key?.trim()) pingIndexNow(c.env.DB, s, [url], origin).catch(() => {});
     if (s.baidu_push_enabled && s.baidu_push_site?.trim() && s.baidu_push_token?.trim()) baiduPush(c.env.DB, s, [url], origin).catch(() => {});
   }

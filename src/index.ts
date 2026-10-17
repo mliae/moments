@@ -27,7 +27,7 @@ import baiduAdminRoutes from "./routes/baidu";
 import bgRoutes, { preheatBg } from "./routes/bg";
 import { analyticsPublicRoutes, analyticsAdminRoutes } from "./routes/analytics";
 import opsRoutes, { runUptimeCheck, recordPerf } from "./routes/ops";
-import { getSettings } from "./settings";
+import { getSettings, type SiteSettings } from "./settings";
 import { detectLang, parseLangs } from "./i18n";
 import { keyToSrc, ensureSchema, type PostRow, type MomentRow } from "./db";
 import { isAdmin, hasAdminPassword, ADMIN_COOKIE } from "./auth";
@@ -45,6 +45,7 @@ import {
   sitemapXml,
   rssXml,
   absoluteUrl,
+  canonicalOrigin as resolveCanonicalOrigin,
 } from "./seo";
 
 const app = new Hono<HonoEnv>();
@@ -354,6 +355,14 @@ app.get("/imgproxy", async c => {
 
 /* ==================== SEO 静态文件 ==================== */
 
+/** 规范站点 origin：优先后台 site_domain（如 https://jxe.me）。
+ *  ESA/CDN 回源时请求 host 可能是 workers.dev，若直接用请求 origin，
+ *  canonical/OG/sitemap/rss 等绝对 URL 会错误指向 workers.dev；
+ *  site_domain 已配置时始终以它为准，换域名也无需改代码。 */
+function canonicalOrigin(c: Context<HonoEnv>, s: SiteSettings): string {
+  return resolveCanonicalOrigin(s.site_domain, new URL(c.req.url).origin);
+}
+
 async function publishedPosts(db: D1Database, limit = 500): Promise<PostRow[]> {
   const rows = await db
     .prepare(`SELECT * FROM posts WHERE status = 'published' ORDER BY id DESC LIMIT ?`)
@@ -363,19 +372,21 @@ async function publishedPosts(db: D1Database, limit = 500): Promise<PostRow[]> {
 }
 
 app.get("/robots.txt", async c => {
-  const origin = new URL(c.req.url).origin;
+  const s = await getSettings(c.env.DB);
+  const origin = canonicalOrigin(c, s);
   return c.text(robotsTxt(origin), 200, { "content-type": "text/plain; charset=utf-8" });
 });
 
 app.get("/sitemap.xml", async c => {
-  const origin = new URL(c.req.url).origin;
+  const s = await getSettings(c.env.DB);
+  const origin = canonicalOrigin(c, s);
   const posts = await publishedPosts(c.env.DB);
   return c.text(sitemapXml(origin, posts), 200, { "content-type": "application/xml; charset=utf-8" });
 });
 
 app.get("/rss.xml", async c => {
-  const origin = new URL(c.req.url).origin;
   const s = await getSettings(c.env.DB);
+  const origin = canonicalOrigin(c, s);
   const posts = await publishedPosts(c.env.DB, 50);
   return c.text(rssXml(origin, s, posts), 200, {
     "content-type": "application/rss+xml; charset=utf-8",
@@ -384,8 +395,8 @@ app.get("/rss.xml", async c => {
 
 // /feed 作为 RSS 订阅源别名（通用惯例），与 /rss.xml 输出一致
 app.get("/feed", async c => {
-  const origin = new URL(c.req.url).origin;
   const s = await getSettings(c.env.DB);
+  const origin = canonicalOrigin(c, s);
   const posts = await publishedPosts(c.env.DB, 50);
   return c.text(rssXml(origin, s, posts), 200, {
     "content-type": "application/rss+xml; charset=utf-8",
@@ -485,7 +496,7 @@ async function serveSsr(
 
 app.get("/", async c => {
   const s = await getSettings(c.env.DB);
-  const origin = new URL(c.req.url).origin;
+  const origin = canonicalOrigin(c, s);
   const html = await getIndexHtml(c);
   const image = s.banner_bg_mode === "random"
     ? absoluteUrl(origin, "/api/bg", s.site_domain)
@@ -512,7 +523,7 @@ app.get("/", async c => {
 
 app.get("/posts", async c => {
   const s = await getSettings(c.env.DB);
-  const origin = new URL(c.req.url).origin;
+  const origin = canonicalOrigin(c, s);
   const posts = await publishedPosts(c.env.DB);
   const title = `文章 · ${s.site_title}`;
   const description = `${s.site_title} 的全部文章，共 ${posts.length} 篇`;
@@ -531,7 +542,7 @@ app.get("/posts", async c => {
 
 app.get("/photos", async c => {
   const s = await getSettings(c.env.DB);
-  const origin = new URL(c.req.url).origin;
+  const origin = canonicalOrigin(c, s);
   const countRow = await c.env.DB
     .prepare(`SELECT COUNT(*) AS n FROM photos WHERE visible = 1`)
     .first<{ n: number }>();
@@ -551,7 +562,7 @@ app.get("/photos", async c => {
 
 app.get("/links", async c => {
   const s = await getSettings(c.env.DB);
-  const origin = new URL(c.req.url).origin;
+  const origin = canonicalOrigin(c, s);
   const countRow = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM friends WHERE status = 'approved'`).first<{ n: number }>();
   const count = Number(countRow?.n ?? 0);
   const title = `友链 · ${s.site_title}`;
@@ -569,7 +580,7 @@ app.get("/links", async c => {
 
 app.get("/links/apply", async c => {
   const s = await getSettings(c.env.DB);
-  const origin = new URL(c.req.url).origin;
+  const origin = canonicalOrigin(c, s);
   const title = `申请友链 · ${s.site_title}`;
   const description = `向 ${s.site_title} 申请交换友情链接`;
   const head = buildSeoHead(origin, {
@@ -587,7 +598,7 @@ app.get("/links/apply", async c => {
  *  首次部署且未设密码时，追加 x-admin-setup=1 标记，前端渲染"设置初始密码"表单。 */
 async function serveAdminEntry(c: Context<HonoEnv>, path: string): Promise<Response> {
   const s = await getSettings(c.env.DB);
-  const origin = new URL(c.req.url).origin;
+  const origin = canonicalOrigin(c, s);
   const needsSetup = !(await hasAdminPassword(c.env.DB, c.env.ADMIN_PASSWORD));
   const head =
     buildSeoHead(origin, {
@@ -608,7 +619,7 @@ app.get("/admin", async c => {
   // 已启用秘密入口：已登录管理员跳转到真实入口，其余人得到 404（后台对扫描器隐形）
   if (s.admin_path !== "/admin") {
     if (await isAdmin(c)) return c.redirect(s.admin_path, 302);
-    const origin = new URL(c.req.url).origin;
+    const origin = canonicalOrigin(c, s);
     const head =
       buildSeoHead(origin, {
         title: `页面不存在 · ${s.site_title}`,
@@ -625,7 +636,7 @@ app.get("/admin", async c => {
 
 app.get("/post/:slug", async c => {
   const s = await getSettings(c.env.DB);
-  const origin = new URL(c.req.url).origin;
+  const origin = canonicalOrigin(c, s);
   const slug = c.req.param("slug");
   const post = await c.env.DB.prepare(`SELECT * FROM posts WHERE slug = ?`).bind(slug).first<PostRow>();
 

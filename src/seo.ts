@@ -19,6 +19,21 @@ const esc = (s: string) =>
 
 const escAttr = esc;
 
+/** 规范站点 origin：优先后台 site_domain（如 https://jxe.me），留空回退请求 origin。
+ *  ESA/CDN 回源时请求 host 可能是 workers.dev，若不处理，
+ *  canonical/OG/sitemap/rss/搜索推送等绝对 URL 会错误指向 workers.dev。 */
+export function canonicalOrigin(siteDomain: string, reqOrigin: string): string {
+  const d = (siteDomain || "").trim();
+  if (d) {
+    try {
+      return new URL(d.includes("://") ? d : "https://" + d).origin;
+    } catch {
+      /* 非法值回退请求 origin */
+    }
+  }
+  return reqOrigin;
+}
+
 /** 站内相对路径 → 绝对 URL（图片 key/相对路径均可）。
  *  siteDomain 有值时优先用它（换域名后 SEO/RSS/OG 链接自动跟随），否则用请求 origin。 */
 export function absoluteUrl(origin: string, src: string, siteDomain?: string): string {
@@ -150,7 +165,6 @@ export function renderPostSsr(row: PostRow, commentCount: number, defaultPoster 
           <div class="article-actions"><a class="btn" href="/posts">返回列表</a></div>
           <section class="article-comments" data-comment-section>
             <h3 class="comment-section-title">评论<span class="comment-count-badge" data-article-comments-count>${commentCount || ""}</span></h3>
-            <div class="comment-list" data-comment-list><span class="spinner"></span></div>
             <form class="comment-form-wrap comment-form-inline" data-comment-form data-ctype="post" data-cid="${p.id}" data-slug="${escAttr(p.slug)}">
               <div class="comment-form-row comment-user-row">
                 <span class="qq-avatar" data-qq-avatar>?</span>
@@ -165,6 +179,7 @@ export function renderPostSsr(row: PostRow, commentCount: number, defaultPoster 
                 <button class="btn primary" type="submit">发表评论</button>
               </div>
             </form>
+            <div class="comment-list" data-comment-list><span class="spinner"></span></div>
           </section>
         </div>
         </div>

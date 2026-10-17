@@ -8,13 +8,14 @@ import type { HonoEnv } from "../types";
 import { requireAdmin } from "../auth";
 import { getSettings } from "../settings";
 import { baiduPush } from "../indexnow";
+import { canonicalOrigin } from "../seo";
 
 const app = new Hono<HonoEnv>();
 app.use("*", requireAdmin);
 
-function originOf(c: Context): string {
+function originOf(c: Context, siteDomain: string): string {
   try {
-    return new URL(c.req.url).origin;
+    return canonicalOrigin(siteDomain, new URL(c.req.url).origin);
   } catch {
     return "";
   }
@@ -39,7 +40,7 @@ app.post("/push", async c => {
     .all<{ slug: string }>();
   const relUrls = rows.results.map(r => `/post/${encodeURIComponent(r.slug)}`);
   if (!relUrls.length) return fail(c, "没有可推送的已发布文章", 400);
-  const r = await baiduPush(c.env.DB, s, relUrls, originOf(c));
+  const r = await baiduPush(c.env.DB, s, relUrls, originOf(c, s.site_domain));
   return ok(c, { pushed: relUrls.length, urls: relUrls, ok: r.ok, message: r.message }, r.ok ? `百度推送成功（${r.message}）` : `百度推送失败：${r.message}`);
 });
 
